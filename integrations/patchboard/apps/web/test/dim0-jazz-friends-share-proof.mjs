@@ -62,7 +62,7 @@ async function createBrowserFriend(label, shareLink, role, boardId) {
   const device = await context.newCDPSession(page);
   await device.send("WebAuthn.enable");
   device.on("WebAuthn.credentialAdded", event => { credential = event.credential; });
-  await device.send("WebAuthn.addVirtualAuthenticator", { options: {
+  const { authenticatorId } = await device.send("WebAuthn.addVirtualAuthenticator", { options: {
     protocol: "ctap2", transport: "internal", hasResidentKey: true,
     hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true,
   } });
@@ -75,7 +75,7 @@ async function createBrowserFriend(label, shareLink, role, boardId) {
   assert.equal(snap.body.role, role);
   assert.deepEqual(exceptions, [], "Browser exceptions for " + label);
   console.log("FRIEND_JOINED_CANVAS", label, role);
-  return { page, context, credential, exceptions };
+  return { page, context, credential, exceptions, device, authenticatorId };
 }
 
 async function createLink(page, role = "editor") {
@@ -109,6 +109,26 @@ try {
   assert.notEqual((await A.page.evaluate(async()=> (await(await fetch("/patchboard-private/api/me")).json()).accountId)),
     (await B.page.evaluate(async()=> (await(await fetch("/patchboard-private/api/me")).json()).accountId)));
   console.log("REUSABLE_LINK_TWO_INDEPENDENT_ACCOUNTS_PASS");
+
+  // A signed-in member's interrupted join must show both recovery choices,
+  // without turning a temporary 503 into a terminal/revoked link.
+  const retryTab = await B.context.newPage();
+  try {
+    await retryTab.goto(shareLink);
+    await expect(retryTab.getByRole("button", { name: "Open board" }))
+      .toBeVisible({ timeout: 20000 });
+    await retryTab.route("**/patchboard-private/api/join", route => route.fulfill({
+      status: 503, contentType: "application/json", body: "{}",
+    }));
+    await retryTab.getByRole("button", { name: "Open board" }).click();
+    await expect(retryTab.getByRole("button", { name: "Retry invitation" }))
+      .toBeVisible({ timeout: 20000 });
+    await expect(retryTab.getByRole("button", { name: "Cancel invitation" })).toBeVisible();
+    await retryTab.unroute("**/patchboard-private/api/join");
+    await retryTab.getByRole("button", { name: "Retry invitation" }).click();
+    await expect(retryTab).toHaveURL(origin + "/boards/" + boardId, { timeout: 20000 });
+    console.log("SIGNED_IN_INVITE_503_RETRY_CANCEL_PASS");
+  } finally { await retryTab.close(); }
 
   const marker = "Friend A created " + randomUUID().slice(0, 8);
   const entityId = randomUUID();
@@ -172,9 +192,17 @@ try {
     board_id: boardId, user_id: aIdentity,
   });
   assert.equal(removed.status, 200);
-  const afterRemove = await readCanvas(A.page, boardId);
-  assert.equal(afterRemove.status, 403);
-  console.log("MEMBER_REMOVAL_BLOCKS_READ_PASS");
+  const afterRemove = await A.context.request.get(
+    origin + "/patchboard-private/api/canvas?board_id=" + boardId);
+  assert.equal(afterRemove.status(), 403);
+  const removedWrite = await A.context.request.post(
+    origin + "/patchboard-private/api/canvas/create", {
+      data: { board_id: boardId, kind: "node", payload: { ...payload, id: randomUUID() } },
+    });
+  assert.equal(removedWrite.status(), 403);
+  await expect(A.page).toHaveURL(origin + "/boards?access=removed", { timeout: 20000 });
+  await expect(A.page.getByRole("alert")).toContainText(/Access to that board was removed/);
+  console.log("MEMBER_REMOVAL_EXITS_OPEN_BOARD_PASS");
 
   // Revoking the editor link blocks a newcomer but preserves existing B.
   const editorLinks = await ownerPage.evaluate(async id =>
@@ -277,6 +305,15 @@ try {
   await returning.goto(origin + "/boards/" + boardId);
   await expect(returning.getByRole("button", { name: "Sign in with passkey" })).toBeVisible();
   assert.ok(B.credential, "Missing test passkey from verified friend registration");
+  // Helium permits a single internal virtual authenticator per environment.
+  // The earlier passkey remains stored in B.credential, so remove that device
+  // before attaching a replacement to the new tab. Avoid two simultaneous
+  // internal authenticators, which raises a CDP protocol error in Helium.
+  await B.device.send("WebAuthn.removeVirtualAuthenticator", {
+    authenticatorId: B.authenticatorId,
+  }).catch(error => {
+    if (!/not found|not exist|No authenticator/i.test(String(error))) throw error;
+  });
   const loginDevice = await B.context.newCDPSession(returning);
   await loginDevice.send("WebAuthn.enable");
   const authenticator = await loginDevice.send("WebAuthn.addVirtualAuthenticator", { options: {

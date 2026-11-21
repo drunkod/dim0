@@ -30,6 +30,7 @@ import { InstallScreen } from "@/features/install/screens/install-screen"
 import { ShareLandingScreen } from "@/features/sharing/screens/share-landing"
 import { LocalBoardScreen } from "@/features/board/local/local-board-screen"
 import { currentJazzIdentity } from "@/features/board/jazz/jazz-auth-client"
+import { JazzSessionUnavailable, JazzSessionCheckError } from "@/features/board/jazz/jazz-session-unavailable"
 import { JazzBoardsPage } from "@/features/board/jazz/jazz-boards-page"
 import { JazzInviteLandingPage } from "@/features/board/jazz/jazz-invite-landing-page"
 
@@ -78,7 +79,13 @@ const requireVerifiedAuth = async () => {
  */
 const requireBoardAuth = async ({ location }: { location: { href: string } }) => {
   if (import.meta.env.VITE_DIM0_JAZZ_CANVAS !== "1") return requireVerifiedAuth()
-  if (await currentJazzIdentity()) return
+  try {
+    if (await currentJazzIdentity()) return
+  } catch {
+    // A failed network/session check is NOT a confirmed sign-out. Preserve
+    // the requested board URL and offer Retry without leaking cached content.
+    throw new JazzSessionCheckError()
+  }
   throw redirect({ href: "/signin?next=" + encodeURIComponent(location.href) })
 }
 
@@ -204,6 +211,7 @@ const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: DashboardUrl,
   beforeLoad: requireBoardAuth,
+  errorComponent: import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" ? JazzSessionUnavailable : undefined,
   component: import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" ? JazzBoardsPage : DashboardScreen,
 })
 
@@ -217,6 +225,7 @@ const boardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: BoardUrl,
   beforeLoad: requireBoardAuth,
+  errorComponent: import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" ? JazzSessionUnavailable : undefined,
   component: BoardScreen,
 })
 

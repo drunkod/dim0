@@ -294,6 +294,13 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
       setBoardRole(role)
       setCanEdit(role === "owner" || role === "member")
     },
+    onAccessRemoved: (status) => {
+      setCanEdit(false)
+      setBoardRole(null)
+      setReady(false)
+      setIsLoading(true)
+      window.location.replace(status === 401 ? "/signin" : "/boards?access=removed")
+    },
     onReady: () => {
       setIsLoading(false)
       setReady(true)

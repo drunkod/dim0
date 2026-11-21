@@ -113,6 +113,11 @@ export function JazzBoardsPage() {
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-5 px-6 py-10 text-foreground">
       <h1 className="text-3xl font-semibold">Boards</h1>
+      {new URLSearchParams(window.location.search).get("access") === "removed" && (
+        <p role="alert" className="rounded-lg border border-destructive px-4 py-3 text-sm text-destructive">
+          Access to that board was removed. Ask the owner to invite you again.
+        </p>
+      )}
       {pendingInvite && (
         <div role="status" className="rounded-lg border bg-muted/30 p-3 text-sm">
           {session ? "Invitation pending. Retry to join or cancel to use your other boards." :
