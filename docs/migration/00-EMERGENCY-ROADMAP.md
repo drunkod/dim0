@@ -55,8 +55,8 @@ flowchart TD
 | P0.1 | Import Patchboard's Jazz 2, OAuth, HTTP/MCP server, policies and tests | Source present and unchanged except isolated port changes | **Done** | 0.5 day |
 | P0.2 | Canonical `canvasEntities` table with append-only migration; transaction-safe CRUD | Create/update/delete, role and restart tests | **Implemented, isolated test passed** | 1–2 days |
 | P0.3 | Add OAuth MCP canvas entity tools and same-origin REST adapter | End-to-end private OAuth MCP proof | **Implemented; isolated private OAuth/CRUD CI passed** | 1 day |
-| P0.4 | Bind Dim0 CanvasStore hydration and user edit batches to Jazz | Two-user live edit/refresh including applets | **Not done** | 3–6 days |
-| P0.5 | Secure conflict and connection recovery in Jazz-driven canvas | Reconnect, collision, permissions, no lost edits | **Not done** | 2–4 days |
+| P0.4 | Bind Dim0 CanvasStore hydration and user edit batches to Jazz | Two-user live edit/refresh including applets | **Opt-in hook + authenticated SSE implemented; two-client acceptance pending** | 3–6 days |
+| P0.5 | Secure conflict and connection recovery in Jazz-driven canvas | Reconnect, collision, permissions, no lost edits | **CAS and fail-closed conflict handling added; durable offline outbox and rebase not done** | 2–4 days |
 | P0.6 | Tailscale route on isolated local port and only selected HTTPS mount | Live WSS and remote MCP SDK access through Funnel | **Not deployed** | 1–2 days |
 | P1.0 | Reconcile Dim0 auth, rooms, membership, invites and identity with Patchboard | Passkey/private/OAuth parity matrix green | **Not done** | 3–6 days |
 | P1.1 | Migrate all remaining Dim0 business tables/metadata to Jazz | All domain entities mapped; no Postgres/Qdrant business writes | **Not done** | 8–15 days |
@@ -77,7 +77,7 @@ The estimates overlap, are engineering planning ranges and assume the pre-existi
 - `webui/src/features/board/jazz/jazz-canvas-api.ts`: **unmounted frontend transport adapter**, preserving complete Dim0 note/link JSON.
 - Jazz and transport unit tests; complete CI and end-to-end gates must be checked below.
 
-**Critical missing connection:** `webui/src/features/board/harness/canvas/harness-canvas.tsx` still invokes `useWsCollab` or `useBoardSyncV2` with Dim0 oplog/GraphStore. Implement a Jazz-backed hydration/subscription/edit path, bypass those old transports for migrated boards, and maintain the agent's in-process `CanvasStore` references. This change must prevent echo loops, handle browser collisions and model live permissions. REST polling alone is not accepted as Jazz-native collaboration.
+**Current development wiring:** `webui/src/features/board/harness/canvas/harness-canvas.tsx` can opt into the Jazz hook with `VITE_DIM0_JAZZ_CANVAS=1`, bypassing both old sync hooks. `integrations/patchboard/apps/server/src/private-canvas-stream.ts` streams actual Jazz live-query snapshots via authenticated SSE, and local canvas edits use versioned REST writes. This is NOT a completed migration: it lacks offline durable outbox, full board metadata/navigation/groups, non-canvas domains, multi-user Dim0 E2E, and Tailscale acceptance. Default behavior remains upstream Dim0.
 
 ## Definition of done: release gates
 

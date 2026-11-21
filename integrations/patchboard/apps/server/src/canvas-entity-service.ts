@@ -73,6 +73,18 @@ function projection(row: {
   return { ...row, payload: row.payload as CanvasPayload };
 }
 
+/** Derive a Dim0 edit role from Jazz membership, never from a client claim. */
+export async function canvasBoardRole(
+  db: Db, boardId: string, actorId: string,
+): Promise<"owner" | "member" | "viewer"> {
+  const board = await db.one(app.boards.where({ id: boardId }));
+  if (!board) throw new CanvasPermissionDenied();
+  if (board.ownerId === actorId) return "owner";
+  const member = await db.one(app.boardMembers.where({ boardId, userId: actorId }));
+  if (!member) throw new CanvasPermissionDenied();
+  return member.role === "editor" || member.role === "admin" ? "member" : "viewer";
+}
+
 /** Read a bounded Jazz-backed board entity snapshot with verified membership. */
 export async function listCanvasEntities(
   db: Db, boardId: string, actorId: string,

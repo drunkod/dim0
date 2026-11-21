@@ -16,6 +16,7 @@ export type JazzCanvasRecord = {
 
 export type JazzCanvasSnapshot = {
   board_id: string
+  role?: "owner" | "member" | "viewer"
   entities: JazzCanvasRecord[]
 }
 
@@ -55,6 +56,34 @@ async function jsonRequest<T>(
 /** Fetch a bounded Jazz snapshot for the current authenticated board. */
 export function loadJazzCanvas(boardId: string): Promise<JazzCanvasSnapshot> {
   return jsonRequest("load", "?board_id=" + encodeURIComponent(boardId))
+}
+
+/** Receive the authenticated Jazz live-query snapshots over a same-origin SSE bridge.
+ * EventSource reconnects automatically; snapshots include deletions, not just upserts.
+ */
+export function subscribeJazzCanvas(
+  boardId: string,
+  onSnapshot: (snapshot: JazzCanvasSnapshot) => void,
+  onError?: (error: Error) => void,
+): () => void {
+  const source = new EventSource(
+    API_ROOT + "/stream?board_id=" + encodeURIComponent(boardId),
+    { withCredentials: true },
+  )
+  source.addEventListener("snapshot", (event) => {
+    try {
+      const snapshot = JSON.parse((event as MessageEvent<string>).data) as JazzCanvasSnapshot
+      if (snapshot.board_id !== boardId) throw new Error("Jazz stream board mismatch")
+      splitJazzCanvasEntities(snapshot)
+      onSnapshot(snapshot)
+    } catch (error) {
+      onError?.(error instanceof Error ? error : new Error("Invalid Jazz stream data"))
+    }
+  })
+  source.addEventListener("error", () => {
+    onError?.(new Error("Jazz live stream disconnected; reconnect pending"))
+  })
+  return () => source.close()
 }
 
 /** Create a Dim0 node or link in Jazz, retaining its original ID and payload. */

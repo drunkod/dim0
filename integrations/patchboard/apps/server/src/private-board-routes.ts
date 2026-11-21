@@ -5,7 +5,7 @@ import type { Db } from "jazz-tools";
 import { app } from "@patchboard/jazz-schema";
 import { auth } from "./private-auth/auth.ts";
 import {
-  listCanvasEntities, getCanvasEntity, createCanvasEntity,
+  canvasBoardRole, listCanvasEntities, getCanvasEntity, createCanvasEntity,
   updateCanvasEntity, deleteCanvasEntity,
   CanvasPermissionDenied, CanvasConflict, CanvasInvalid, type CanvasPayload,
 } from "./canvas-entity-service.ts";
@@ -155,7 +155,8 @@ export async function privateBoardRequest(
     // Better Auth account, never to an arbitrary actor ID supplied by the browser.
     if (pathname === "/patchboard-private/api/canvas" && request.method === "GET") {
       const boardId = boardIdSchema.parse(url.searchParams.get("board_id"));
-      return json({ board_id: boardId, entities: await listCanvasEntities(db, boardId, accountId) });
+      const role = await canvasBoardRole(db, boardId, accountId);
+      return json({ board_id: boardId, role, entities: await listCanvasEntities(db, boardId, accountId) });
     }
     if (pathname === "/patchboard-private/api/canvas/entity" && request.method === "GET") {
       const boardId = boardIdSchema.parse(url.searchParams.get("board_id"));

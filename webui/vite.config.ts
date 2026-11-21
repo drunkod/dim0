@@ -289,6 +289,19 @@ export default defineConfig({
     allowedHosts,
     host: "0.0.0.0",
     port: Number(process.env.APP_PORT) || 5173,
+    // Local-only opt-in: the browser uses the existing private Patchboard
+    // cookies while the server remains bound to 127.0.0.1. No Funnel changes.
+    proxy: process.env.VITE_DIM0_JAZZ_CANVAS === "1" ? {
+      "/patchboard-private": {
+        target: `http://127.0.0.1:${process.env.PATCHBOARD_PRIVATE_PORT ?? "8792"}`,
+        changeOrigin: true,
+        ws: true,
+      },
+      "/patchboard-auth": {
+        target: `http://127.0.0.1:${process.env.PATCHBOARD_PRIVATE_PORT ?? "8792"}`,
+        changeOrigin: true,
+      },
+    } : undefined,
   },
   preview: {
     allowedHosts,

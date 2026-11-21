@@ -29,6 +29,7 @@ import { ResetPasswordPage } from "@/features/signin/screens/reset-password"
 import { InstallScreen } from "@/features/install/screens/install-screen"
 import { ShareLandingScreen } from "@/features/sharing/screens/share-landing"
 import { LocalBoardScreen } from "@/features/board/local/local-board-screen"
+import { JazzSignInPage } from "@/features/board/jazz/jazz-signin-page"
 
 
 export const rootRoute = createRootRoute({
@@ -70,11 +71,35 @@ const requireVerifiedAuth = async () => {
   }
 }
 
+/** For opt-in Jazz canvas boards, Patchboard passkeys replace Dim0 JWTs.
+ * The server still checks the actual board grant on every read/write.
+ */
+const requireBoardAuth = async () => {
+  if (import.meta.env.VITE_DIM0_JAZZ_CANVAS !== "1") return requireVerifiedAuth()
+  try {
+    const response = await fetch("/patchboard-private/api/me", {
+      credentials: "include",
+      cache: "no-store",
+    })
+    if (response.ok) {
+      const body = await response.json() as { signedIn?: boolean }
+      if (body.signedIn === true) return
+    }
+  } catch { /* Connection or sign-in failure is handled by the login route. */ }
+  throw redirect({ to: "/jazz-signin" })
+}
+
 // auth pages (unguarded)
 const signinRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/signin",
   component: SigninPage,
+})
+
+const jazzSigninRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/jazz-signin",
+  component: JazzSignInPage,
 })
 
 // DEV-only spike: snapDOM whole-applet capture on WKWebView (throwaway — PR 0 of the
@@ -183,7 +208,7 @@ export const BoardUrl = "/boards/$id"
 const boardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: BoardUrl,
-  beforeLoad: requireVerifiedAuth,
+  beforeLoad: requireBoardAuth,
   component: BoardScreen,
 })
 
@@ -364,6 +389,7 @@ const routeTree = rootRoute.addChildren([
   ]),
   ...(import.meta.env.DEV ? [captureSpikeRoute] : []),
   signinRoute,
+  jazzSigninRoute,
   signupRoute,
   googleCallbackRoute,
   verifyEmailRoute,

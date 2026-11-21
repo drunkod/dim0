@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { startBoardServer } from "./http-server.ts";
 import { auth } from "./private-auth/auth.ts";
 import { privateBoardRequest } from "./private-board-routes.ts";
+import { handlePrivateCanvasStream } from "./private-canvas-stream.ts";
 import { privateAuthConfig } from "./private-auth/config.ts";
 import { closePrivateAuthDatabase } from "./private-auth/db.ts";
 import { handlePrivateAuth } from "./private-auth/http.ts";
@@ -32,6 +33,7 @@ const server = await startBoardServer({
     };
   },
   extraHandler: (request, response, db) =>
+    handlePrivateCanvasStream(request, response, db, (subject) => server.jazz.createAccountFor(subject)) ||
     handlePrivateAuth(request, response, db, (subject) => server.jazz.createAccountFor(subject),
       (received) => privateBoardRequest(received, db,
         (subject) => server.jazz.createAccountFor(subject)),
