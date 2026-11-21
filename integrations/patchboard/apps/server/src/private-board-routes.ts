@@ -50,6 +50,31 @@ export async function privateBoardRequest(
     const accountId = await jazzAccountFor(session.user.id);
     return json({ signedIn: true, id: session.user.id, accountId, name: session.user.name });
   }
+  // Match Dim0's original share-link contract: a holder of the
+  // fragment-borne secret may preview the invite BEFORE registering.
+  // The digest is checked without consuming the link or creating a grant.
+  // Keep private board and account endpoints session-protected.
+  if (pathname === "/patchboard-private/api/invites/preview" && request.method === "POST") {
+    try {
+      const parsed = z.object({
+        board_id: boardIdSchema, token: inviteSchema,
+      }).strict().parse(await safeJson(request));
+      const digest = createHash("sha256").update(parsed.token).digest("hex");
+      const invite = await db.one(app.boardInvites.where({
+        boardId: parsed.board_id, token: digest,
+      }));
+      if (!invite || (invite.expiresAtEpochMs !== null &&
+          invite.expiresAtEpochMs < Date.now())) {
+        return json({ error: "Invitation expired or revoked" }, 404);
+      }
+      return json({ role: invite.role });
+    } catch (error) {
+      if (error instanceof z.ZodError || error instanceof SyntaxError) {
+        return json({ error: "Invalid invitation request" }, 400);
+      }
+      throw error;
+    }
+  }
   if (!session) return json({ error: "Sign in required" }, 401);
   const accountId = await jazzAccountFor(session.user.id);
 
@@ -73,7 +98,9 @@ export async function privateBoardRequest(
       if (!board || board.ownerId !== accountId) return json({ error: "Only owner may invite" }, 403);
       const token = randomBytes(32).toString("base64url");
       const hash = createHash("sha256").update(token).digest("hex");
-      const expiry = Date.now() + 7 * 86_400_000;
+      // Original Dim0 reusable links stay active until the owner revokes
+      // them; only single-use links have the 7-day expiration policy.
+      const expiry = parsed.reusable ? null : Date.now() + 7 * 86_400_000;
       const pending = db.insert(app.boardInvites, {
         boardId: parsed.board_id,
         token: hash, // digest only; plaintext is never placed in Jazz
@@ -100,7 +127,8 @@ export async function privateBoardRequest(
       if (!board || board.ownerId !== accountId) return json({ error: "Only owner may manage sharing" }, 403);
       const rows = await db.all(app.boardInvites.where({ boardId }).limit(200));
       // Only opaque IDs and metadata leave the server, never stored invite digests.
-      return json({ invites: rows.filter((row) => (row.expiresAtEpochMs ?? 0) > Date.now())
+      return json({ invites: rows.filter((row) =>
+        row.expiresAtEpochMs === null || row.expiresAtEpochMs > Date.now())
         .map((row) => ({ id: row.id, role: row.role, reusable: !row.singleUse,
           expires_at: row.expiresAtEpochMs })) });
     }
@@ -155,8 +183,7 @@ export async function privateBoardRequest(
       await write.wait({ timeoutMs: 10000 });
       return json({ removed: write.value });
     }
-    const preview = pathname === "/patchboard-private/api/invites/preview";
-    if ((preview || pathname === "/patchboard-private/api/join") && request.method === "POST") {
+    if (pathname === "/patchboard-private/api/join" && request.method === "POST") {
       const parsed = z.object({
         board_id: boardIdSchema, token: inviteSchema,
       }).strict().parse(await safeJson(request));
@@ -166,8 +193,8 @@ export async function privateBoardRequest(
           const invite = await tx.one(app.boardInvites.where({
             boardId: parsed.board_id, token: digest,
           }));
-          if (!invite || !invite.expiresAtEpochMs ||
-              invite.expiresAtEpochMs < Date.now() ||
+          if (!invite || (invite.expiresAtEpochMs !== null &&
+              invite.expiresAtEpochMs < Date.now()) ||
               (invite.intendedUserId && invite.intendedUserId !== accountId)) {
             throw new Error("INVITE_INVALID");
           }
@@ -177,7 +204,6 @@ export async function privateBoardRequest(
           if (existing && invite.singleUse) throw new Error("INVITE_INVALID");
           const board = await tx.one(app.boards.where({ id: parsed.board_id }));
           if (!board) throw new Error("INVITE_INVALID");
-          if (preview) return { role: invite.role };
           if (existing) {
             // Original Dim0 invitation semantics: upgrade-only, never downgrade.
             if (existing.role === "viewer" && invite.role === "editor") {
@@ -191,7 +217,6 @@ export async function privateBoardRequest(
           if (invite.singleUse) tx.delete(app.boardInvites, invite.id);
           return { role: invite.role };
         });
-        if (preview) return json(write.value);
         await write.wait({ timeoutMs: 10000 });
         return json({ joined: true, board_id: parsed.board_id }, 200);
       } catch (error) {

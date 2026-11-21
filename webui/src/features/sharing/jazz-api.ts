@@ -1,6 +1,6 @@
 import type { BoardMember, ShareRole } from "./api"
 
-type InviteInfo = { id: string; role: "editor" | "viewer"; reusable: boolean; expires_at: number }
+type InviteInfo = { id: string; role: "editor" | "viewer"; reusable: boolean; expires_at: number | null }
 type MemberInfo = { id: string; role: string }
 const root = "/patchboard-private/api/"
 

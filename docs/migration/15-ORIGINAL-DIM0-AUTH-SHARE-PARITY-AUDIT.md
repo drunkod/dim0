@@ -1,0 +1,39 @@
+# Original Dim0 authentication and sharing — Jazz parity audit
+
+Date: 22 November 2026
+Audit source: original fork implementation and the stacked Jazz route-shell/access PRs.
+Candidate branch: fix/dim0-native-jazz-access; keep PR #3 and #4 in review.
+
+## Confirmed reuse of original fork
+
+- Frontend login and registration screens: original Dim0 SigninPage / SignupPage and AccountCard, with the Better Auth passkey provider in Jazz mode.
+- Board Share entry point: original ShareButton and ShareDialog; separate JazzShareDialog deleted. Existing role toggle, Copy, Revoke, Disable sharing, and People with access remain.
+- Invitation presentation: the original shared invite-panel components; Jazz-specific delivery needs the board ID and opaque fragment token.
+- Business rules: Edit vs View, upgrade-only acceptance, multiple users per reusable link, owner-only revocation, all-link Disable sharing without removing granted members, viewer write denial, and membership removal.
+- Login recovery: exact bookmarked board/applet destination is retained; failed identity reads offer Retry; logout clears session-scoped state.
+- Frontend Jazz routes select their layout before loading legacy authentication effects.
+
+## Parity fixes in the current candidate
+
+- The Jazz invitation role is previewable before registration with an anonymous POST carrying a 43-character opaque token in the request body. The server returns only the invitation role; it does not issue a membership. It keeps the existing same-origin POST check.
+- A revoked, invalid or expired code gets a terminal 404. A temporary preview/service failure still shows Retry/Cancel. Original share preview was anonymous; requiring sign-in first was a regression.
+- Reusable Edit/View links do not expire automatically. One-time links keep their seven-day expiry. The owner can revoke individual or all reusable links. The original fork's reusable links remained active until revoked.
+- The original warning about board/nested content appears on Jazz boards as well as flag-off legacy boards.
+- Browser regressions explicitly check anonymous role preview and viewer-to-editor upgrade with no subsequent downgrade. The original fork's acceptance policy is the reference.
+- A disposable QA test created 205 reusable Jazz invitations, verified each had no automatic expiry, and confirmed owner-authorized Disable sharing revoked all 205 despite the list endpoint's 200-item display cap. A revoked token could not be redeemed.
+
+## Gaps that must not be represented as completed migration
+
+1. Old Dim0 password/Google identities are stored and authenticated by the legacy backend; Better Auth passkey accounts are separate identities. Sign-in through old credentials is not Jazz sign-in and identity linking is not implemented. The legacy auth screens remain available with Jazz mode off.
+2. Existing POSTGRES-backed invitation codes under /share/:token are not Jazz invitation records. New Jazz links use /share/join/:boardId with an opaque token in the URL fragment. Do not silently reinterpret old tokens or claim that old memberships migrated. Retain the original resolver when legacy mode is used; plan an explicit migration or upgrade policy.
+3. A distinct JazzBoardsPage still renders the signed-in Jazz board list. Its basic list is not feature-parity with the original Dim0 dashboard/sidebar.
+4. Member listing in the Jazz adapter currently uses Jazz account IDs as the display label, not the original email/name directory. Display-name mapping needs a privacy-aware identity design before public rollout.
+5. The original Patchboard single-use link format still uses its older landing handler; the Dim0 Share dialog mints reusable links. Full invitation-route consolidation is separate.
+6. A friend's successful write through their own ChatGPT account and Dim0 identity is still an independent release gate, not established by browser-sharing proofs.
+
+## Verification and rollout
+
+- MacBook isolated QA uses a disposable Better Auth SQLite database, migrated with the repo's auth:migrate:private command, and a separate Jazz SQLite store.
+- The public presentation deployment and its data are untouched.
+- Frontend / server compile, invitation lifecycle, route layout, 503 recovery and independent Helium friend acceptance are the primary regressions.
+- Do not merge as a completed Jazz cutover. The web app and its matching Jazz server routes must be shipped together.

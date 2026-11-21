@@ -12,13 +12,17 @@ export function Status({ text }: { text: string }) {
 }
 
 
-export function SignInPanel({ onGoSignIn }: { onGoSignIn: () => void }) {
+export function SignInPanel({ onGoSignIn, role }: { onGoSignIn: () => void; role?: ShareRole }) {
   return (
     <div className="flex flex-col items-center gap-3 text-center">
       <h1 className="text-lg font-semibold">You've been invited to a board</h1>
       <p className="text-sm text-muted-foreground">
         Sign in to your Dim0 account to accept this invitation.
       </p>
+      {role && <p className="text-sm text-muted-foreground">
+        {role === "member" ? "This link grants permission to view and edit the board." :
+          "This link grants view-only access to the board."}
+      </p>}
       <Button onClick={onGoSignIn} className="mt-2">
         Sign in
       </Button>

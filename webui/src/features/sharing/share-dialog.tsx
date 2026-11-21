@@ -142,7 +142,7 @@ export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenCha
           surprised by a peer seeing a private note they forgot was
           nested in here.
         */}
-        {!jazz && <div
+        <div
           role="note"
           className="flex items-start gap-2 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-100"
         >
@@ -151,7 +151,7 @@ export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenCha
             Sharing this board also shares every sub-board and nested
             note inside it. Move anything private out before inviting.
           </span>
-        </div>}
+        </div>
 
         <section className="flex flex-col gap-3">
           <div className="text-sm text-muted-foreground">Anyone with the link can:</div>
@@ -199,7 +199,7 @@ export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenCha
 
           {jazz && linksQuery.data?.map(link => (
             <div key={link.id} className="flex justify-between gap-2 text-sm">
-              <span>{link.role === "member" ? "Edit" : "View"} · {link.reusable ? "Reusable" : "One-time"} · expires {new Date(link.expires).toLocaleDateString()}</span>
+              <span>{link.role === "member" ? "Edit" : "View"} · {link.reusable ? "Reusable" : "One-time"} · {link.expires === null ? "Never expires" : "expires " + new Date(link.expires).toLocaleDateString()}</span>
               <Button size="sm" variant="outline" disabled={revoke.isPending} onClick={() => revoke.mutate(link.id)}>Revoke</Button>
             </div>
           ))}

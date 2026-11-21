@@ -38,6 +38,10 @@ try {
   // The invitation page must not present a 503 as a signed-out account or
   // as an expired link; it offers Retry and Cancel until the service returns.
   await page.route("**/patchboard-private/api/me", failIdentity);
+  // A valid-looking, otherwise unknown QA token is mocked at the public
+  // preview boundary. This isolates identity 503 from an expired-link 404.
+  await page.route("**/patchboard-private/api/invites/preview", async route =>
+    route.fulfill({ status: 200, contentType: "application/json", body: '{"role":"editor"}' }));
   const invite = "/share/join/" + boardId + "#invite=" + "A".repeat(43);
   await page.goto(base + invite);
   await expect(page.getByRole("button", { name: "Retry invitation" }))
@@ -49,8 +53,10 @@ try {
   await page.getByRole("button", { name: "Retry invitation" }).click();
   await expect(page.getByRole("button", { name: "Sign in", exact: true }))
     .toBeVisible({ timeout: 25000 });
+  await expect(page.getByText(/grants permission to view and edit/i)).toBeVisible();
   assert.ok(page.url().endsWith(invite));
   console.log("JAZZ_INVITATION_RETRY_KEEPS_LINK_PASS");
+  await page.unroute("**/patchboard-private/api/invites/preview");
 
   assert.deepEqual(errors, [], "No unhandled errors should reach the browser");
   console.log("JAZZ_AUTH_OUTAGE_BROWSER_ACCEPTANCE_PASS");

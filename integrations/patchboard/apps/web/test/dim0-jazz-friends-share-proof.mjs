@@ -44,9 +44,21 @@ async function createBrowserFriend(label, shareLink, role, boardId) {
   const page = await context.newPage();
   const exceptions = [];
   page.on("pageerror", e => exceptions.push(String(e)));
-  await page.goto(shareLink);
+  // A dev server may stream fonts and canvases after the invite page is
+  // interactive. Waiting for the full load event made the second independent
+  // friend spuriously time out even though the initial invite was usable.
+  await page.goto(shareLink, { waitUntil: "domcontentloaded", timeout: 60000 });
   await expect(page.getByRole("heading", { name: "You've been invited to a board" }))
     .toBeVisible({ timeout: 25000 });
+  // Match the original Dim0 share semantics: anonymous invitees see their
+  // View/Edit permission before they register, without being granted access.
+  const token = new URLSearchParams(new URL(shareLink).hash.slice(1)).get("invite");
+  const preview = await api(page, "invites/preview", { board_id: boardId, token });
+  assert.equal(preview.status, 200);
+  assert.equal(preview.body.role, role === "member" ? "editor" : "viewer");
+  await expect(page.getByText(role === "member" ?
+    /grants permission to view and edit/i : /grants view-only access/i)).toBeVisible();
+  console.log("ANONYMOUS_INVITE_PREVIEW_PASS", label, role);
   await expect(page.getByRole("button", { name: "Sign in" }))
     .toBeVisible();
   await page.getByRole("button", { name: "Sign in" }).click();
@@ -91,6 +103,7 @@ async function createLink(page, role = "editor") {
   assert.match(url.pathname, /^\/share\/join\/[a-f0-9-]{36}$/);
   assert.match(url.hash, /^#invite=[\w-]{43}$/);
   await expect(dialog.getByText(/Reusable/).first()).toBeVisible();
+  await expect(dialog.getByText(/Never expires/).first()).toBeVisible();
   console.log("SHARE_LINK_CREATED", role, "hash-secret-not-logged");
   await page.keyboard.press("Escape");
   return link;
@@ -183,6 +196,16 @@ try {
   assert.equal(denied.status, 403);
   console.log("VIEWER_CAN_READ_CANNOT_WRITE_PASS");
 
+  // Preserve the legacy upgrade-only rule in Jazz: viewer -> editor when
+  // accepting an Edit link, and never editor -> viewer on a View link.
+  const editorCode = new URLSearchParams(new URL(shareLink).hash.slice(1)).get("invite");
+  const viewerCode = new URLSearchParams(new URL(viewerLink).hash.slice(1)).get("invite");
+  assert.equal((await api(V.page, "join", { board_id: boardId, token: editorCode })).status, 200);
+  assert.equal((await readCanvas(V.page, boardId)).body.role, "member");
+  assert.equal((await api(V.page, "join", { board_id: boardId, token: viewerCode })).status, 200);
+  assert.equal((await readCanvas(V.page, boardId)).body.role, "member");
+  console.log("JAZZ_INVITE_UPGRADE_ONLY_ROLE_PARITY_PASS");
+
   const members = await ownerPage.evaluate(async id =>
     (await (await fetch("/patchboard-private/api/members?board_id=" + id)).json()).members, boardId);
   assert.equal(members.length, 4, JSON.stringify(members));
@@ -250,14 +273,18 @@ try {
     hasUserVerification: true, isUserVerified: true,
     automaticPresenceSimulation: true,
   } });
-  await newPage.goto(shareLink);
-  await newPage.getByRole("button", { name: "Sign in" }).click();
+  await newPage.goto(shareLink, { waitUntil: "domcontentloaded", timeout: 60000 });
+  // With original Dim0-style public preview, a confirmed revoked token
+  // correctly shows a terminal error BEFORE making the user register.
+  await expect(newPage.getByText(/Invitation expired or revoked/))
+    .toBeVisible({ timeout: 20000 });
+  await newPage.getByRole("button", { name: "Back home" }).click();
+  await expect(newPage).toHaveURL(/\/signin/, { timeout: 20000 });
   await newPage.getByRole("link", { name: "Create an account" }).click();
   await newPage.getByRole("button", { name: "Create account with passkey" }).click();
-  await expect(newPage.getByText(/Invitation expired or revoked/))
-    .toBeVisible({ timeout: 30000 });
   await expect(newPage.getByRole("button", { name: "Create board" }))
     .toBeVisible({ timeout: 20000 });
+  console.log("REVOKED_INVITE_PREVIEW_BEFORE_SIGNUP_PASS");
   const signedIn = await newPage.evaluate(async () =>
     (await (await fetch("/patchboard-private/api/me", { credentials: "include" })).json()).signedIn);
   assert.equal(signedIn, true);
@@ -328,8 +355,8 @@ try {
   console.log("RETURNING_EDITOR_SIGNOUT_SIGNIN_DEEP_LINK_PASS");
 
   console.log("FRIENDS_SHARE_UI_ACCEPTANCE_PASS", JSON.stringify({
-    boardId, roles: ["owner", "member", "member", "viewer"],
-    sameReusableLinkRedemptions: 2, canvasLive: true,
+    boardId, roles: ["owner", "member", "member", "member"],
+    viewerWasUpgraded: true, sameReusableLinkRedemptions: 2, canvasLive: true,
   }));
 } finally {
   await Promise.all(actors.map(c => c.close().catch(() => {})));

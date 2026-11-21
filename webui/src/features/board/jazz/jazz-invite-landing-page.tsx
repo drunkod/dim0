@@ -25,9 +25,9 @@ export function JazzInviteLandingPage() {
       return
     }
     let cancelled = false
-    void currentJazzIdentity().then(async identity => {
-      if (cancelled) return
-      if (!identity) { setStatus("signed-out"); return }
+    // Original Dim0 let an invitee inspect the role before creating an
+    // account. This request uses only the opaque link secret, not a session.
+    void (async () => {
       const response = await fetch("/patchboard-private/api/invites/preview", {
         method: "POST", credentials: "include", headers: { "content-type": "application/json" },
         body: JSON.stringify({ board_id: boardId, token }),
@@ -40,11 +40,11 @@ export function JazzInviteLandingPage() {
       }
       if (!response.ok) throw new Error("Invitation unavailable")
       const info = await response.json() as { role: "editor" | "viewer" }
-      if (!cancelled) {
-        setRole(info.role === "editor" ? "member" : "viewer")
-        setStatus("ready")
-      }
-    }).catch(() => {
+      if (cancelled) return
+      setRole(info.role === "editor" ? "member" : "viewer")
+      const identity = await currentJazzIdentity()
+      if (!cancelled) setStatus(identity ? "ready" : "signed-out")
+    })().catch(() => {
       if (!cancelled) {
         setRetryJoin(false)
         setError("Could not check your account or this invitation. Retry when connected.")
@@ -95,7 +95,7 @@ export function JazzInviteLandingPage() {
     <main className="mx-auto max-w-md p-6">
       <div className="rounded-2xl border border-border bg-background p-6 shadow-md">
         {status === "loading" && <InviteStatus text="Checking invitation…" />}
-        {status === "signed-out" && <SignInPanel onGoSignIn={signIn} />}
+        {status === "signed-out" && <SignInPanel onGoSignIn={signIn} role={role} />}
         {status === "ready" && <ReadyPanel role={role} onOpen={() => void accept()} />}
         {status === "joining" && <InviteStatus text="Joining the board…" />}
         {status === "invalid" && <ErrorPanel message={error} onGoHome={() => location.assign("/boards")} />}
