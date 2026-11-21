@@ -1,6 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Db } from "jazz-tools";
 import { auth } from "./auth.ts";
+import { privateAuthDatabase } from "./db.ts";
+import { rememberJazzMemberIdentity } from "./member-directory.ts";
 import { privateAuthConfig } from "./config.ts";
 import { EnrollmentLimitReached, newRegistrationIntent } from "./enrollment.ts";
 import { oauthConsentPage } from "./oauth-ui.ts";
@@ -97,7 +99,11 @@ export function handlePrivateAuth(
         } else {
           let allowed = false;
           try {
-            await grantBoardForConsent(db, boardId as string, await jazzAccountFor(session.user.id));
+            const jazzAccountId = await jazzAccountFor(session.user.id);
+            await grantBoardForConsent(db, boardId as string, jazzAccountId);
+            // A ChatGPT-only member may consent without visiting Dim0 /me.
+            // Record only the server-verified subject/account mapping.
+            rememberJazzMemberIdentity(privateAuthDatabase(), jazzAccountId, session.user.id);
             allowed = true;
           } catch { /* Never expose private board existence in a consent error. */ }
           if (!allowed) {

@@ -1,7 +1,7 @@
 import type { BoardMember, ShareRole } from "./api"
 
 type InviteInfo = { id: string; role: "editor" | "viewer"; reusable: boolean; expires_at: number | null }
-type MemberInfo = { id: string; role: string }
+type MemberInfo = { id: string; role: string; name?: string | null }
 const root = "/patchboard-private/api/"
 
 async function api<T>(endpoint: string, data?: object): Promise<T> {
@@ -19,7 +19,12 @@ async function api<T>(endpoint: string, data?: object): Promise<T> {
 export async function jazzMembers(boardId: string): Promise<BoardMember[]> {
   const { members } = await api<{ members: MemberInfo[] }>("members?board_id=" + encodeURIComponent(boardId))
   return members.map(member => ({
-    user_uid: member.id, email: member.id,
+    user_uid: member.id,
+    // The original Dim0 row renders "email". Pass the verified display name
+    // instead of falsely labeling Jazz UUIDs as email addresses.
+    email: member.name?.trim()
+      ? member.name.trim() + " · " + member.id.slice(0, 8)
+      : "Member · " + member.id.slice(0, 8),
     role: member.role === "owner" ? "owner" : member.role === "editor" ? "member" : "viewer",
     joined_at: null,
   }))

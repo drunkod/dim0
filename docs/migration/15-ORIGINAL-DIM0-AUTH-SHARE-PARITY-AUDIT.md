@@ -27,9 +27,16 @@ Candidate branch: fix/dim0-native-jazz-access; keep PR #3 and #4 in review.
 1. Old Dim0 password/Google identities are stored and authenticated by the legacy backend; Better Auth passkey accounts are separate identities. Sign-in through old credentials is not Jazz sign-in and identity linking is not implemented. The legacy auth screens remain available with Jazz mode off.
 2. Existing POSTGRES-backed invitation codes under /share/:token are not Jazz invitation records. New Jazz links use /share/join/:boardId with an opaque token in the URL fragment. Do not silently reinterpret old tokens or claim that old memberships migrated. Retain the original resolver when legacy mode is used; plan an explicit migration or upgrade policy.
 3. A distinct JazzBoardsPage still renders the signed-in Jazz board list. Its basic list is not feature-parity with the original Dim0 dashboard/sidebar.
-4. Member listing in the Jazz adapter currently uses Jazz account IDs as the display label, not the original email/name directory. Display-name mapping needs a privacy-aware identity design before public rollout.
+4. The Jazz member list now resolves Better Auth display names through a server-maintained Jazz account reference, only after the owner passes the canonical board check. Unmapped accounts get an abbreviated member-ID fallback. Registration still creates generated passkey names; self-service personal display names and historical account linking remain separate rollout tasks.
 5. The original Patchboard single-use link format still uses its older landing handler; the Dim0 Share dialog mints reusable links. Full invitation-route consolidation is separate.
 6. A friend's successful write through their own ChatGPT account and Dim0 identity is still an independent release gate, not established by browser-sharing proofs.
+
+## Owner-only member display-name parity (22 November 2026)
+
+- The original Dim0 Share dialog now shows verified Better Auth names with an abbreviated Jazz ID suffix for disambiguation. It no longer misrepresents Jazz UUIDs as email addresses. Removal still uses the unchanged Jazz grant ID.
+- A private identity-reference table links a verified Better Auth subject to its Jazz account ID. It stores no membership grants, copies no email addresses, and is updated only after authenticated /me or a valid, scoped OAuth consent. Member name lookup is limited to the board's current grant IDs after an owner-only access check.
+- The full production-build Helium acceptance passed including JAZZ_OWNER_ONLY_MEMBER_DISPLAY_NAMES_PASS: owner and two friends' names matched verified identities, and a viewer received 403 for the member list. Two SQLite unit tests cover scoped lookup, unmapped IDs, remapping and conflicting subjects. Server tests and frontend TypeScript/ESLint also passed.
+- A fresh, disposable private OAuth/MCP CI fixture passed PRIVATE_CI_ACCEPTANCE_PASS after the consent-path mapping was added. Its evidence includes OAuth PKCE, tool calls for shared applet state and canvas CRUD, independently authorized owner/editor writes, viewer write denial, refresh-token board scoping and restart attribution. It is NOT a real friend's ChatGPT UI account acceptance.
 
 ## Verification and rollout
 

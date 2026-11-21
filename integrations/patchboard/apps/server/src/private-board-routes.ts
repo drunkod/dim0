@@ -4,6 +4,8 @@ import { z } from "zod";
 import type { Db } from "jazz-tools";
 import { app } from "@patchboard/jazz-schema";
 import { auth } from "./private-auth/auth.ts";
+import { privateAuthDatabase } from "./private-auth/db.ts";
+import { memberDisplayNames, rememberJazzMemberIdentity } from "./private-auth/member-directory.ts";
 import { listPrivateBoards } from "./private-auth/grants.ts";
 import {
   canvasEntityIdPattern, canvasBoardRole, listCanvasEntities, getCanvasEntity, createCanvasEntity,
@@ -48,6 +50,7 @@ export async function privateBoardRequest(
   if (pathname === "/patchboard-private/api/me" && request.method === "GET") {
     if (!session) return json({ signedIn: false });
     const accountId = await jazzAccountFor(session.user.id);
+    rememberJazzMemberIdentity(privateAuthDatabase(), accountId, session.user.id);
     return json({ signedIn: true, id: session.user.id, accountId, name: session.user.name });
   }
   // Match Dim0's original share-link contract: a holder of the
@@ -164,8 +167,14 @@ export async function privateBoardRequest(
       const board = await db.one(app.boards.where({ id: boardId }));
       if (!board || board.ownerId !== accountId) return json({ error: "Only owner may manage members" }, 403);
       const rows = await db.all(app.boardMembers.where({ boardId }).limit(200));
-      return json({ members: [{ id: board.ownerId, role: "owner" },
-        ...rows.map((row) => ({ id: row.userId, role: row.role }))] });
+      const members = [{ id: board.ownerId, role: "owner" },
+        ...rows.map((row) => ({ id: row.userId, role: row.role }))];
+      // Server-side owner-only join, scoped strictly to existing Jazz grants.
+      // No arbitrary user-profile lookup or email address is exposed.
+      const names = memberDisplayNames(privateAuthDatabase(), members.map((member) => member.id));
+      return json({ members: members.map((member) => ({
+        ...member, name: names.get(member.id) ?? null,
+      })) });
     }
     if (pathname === "/patchboard-private/api/members/remove" && request.method === "POST") {
       const parsed = z.object({ board_id: boardIdSchema, user_id: boardIdSchema })

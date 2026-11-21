@@ -214,8 +214,20 @@ try {
   const members = await ownerPage.evaluate(async id =>
     (await (await fetch("/patchboard-private/api/members?board_id=" + id)).json()).members, boardId);
   assert.equal(members.length, 4, JSON.stringify(members));
-  const aIdentity = await A.page.evaluate(async () =>
-    (await (await fetch("/patchboard-private/api/me")).json()).accountId);
+  const ownerIdentity = await ownerPage.evaluate(async () =>
+    (await (await fetch("/patchboard-private/api/me")).json()));
+  assert.equal(members.find(m => m.id === ownerIdentity.accountId)?.name, ownerIdentity.name);
+  const aProfile = await A.page.evaluate(async () =>
+    (await (await fetch("/patchboard-private/api/me")).json()));
+  assert.equal(members.find(m => m.id === aProfile.accountId)?.name, aProfile.name);
+  const bProfile = await B.page.evaluate(async () =>
+    (await (await fetch("/patchboard-private/api/me")).json()));
+  assert.equal(members.find(m => m.id === bProfile.accountId)?.name, bProfile.name);
+  const viewerDirectory = await V.page.evaluate(async id =>
+    (await fetch("/patchboard-private/api/members?board_id=" + id)).status, boardId);
+  assert.equal(viewerDirectory, 403, "Viewer cannot inspect the owner's member directory");
+  console.log("JAZZ_OWNER_ONLY_MEMBER_DISPLAY_NAMES_PASS");
+  const aIdentity = aProfile.accountId;
   const removed = await api(ownerPage, "members/remove", {
     board_id: boardId, user_id: aIdentity,
   });

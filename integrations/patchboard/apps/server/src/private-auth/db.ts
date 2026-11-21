@@ -2,6 +2,7 @@ import { DatabaseSync } from "node:sqlite";
 import { chmodSync, existsSync, readdirSync, readFileSync, unlinkSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { privateAuthConfig } from "./config.ts";
+import { installJazzMemberDirectory } from "./member-directory.ts";
 
 let database: DatabaseSync | undefined;
 /** Better Auth owns this dedicated SQLite store. It is not a Jazz application table. */
@@ -28,6 +29,7 @@ export function privateAuthDatabase(): DatabaseSync {
     expires_at_ms INTEGER NOT NULL
   );
   CREATE INDEX IF NOT EXISTS patchboard_enrollment_expiry ON patchboard_enrollment_intent(expires_at_ms);`);
+  installJazzMemberDirectory(db);
   db.prepare("DELETE FROM patchboard_enrollment_intent WHERE expires_at_ms<=?").run(Date.now());
   // Preserve live five-minute registrations from the historical file store,
   // while removing abandoned/invalid file tickets on first upgraded startup.
