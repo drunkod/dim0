@@ -1,3 +1,4 @@
+import { disableJazzLinks, jazzLinks, jazzMembers, mintJazzLink, removeJazzMember, revokeJazzLink } from "./jazz-api"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -19,12 +20,12 @@ import {
   revokeAllShareLinks,
   shareLinkUrl,
   type BoardMember,
-  type ShareLink,
   type ShareRole,
 } from "./api"
 
 
 type ShareDialogProps = {
+  jazz?: boolean
   boardId: string
   boardLabel: string
   open: boolean
@@ -38,41 +39,56 @@ type ShareDialogProps = {
  * mounted for boards where the signed-in user's role is `"owner"`
  * (see [HarnessCanvas](../board/harness/canvas/harness-canvas.tsx)).
  */
-export function ShareDialog({ boardId, boardLabel, open, onOpenChange }: ShareDialogProps) {
+export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenChange }: ShareDialogProps) {
   const [selectedRole, setSelectedRole] = useState<ShareRole>("member")
   const queryClient = useQueryClient()
 
+  const [minted, setMinted] = useState<{ id: string; role: ShareRole; url: string } | null>(null)
+  const linksKey = ["shareLinks", boardId, jazz]
+  const membersKey = ["boardMembers", boardId, jazz]
   const linksQuery = useQuery({
-    queryKey: ["shareLinks", boardId],
-    queryFn: () => listShareLinks(boardId),
+    queryKey: linksKey,
+    queryFn: async () => jazz ? jazzLinks(boardId) : (await listShareLinks(boardId)).map(link => ({
+      id: link.token, role: link.role, expires: 0, reusable: true,
+    })),
     enabled: open,
   })
 
   const membersQuery = useQuery({
-    queryKey: ["boardMembers", boardId],
-    queryFn: () => listBoardMembers(boardId),
+    queryKey: membersKey,
+    queryFn: () => jazz ? jazzMembers(boardId) : listBoardMembers(boardId),
     enabled: open,
   })
 
   const mintMutation = useMutation({
-    mutationFn: (role: ShareRole) => mintShareLink(boardId, role),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["shareLinks", boardId] }),
+    mutationFn: async (role: ShareRole) => {
+      if (jazz) {
+        const result = await mintJazzLink(boardId, role)
+        setMinted({ id: result.invite_id, url: result.invite_url, role })
+      } else await mintShareLink(boardId, role)
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: linksKey }),
     onError: () => toast.error("Couldn't create share link. Try again."),
   })
 
   const revokeAllMutation = useMutation({
-    mutationFn: () => revokeAllShareLinks(boardId),
+    mutationFn: () => jazz ? disableJazzLinks(boardId) : revokeAllShareLinks(boardId),
     onSuccess: (count) => {
-      queryClient.invalidateQueries({ queryKey: ["shareLinks", boardId] })
+      setMinted(null)
+      queryClient.invalidateQueries({ queryKey: linksKey })
       toast.success(count === 0 ? "Sharing was already disabled." : `Disabled ${count} link(s).`)
     },
     onError: () => toast.error("Couldn't disable sharing. Try again."),
   })
 
   const removeMutation = useMutation({
-    mutationFn: (userUid: string) => removeBoardMember(boardId, userUid),
+    mutationFn: async (userUid: string) => {
+      if (!jazz) return removeBoardMember(boardId, userUid)
+      await removeJazzMember(boardId, userUid)
+      return { kicked_sessions: 0 }
+    },
     onSuccess: (res) => {
-      queryClient.invalidateQueries({ queryKey: ["boardMembers", boardId] })
+      queryClient.invalidateQueries({ queryKey: membersKey })
       const kickedNote = res.kicked_sessions > 0
         ? ` (${res.kicked_sessions} live session(s) closed)`
         : ""
@@ -81,12 +97,22 @@ export function ShareDialog({ boardId, boardLabel, open, onOpenChange }: ShareDi
     onError: () => toast.error("Couldn't remove member. Try again."),
   })
 
+  const revoke = useMutation({
+    mutationFn: (id: string) => revokeJazzLink(boardId, id),
+    onSuccess: (_, id) => {
+      if (minted?.id === id) setMinted(null)
+      void queryClient.invalidateQueries({ queryKey: linksKey })
+    },
+    onError: () => toast.error("Could not revoke invitation."),
+  })
   const activeLink = (linksQuery.data ?? []).find((l) => l.role === selectedRole) ?? null
   const otherLinks = (linksQuery.data ?? []).filter((l) => l.role !== selectedRole)
 
-  const copyLink = async (link: ShareLink) => {
+  const url = jazz ? (minted?.role === selectedRole && linksQuery.data?.some(link => link.id === minted.id) ? minted.url : "") :
+    (activeLink ? shareLinkUrl(activeLink.id) : "")
+  const copyLink = async (value: string) => {
     try {
-      await navigator.clipboard.writeText(shareLinkUrl(link.token))
+      await navigator.clipboard.writeText(value)
       toast.success("Link copied to clipboard.")
     } catch {
       toast.error("Couldn't copy. Long-press to select.")
@@ -95,7 +121,7 @@ export function ShareDialog({ boardId, boardLabel, open, onOpenChange }: ShareDi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
+      <DialogContent className="max-w-lg max-h-[86vh] overflow-y-auto">
         {/*
           `min-w-0` on the header lets the grid cell shrink to the
           dialog's `max-w-lg` instead of expanding to the title's
@@ -116,7 +142,7 @@ export function ShareDialog({ boardId, boardLabel, open, onOpenChange }: ShareDi
           surprised by a peer seeing a private note they forgot was
           nested in here.
         */}
-        <div
+        {!jazz && <div
           role="note"
           className="flex items-start gap-2 rounded-md border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:border-amber-500/40 dark:bg-amber-950/40 dark:text-amber-100"
         >
@@ -125,7 +151,7 @@ export function ShareDialog({ boardId, boardLabel, open, onOpenChange }: ShareDi
             Sharing this board also shares every sub-board and nested
             note inside it. Move anything private out before inviting.
           </span>
-        </div>
+        </div>}
 
         <section className="flex flex-col gap-3">
           <div className="text-sm text-muted-foreground">Anyone with the link can:</div>
@@ -144,15 +170,15 @@ export function ShareDialog({ boardId, boardLabel, open, onOpenChange }: ShareDi
             />
           </div>
 
-          {activeLink ? (
+          {url ? (
             <LinkRow
-              link={activeLink}
-              onCopy={() => copyLink(activeLink)}
+              url={url}
+              onCopy={() => copyLink(url)}
             />
           ) : (
             <div className="flex items-center justify-between gap-2 rounded-md border border-dashed border-border bg-muted/40 p-3 text-sm">
               <span className="text-muted-foreground">
-                No active {selectedRole === "member" ? "edit" : "view"} link yet.
+                {activeLink ? "Create a new link to copy and share." : "Create a link to invite people."}
               </span>
               <Button
                 size="sm"
@@ -171,6 +197,13 @@ export function ShareDialog({ boardId, boardLabel, open, onOpenChange }: ShareDi
             </div>
           )}
 
+          {jazz && linksQuery.data?.map(link => (
+            <div key={link.id} className="flex justify-between gap-2 text-sm">
+              <span>{link.role === "member" ? "Edit" : "View"} · {link.reusable ? "Reusable" : "One-time"} · expires {new Date(link.expires).toLocaleDateString()}</span>
+              <Button size="sm" variant="outline" disabled={revoke.isPending} onClick={() => revoke.mutate(link.id)}>Revoke</Button>
+            </div>
+          ))}
+          {(membersQuery.isError || linksQuery.isError) && <p role="alert">Could not load sharing details. Reopen to retry.</p>}
           <div className="flex justify-end">
             <Button
               variant="ghost"
@@ -211,6 +244,12 @@ export function ShareDialog({ boardId, boardLabel, open, onOpenChange }: ShareDi
             </ul>
           )}
         </section>
+        {jazz && <section className="space-y-2 border-t pt-3">
+          <label className="text-sm font-medium" htmlFor="mcp-endpoint">Connect ChatGPT</label>
+          <input id="mcp-endpoint" readOnly value={location.origin + "/patchboard-private-mcp"}
+            onClick={event => event.currentTarget.select()} className="w-full text-xs" />
+          <Button size="sm" variant="outline" onClick={() => void copyLink(location.origin + "/patchboard-private-mcp")}>Copy MCP endpoint</Button>
+        </section>}
       </DialogContent>
     </Dialog>
   )
@@ -243,12 +282,12 @@ function RoleToggle({
 }
 
 
-function LinkRow({ link, onCopy }: { link: ShareLink; onCopy: () => void }) {
-  const url = shareLinkUrl(link.token)
+function LinkRow({ url, onCopy }: { url: string; onCopy: () => void }) {
   return (
     <div className="flex items-center gap-2 rounded-md border border-border bg-background p-2">
       <input
         readOnly
+        aria-label="Invitation link"
         value={url}
         onClick={(e) => (e.target as HTMLInputElement).select()}
         className="flex-1 truncate bg-transparent text-xs font-mono text-muted-foreground outline-none"

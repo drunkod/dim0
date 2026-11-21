@@ -4,7 +4,8 @@ import { Link } from "@tanstack/react-router"
 import { Google } from "@lobehub/icons"
 import { getAuthMethods, signin } from "@/api"
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { AccountCard } from "../components/account-card"
+import { PasskeyForm } from "../components/passkey-form"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -18,6 +19,12 @@ import { isTauri } from "@/platform"
 
 /** Renders the sign-in screen and routes successful authentication into the app. */
 export function SigninPage() {
+  if (import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1") return <AccountCard mode="signin"><PasskeyForm mode="signin" /></AccountCard>
+  return <LegacySigninPage />
+}
+
+
+function LegacySigninPage() {
   const completeSignin = useCompleteSignin()
 
   const [email, setEmail] = React.useState("")
@@ -86,18 +93,7 @@ export function SigninPage() {
     : null
 
   return (
-    <div className="w-full max-w-md mx-auto">
-      <Card className="bg-card text-card-foreground border border-border shadow-xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl flex flex-col items-center justify-center gap-2">
-            <img src="/dim0.svg" alt="Dim0 Logo" className="h-12 w-12 aspect-square object-contain" />
-            <span className="text-muted-foreground">Welcome back!</span>
-          </CardTitle>
-          <CardDescription className="text-muted-foreground">
-            Sign in to continue to your workspace
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+    <AccountCard mode="signin">
           <form
             className="space-y-5"
             onSubmit={e => {
@@ -277,8 +273,6 @@ export function SigninPage() {
               </Link>
             </div>
           </form>
-        </CardContent>
-      </Card>
-    </div>
+    </AccountCard>
   )
 }

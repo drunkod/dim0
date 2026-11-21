@@ -44,24 +44,28 @@ async function createBrowserFriend(label, shareLink, role, boardId) {
   const page = await context.newPage();
   const exceptions = [];
   page.on("pageerror", e => exceptions.push(String(e)));
-  const cdp = await context.newCDPSession(page);
-  await cdp.send("WebAuthn.enable");
-  await cdp.send("WebAuthn.addVirtualAuthenticator", { options: {
-    protocol: "ctap2", transport: "internal", hasResidentKey: true,
-    hasUserVerification: true, isUserVerified: true,
-    automaticPresenceSimulation: true,
-  } });
   await page.goto(shareLink);
   await expect(page.getByRole("heading", { name: "You've been invited to a board" }))
     .toBeVisible({ timeout: 25000 });
-  await expect(page.getByRole("button", { name: "Sign in or create a passkey to join" }))
+  await expect(page.getByRole("button", { name: "Sign in" }))
     .toBeVisible();
-  await page.getByRole("button", { name: "Sign in or create a passkey to join" }).click();
-  await expect(page).toHaveURL(origin + "/jazz-signin", { timeout: 20000 });
-  await expect(page.getByRole("heading", { name: "Your collaborative canvas" }))
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page).toHaveURL(origin + "/signin", { timeout: 20000 });
+  await expect(page.getByText("Welcome back!", { exact: true }))
     .toBeVisible({ timeout: 20000 });
+  await page.getByRole("link", { name: "Create an account" }).click();
   await expect(page.getByRole("button", { name: "Create account with passkey" }))
     .toBeVisible({ timeout: 30000 });
+  // The virtual device is frame-scoped. Retain its disposable test credential
+  // in memory so it can be presented again after the full sign-out navigation.
+  let credential;
+  const device = await context.newCDPSession(page);
+  await device.send("WebAuthn.enable");
+  device.on("WebAuthn.credentialAdded", event => { credential = event.credential; });
+  await device.send("WebAuthn.addVirtualAuthenticator", { options: {
+    protocol: "ctap2", transport: "internal", hasResidentKey: true,
+    hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true,
+  } });
   await page.getByRole("button", { name: "Create account with passkey" }).click();
   // Membership is redeemed server-side and Dim0 opens without Patchboard UI.
   assert.ok(!page.url().includes("/patchboard-private/"));
@@ -71,20 +75,20 @@ async function createBrowserFriend(label, shareLink, role, boardId) {
   assert.equal(snap.body.role, role);
   assert.deepEqual(exceptions, [], "Browser exceptions for " + label);
   console.log("FRIEND_JOINED_CANVAS", label, role);
-  return { page, context, exceptions };
+  return { page, context, credential, exceptions };
 }
 
 async function createLink(page, role = "editor") {
   await page.getByRole("button", { name: "Share this board" }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByRole("heading", { name: /Share/ })).toBeVisible();
-  await dialog.locator("#jazz-invite-role").selectOption(role);
-  await dialog.getByRole("button", { name: "Create share link for multiple friends" }).click();
-  await expect(dialog.locator("#jazz-invite-link")).not.toHaveValue("", { timeout: 12000 });
-  const link = await dialog.locator("#jazz-invite-link").inputValue();
+  await dialog.getByRole("radio", { name: role === "editor" ? "Edit" : "View" }).click();
+  await dialog.getByRole("button", { name: "Create link" }).click();
+  await expect(dialog.getByLabel("Invitation link")).not.toHaveValue("", { timeout: 12000 });
+  const link = await dialog.getByLabel("Invitation link").inputValue();
   const url = new URL(link);
   assert.equal(url.origin, origin);
-  assert.match(url.pathname, /^\/jazz-invite\/[a-f0-9-]{36}$/);
+  assert.match(url.pathname, /^\/share\/join\/[a-f0-9-]{36}$/);
   assert.match(url.hash, /^#invite=[\w-]{43}$/);
   await expect(dialog.getByText(/Reusable/).first()).toBeVisible();
   console.log("SHARE_LINK_CREATED", role, "hash-secret-not-logged");
@@ -189,6 +193,23 @@ try {
   assert.equal(replay.status, 404);
   console.log("REVOKE_LINK_STOPS_NEW_GRANTS_PASS");
 
+  const viewerToken = new URLSearchParams(new URL(viewerLink).hash.slice(1)).get("invite");
+  const preview = await api(B.page, "invites/preview", { board_id: boardId, token: viewerToken });
+  assert.equal(preview.status, 200);
+  assert.equal(preview.body.role, "viewer");
+  assert.equal((await readCanvas(B.page, boardId)).body.role, "member");
+  const deniedDisable = await api(B.page, "invites/revoke-all", { board_id: boardId });
+  assert.equal(deniedDisable.status, 403);
+  await ownerPage.getByRole("button", { name: "Share this board" }).click();
+  ownerPage.once("dialog", prompt => prompt.accept());
+  await ownerPage.getByRole("button", { name: "Disable sharing" }).click();
+  await expect(ownerPage.getByRole("button", { name: "Revoke", exact: true })).toHaveCount(0);
+
+  assert.equal((await api(V.page, "join", { board_id: boardId, token: viewerToken })).status, 404);
+  assert.equal((await readCanvas(V.page, boardId)).status, 200);
+  await ownerPage.keyboard.press("Escape");
+  console.log("DISABLE_SHARING_PRESERVES_MEMBERSHIP_PASS");
+
   // A completely new friend can register after following a revoked link;
   // the invalid link must not trap them or silently sign them out.
   const newcomer = await browser.newContext({ viewport: { width: 1280, height: 850 } });
@@ -202,11 +223,12 @@ try {
     automaticPresenceSimulation: true,
   } });
   await newPage.goto(shareLink);
-  await newPage.getByRole("button", { name: "Sign in or create a passkey to join" }).click();
+  await newPage.getByRole("button", { name: "Sign in" }).click();
+  await newPage.getByRole("link", { name: "Create an account" }).click();
   await newPage.getByRole("button", { name: "Create account with passkey" }).click();
   await expect(newPage.getByText(/Invitation expired or revoked/))
     .toBeVisible({ timeout: 30000 });
-  await expect(newPage.getByRole("button", { name: "Create Jazz board" }))
+  await expect(newPage.getByRole("button", { name: "Create board" }))
     .toBeVisible({ timeout: 20000 });
   const signedIn = await newPage.evaluate(async () =>
     (await (await fetch("/patchboard-private/api/me", { credentials: "include" })).json()).signedIn);
@@ -217,14 +239,14 @@ try {
   // A verified owner with a stale link must not be portrayed as logged out.
   const staleTab = await ownerPage.context().newPage();
   try {
-    await staleTab.goto(origin + "/jazz-signin");
+    await staleTab.goto(origin + "/boards");
     await staleTab.evaluate(({ boardId, code }) => sessionStorage.setItem(
       "dim0:jazz:pendingInvite", JSON.stringify({ boardId, token: code }),
     ), { boardId, code });
     await staleTab.reload();
     await expect(staleTab.getByText(/Invitation expired or revoked/))
       .toBeVisible({ timeout: 20000 });
-    await expect(staleTab.getByRole("heading", { name: "Your Jazz boards" }))
+    await expect(staleTab.getByRole("heading", { name: "Your boards" }))
       .toBeVisible({ timeout: 20000 });
     assert.equal(await staleTab.evaluate(() => sessionStorage.getItem("dim0:jazz:pendingInvite")), null);
     console.log("STALE_INVITE_404_AUTHENTICATED_DASHBOARD_PASS");
@@ -247,6 +269,26 @@ try {
     assert.equal(await staleTab.evaluate(() => sessionStorage.getItem("dim0:jazz:pendingInvite")), null);
     console.log("TRANSIENT_INVITE_RETRY_AND_CLEAR_PASS");
   } finally { await staleTab.close(); }
+
+  const returning = B.page;
+  await returning.getByRole("button", { name: "Sign out" }).click();
+  await expect(returning).toHaveURL(origin + "/signin");
+  assert.equal((await readCanvas(returning, boardId)).status, 401);
+  await returning.goto(origin + "/boards/" + boardId);
+  await expect(returning.getByRole("button", { name: "Sign in with passkey" })).toBeVisible();
+  assert.ok(B.credential, "Missing test passkey from verified friend registration");
+  const loginDevice = await B.context.newCDPSession(returning);
+  await loginDevice.send("WebAuthn.enable");
+  const authenticator = await loginDevice.send("WebAuthn.addVirtualAuthenticator", { options: {
+    protocol: "ctap2", transport: "internal", hasResidentKey: true,
+    hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true,
+  } });
+  await loginDevice.send("WebAuthn.addCredential", { ...authenticator, credential: B.credential });
+  await returning.bringToFront();
+  await returning.getByRole("button", { name: "Sign in with passkey" }).click();
+  await expect(returning).toHaveURL(origin + "/boards/" + boardId, { timeout: 30000 });
+  assert.equal((await readCanvas(returning, boardId)).body.role, "member");
+  console.log("RETURNING_EDITOR_SIGNOUT_SIGNIN_DEEP_LINK_PASS");
 
   console.log("FRIENDS_SHARE_UI_ACCEPTANCE_PASS", JSON.stringify({
     boardId, roles: ["owner", "member", "member", "viewer"],

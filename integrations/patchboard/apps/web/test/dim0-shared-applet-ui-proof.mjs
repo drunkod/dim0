@@ -21,11 +21,11 @@ async function actor(label) {
     protocol: "ctap2", transport: "internal", hasResidentKey: true,
     hasUserVerification: true, isUserVerified: true, automaticPresenceSimulation: true,
   }});
-  await page.goto(origin + "/jazz-signin", { waitUntil: "domcontentloaded", timeout: 65000 });
+  await page.goto(origin + "/signup", { waitUntil: "domcontentloaded", timeout: 65000 });
   await expect(page.getByRole("button", { name: "Create account with passkey" })).toBeVisible({ timeout: 85000 });
   await page.bringToFront();
   await page.getByRole("button", { name: "Create account with passkey" }).click();
-  await expect(page.getByRole("button", { name: "Create Jazz board" })).toBeVisible({ timeout: 55000 });
+  await expect(page.getByRole("button", { name: "Create board" })).toBeVisible({ timeout: 55000 });
   return page;
 }
 async function call(page, route, data) {

@@ -85,7 +85,7 @@ export async function privateBoardRequest(
       // The original single-use Patchboard invite URL remains backwards-compatible.
       // Reusable group invites land directly on Dim0 Canvas after the passkey join.
       const inviteUrl = new URL(parsed.reusable
-        ? "/jazz-invite/" + parsed.board_id : "/patchboard-private/", request.url);
+        ? "/share/join/" + parsed.board_id : "/patchboard-private/", request.url);
       if (parsed.reusable) inviteUrl.hash = "invite=" + encodeURIComponent(token);
       else {
         inviteUrl.searchParams.set("board", parsed.board_id);
@@ -103,6 +103,18 @@ export async function privateBoardRequest(
       return json({ invites: rows.filter((row) => (row.expiresAtEpochMs ?? 0) > Date.now())
         .map((row) => ({ id: row.id, role: row.role, reusable: !row.singleUse,
           expires_at: row.expiresAtEpochMs })) });
+    }
+    if (pathname === "/patchboard-private/api/invites/revoke-all" && request.method === "POST") {
+      const { board_id } = z.object({ board_id: boardIdSchema }).strict().parse(await safeJson(request));
+      const result = await db.serializableTransaction(async (tx) => {
+        const board = await tx.one(app.boards.where({ id: board_id }));
+        if (!board || board.ownerId !== accountId) throw new PrivatePermissionDenied();
+        const invites = await tx.all(app.boardInvites.where({ boardId: board_id }));
+        for (const invite of invites) tx.delete(app.boardInvites, invite.id);
+        return invites.length;
+      });
+      await result.wait({ timeoutMs: 10000 });
+      return json({ revoked_count: result.value });
     }
     if (pathname === "/patchboard-private/api/invites/revoke" && request.method === "POST") {
       const parsed = z.object({ board_id: boardIdSchema, invite_id: boardIdSchema })
@@ -143,7 +155,8 @@ export async function privateBoardRequest(
       await write.wait({ timeoutMs: 10000 });
       return json({ removed: write.value });
     }
-    if (pathname === "/patchboard-private/api/join" && request.method === "POST") {
+    const preview = pathname === "/patchboard-private/api/invites/preview";
+    if ((preview || pathname === "/patchboard-private/api/join") && request.method === "POST") {
       const parsed = z.object({
         board_id: boardIdSchema, token: inviteSchema,
       }).strict().parse(await safeJson(request));
@@ -164,6 +177,7 @@ export async function privateBoardRequest(
           if (existing && invite.singleUse) throw new Error("INVITE_INVALID");
           const board = await tx.one(app.boards.where({ id: parsed.board_id }));
           if (!board) throw new Error("INVITE_INVALID");
+          if (preview) return { role: invite.role };
           if (existing) {
             // Original Dim0 invitation semantics: upgrade-only, never downgrade.
             if (existing.role === "viewer" && invite.role === "editor") {
@@ -175,8 +189,9 @@ export async function privateBoardRequest(
             }, { id: randomUUID() });
           }
           if (invite.singleUse) tx.delete(app.boardInvites, invite.id);
-          return true;
+          return { role: invite.role };
         });
+        if (preview) return json(write.value);
         await write.wait({ timeoutMs: 10000 });
         return json({ joined: true, board_id: parsed.board_id }, 200);
       } catch (error) {

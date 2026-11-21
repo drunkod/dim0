@@ -1,3 +1,4 @@
+import { resetSignedOutState } from "@/features/signin/reset-signed-out-state"
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
 import { AppSidebar } from "@/components/sidebar/app-sidebar"
@@ -23,15 +24,16 @@ import { AuthGraphTexture } from '@/features/signin/components/auth-graph-textur
 
 export function RootLayout() {
   const pathname = useRouterState({ select: (state) => state.location.pathname })
-  const jazzRoute = pathname === "/jazz-signin" || pathname === "/jazz-signin/" ||
-    pathname.startsWith("/jazz-invite/") || pathname === "/boards" || pathname.startsWith("/boards/")
+  const accountRoute = /^\/(signin|signup|jazz-signin)\/?$/.test(pathname)
+  const jazzRoute = accountRoute ||
+    pathname.startsWith("/share/join/") || pathname.startsWith("/jazz-invite/") || pathname === "/boards" || pathname.startsWith("/boards/")
 
   if (import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" && jazzRoute) {
     return (
       <ThemeProvider>
         <StyleDefaultsProvider>
           <div className="relative h-dvh w-full overflow-hidden bg-background">
-            <Outlet />
+            {accountRoute ? <><AuthBackground /><div className="absolute inset-0 grid place-items-center overflow-auto px-4"><Outlet /></div></> : <Outlet />}
             <Toaster position="top-right" closeButton />
           </div>
         </StyleDefaultsProvider>
@@ -51,11 +53,6 @@ function LegacyRootLayout({ pathname }: { pathname: string }) {
 
   // Zustand state
   const userId = useAppStore(s => s.userId)
-  const setUserId = useAppStore(s => s.setUserId)
-  const setUserEmail = useAppStore(s => s.setUserEmail)
-  const setUserPlan = useAppStore(s => s.setUserPlan)
-  const setEmailVerificationEnabled = useAppStore(s => s.setEmailVerificationEnabled)
-  const setEmailVerified = useAppStore(s => s.setEmailVerified)
   const setBillingActive = useAppStore(s => s.setBillingActive)
 
   // Billing is "active" only if the backend has the flag AND the Stripe keys —
@@ -75,16 +72,11 @@ function LegacyRootLayout({ pathname }: { pathname: string }) {
 
   const onLogout = useCallback(() => {
     clearTokens()
-    queryClient.clear()
-    setUserId('root')
-    setUserEmail('root@localhost')
-    setUserPlan('free')
-    setEmailVerificationEnabled(false)
-    setEmailVerified(true)
+    resetSignedOutState(queryClient)
     // Local-first desktop: signing out drops back to the local dashboard, not a
     // login wall you don't need. Web keeps the sign-in screen.
     navigate({ to: isTauri() ? '/' : '/signin', replace: true })
-  }, [navigate, queryClient, setEmailVerificationEnabled, setEmailVerified, setUserEmail, setUserId, setUserPlan])
+  }, [navigate, queryClient])
 
   const isAuthed = isSignedIn(userId)
 

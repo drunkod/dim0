@@ -20,7 +20,7 @@ try {
   const ownerContext=existing.context();
   qaPage=await ownerContext.newPage();
   qaPage.on("pageerror",e=>userErrors.push("standard Helium: "+String(e)));
-  await qaPage.goto(origin+"/jazz-signin",{waitUntil:"domcontentloaded",timeout:45000});
+  await qaPage.goto(origin+"/boards",{waitUntil:"domcontentloaded",timeout:45000});
   const create=await qaPage.evaluate(async title=>{
     const response=await fetch("/patchboard-private/api/boards",{
       method:"POST",credentials:"include",headers:{"content-type":"application/json"},body:JSON.stringify({title}),
@@ -32,10 +32,10 @@ try {
   await expect(qaPage.getByRole("button",{name:"Share this board"})).toBeVisible({timeout:65000});
   await qaPage.getByRole("button",{name:"Share this board"}).click();
   const dlg=qaPage.getByRole("dialog");
-  await dlg.locator("#jazz-invite-role").selectOption("editor");
-  await dlg.getByRole("button",{name:"Create share link for multiple friends"}).click();
-  const link=await dlg.locator("#jazz-invite-link").inputValue({timeout:25000});
-  assert.match(link,/\/jazz-invite\/[a-f0-9-]{36}#invite=[\w-]{43}$/);
+  await dlg.getByRole("radio",{name:"Edit"}).click();
+  await dlg.getByRole("button",{name:"Create link"}).click();
+  const link=await dlg.getByLabel("Invitation link").inputValue({timeout:25000});
+  assert.match(link,/\/share\/join\/[a-f0-9-]{36}#invite=[\w-]{43}$/);
   console.log("STANDARD_HELIUM_OWNER_SHARE_PASS");
   await qaPage.keyboard.press("Escape");
 
@@ -57,8 +57,9 @@ try {
     isUserVerified:true,automaticPresenceSimulation:true
   }});
   await guest.goto(link,{waitUntil:"domcontentloaded",timeout:50000});
-  await expect(guest.getByRole("button",{name:"Sign in or create a passkey to join"})).toBeVisible({timeout:55000});
-  await guest.getByRole("button",{name:"Sign in or create a passkey to join"}).click();
+  await expect(guest.getByRole("button",{name:"Sign in"})).toBeVisible({timeout:55000});
+  await guest.getByRole("button",{name:"Sign in"}).click();
+  await guest.getByRole("link",{name:"Create an account"}).click();
   await expect(guest.getByRole("button",{name:"Create account with passkey"})).toBeVisible({timeout:55000});
   await guest.bringToFront();
   await guest.getByRole("button",{name:"Create account with passkey"}).click();

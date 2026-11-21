@@ -3,7 +3,7 @@ import { useQueryClient } from "@tanstack/react-query"
 import { useNavigate, useParams } from "@tanstack/react-router"
 import { toast } from "sonner"
 
-import { Button } from "@/components/ui/button"
+import { Status, SignInPanel, ReadyPanel, ErrorPanel } from "./invite-panels"
 import { getAccessToken } from "@/features/signin/auth-storage"
 import { useAppStore } from "@/store"
 import { acceptShareLink, previewShareLink, type ShareRole } from "../api"
@@ -114,61 +114,6 @@ export function ShareLandingScreen() {
           />
         )}
       </div>
-    </div>
-  )
-}
-
-
-function Status({ text }: { text: string }) {
-  return (
-    <div className="flex flex-col items-center gap-3 text-center">
-      <div className="h-2 w-2 animate-pulse rounded-full bg-primary" aria-hidden="true" />
-      <p className="text-sm text-muted-foreground">{text}</p>
-    </div>
-  )
-}
-
-
-function SignInPanel({ onGoSignIn }: { onGoSignIn: () => void }) {
-  return (
-    <div className="flex flex-col items-center gap-3 text-center">
-      <h1 className="text-lg font-semibold">You've been invited to a board</h1>
-      <p className="text-sm text-muted-foreground">
-        Sign in to your Dim0 account to accept this invitation.
-      </p>
-      <Button onClick={onGoSignIn} className="mt-2">
-        Sign in
-      </Button>
-    </div>
-  )
-}
-
-
-function ReadyPanel({ role, onOpen }: { role: ShareRole; onOpen: () => void }) {
-  return (
-    <div className="flex flex-col items-center gap-3 text-center">
-      <h1 className="text-lg font-semibold">You've been invited</h1>
-      <p className="text-sm text-muted-foreground">
-        {role === "member"
-          ? "You'll be able to view and edit this board."
-          : "You'll have view-only access to this board."}
-      </p>
-      <Button onClick={onOpen} className="mt-2">
-        Open board
-      </Button>
-    </div>
-  )
-}
-
-
-function ErrorPanel({ message, onGoHome }: { message: string; onGoHome: () => void }) {
-  return (
-    <div className="flex flex-col items-center gap-3 text-center">
-      <h1 className="text-lg font-semibold">This invitation isn't usable</h1>
-      <p className="text-sm text-muted-foreground">{message}</p>
-      <Button variant="secondary" onClick={onGoHome} className="mt-2">
-        Back home
-      </Button>
     </div>
   )
 }

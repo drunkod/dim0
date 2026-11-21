@@ -5,7 +5,8 @@ import { decodeJwt, resolveBillingPlan } from "@/lib/decode-jwt"
 import { useAppStore } from "@/store"
 import { getEmailVerificationStatus, signup } from "@/api"
 
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { AccountCard } from "../components/account-card"
+import { PasskeyForm } from "../components/passkey-form"
 import { Label } from "@/components/ui/label"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -17,6 +18,12 @@ import { getPasswordStrength } from "../lib/password-strength"
 
 /** Renders the sign-up screen and creates a new account after validation passes. */
 export function SignupPage() {
+  if (import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1") return <AccountCard mode="signup"><PasskeyForm mode="signup" /></AccountCard>
+  return <LegacySignupPage />
+}
+
+
+function LegacySignupPage() {
   const navigate = useNavigate()
   const setUserId = useAppStore(s => s.setUserId)
   const setUserEmail = useAppStore(s => s.setUserEmail)
@@ -51,15 +58,7 @@ export function SignupPage() {
   })
 
   return (
-    <div className="w-full max-w-md mx-auto">
-      <Card className="bg-card text-card-foreground border border-border shadow-xl">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl">Create your account</CardTitle>
-          <CardDescription className="text-muted-foreground">
-            Start organizing your chats and boards
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+    <AccountCard mode="signup">
           <form
             className="space-y-5"
             onSubmit={e => {
@@ -190,8 +189,6 @@ export function SignupPage() {
               </Link>
             </p>
           </form>
-        </CardContent>
-      </Card>
-    </div>
+    </AccountCard>
   )
 }
