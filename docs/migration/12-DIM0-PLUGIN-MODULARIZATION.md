@@ -72,18 +72,22 @@ If `DIM0_PLUGIN_OUTPUT_DIR` is supplied, extracted files go there and the ZIP
 goes in its parent. Both invocation paths build the same JSON, assets, skills,
 and archive entry names. If validation or zipping fails, the previous
 successful ZIP remains available. The extracted output is replaced only if
-it is absent, empty, or matches the known generated Dim0 layout. Unknown or
-caller-owned files cause refusal without deletion. If stage promotion fails
+it is absent, empty, or matches the generated Dim0 layout, **or** matches the
+verified legacy three-file Dim0 layout from the pre-modular packager.
+Unknown or caller-owned files still cause refusal without deletion. If stage promotion fails
 after the old stage is moved, it is restored before cleanup; if restoration
 itself fails, the backup directory is retained with a printed recovery path.
 
 ## Verification performed
 
 - **PASS:** new and compatibility builder ZIP entries and parsed JSON agree.
-- **PASS:** 14 packaging tests, including invalid URLs, source-install
+- **PASS:** 16 packaging tests, including invalid URLs, source-install
   restrictions, temporary-tunnel release rejection, approved origin matching,
   caller-owned file preservation, promotion rollback, missing icons, malformed
-  skill metadata, and last-good-ZIP preservation.
+  skill metadata, last-good-ZIP preservation and a real **legacy three-file**
+  builder-to-modular in-place upgrade. Successful rebuilds now compare ZIP
+  entry names and uncompressed bytes, not timestamp-sensitive ZIP hashes.
+  Failed rebuild tests still require the original ZIP bytes to remain identical.
 - **PASS:** clean offline `pnpm` install and the full private OAuth/MCP
   regression suite in this isolated worktree. Includes two distinct Jazz
   actors, versioned CRUD, viewer denial, reauthorization/restart, scopes.
@@ -155,3 +159,23 @@ plugin documentation *explicitly* prescribes
 `mcpServers.dim0.extensions["com.openai"].auth` for OAuth. This package
 uses the documented OpenAI extension and validates that shape separately.
 A real ChatGPT installation is still the final format-acceptance gate.
+
+## 22 November 2026 — PR #2 compatibility correction
+
+The packaging branch now accepts a genuine predecessor artifact containing
+exactly `plugin.json`, `mcp.json`, and `README.md` after validating its
+Dim0 manifest and MCP descriptor identity. Unknown files remain a hard
+failure, and the original ZIP survives both validation and promotion errors.
+
+The regression suite builds a legacy stage **using the original target-branch
+packager**, injects an unowned file to assert refusal, then upgrades that same
+stage in place with the modular compatibility command. An additional test
+rejects a three-file lookalike with a different manifest identity.
+
+Successful rebuilds compare ZIP entry names and the uncompressed bytes of
+each entry, because ZIP timestamps can differ across otherwise identical
+archives. Failed rebuilds retain the previous exact ZIP hash as a byte-level
+rollback assertion.
+
+The presentation deployment and public Jazz service were not modified by
+this packaging-only change.

@@ -289,11 +289,21 @@ test("rebuild replaces an existing owned stage and ZIP successfully", async () =
   const stage = join(qa, "owned-rebuild", "stage");
   let result = build(canonical, stage);
   assert.equal(result.status, 0, result.stderr);
-  const oldZip = await readFile(archive(stage));
+  const oldArchive = archive(stage);
+  const oldNames = entries(oldArchive);
+  const oldBytes = new Map(oldNames.filter(name => !name.endsWith("/"))
+    .map(name => [name, execFileSync("unzip", ["-p", oldArchive, name])]));
+  // ZIP DOS timestamps have 2-second resolution. An identical rebuild at a
+  // different time need not have an identical archive hash.
+  await new Promise(resolve => setTimeout(resolve, 2300));
   result = build(compat, stage);
   assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(entries(archive(stage)), oldNames);
   assert.deepEqual(entries(archive(stage)), entries(canonicalZip));
-  assert.equal(sha(await readFile(archive(stage))), sha(oldZip));
+  for (const [name, bytes] of oldBytes) {
+    assert.deepEqual(execFileSync("unzip", ["-p", archive(stage), name]), bytes,
+      "Uncompressed archive content changed for " + name);
+  }
   assert.deepEqual((await readdir(dirname(stage))).filter(name => name.startsWith(".dim0-plugin-")),
     [], "successful promotion must clean up its previous-stage backup");
 });
@@ -311,4 +321,66 @@ test("failed ZIP promotion also rolls back the promoted stage", async () => {
   assert.match(result.stderr, /Injected ZIP promotion failure/);
   assert.equal(sha(await readFile(archive(stage))), previousZip);
   assert.equal(await readFile(join(stage, "plugin.json"), "utf8"), previousManifest);
+});
+
+
+/** The parent branch's packager must remain compatible across upgrades. */
+async function originalLegacyBuilder() {
+  const fixture = join(qa, "legacy-before-modular");
+  await mkdir(join(fixture, "scripts"), { recursive: true });
+  const script = execFileSync("git", [
+    "show", "b6f4c579:integrations/dim0-mcp-plugin/scripts/build.mjs",
+  ], { cwd: root, encoding: "utf8" });
+  const readme = execFileSync("git", [
+    "show", "b6f4c579:integrations/dim0-mcp-plugin/README.md",
+  ], { cwd: root, encoding: "utf8" });
+  await writeFile(join(fixture, "scripts/build.mjs"), script);
+  await writeFile(join(fixture, "README.md"), readme);
+  return join(fixture, "scripts/build.mjs");
+}
+
+test("upgrades the exact original three-file Dim0 stage in place", async () => {
+  const stage = join(qa, "legacy-upgrade", "stage");
+  const oldBuilder = await originalLegacyBuilder();
+  let result = build(oldBuilder, stage);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual((await readdir(stage)).sort(), [
+    "plugin.json", "mcp.json", "README.md",
+  ].sort(), "Original builder must really produce the three-file layout");
+  const oldManifest = JSON.parse(await readFile(join(stage, "plugin.json"), "utf8"));
+  assert.equal(oldManifest.name, "dim0-jazz");
+  const oldZip = sha(await readFile(archive(stage)));
+
+  const unexpected = join(stage, "caller-owned.txt");
+  await writeFile(unexpected, "preserve me");
+  result = build(compat, stage);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Refusing to replace unowned plugin output files/);
+  assert.equal(await readFile(unexpected, "utf8"), "preserve me");
+  assert.equal(sha(await readFile(archive(stage))), oldZip);
+  await rm(unexpected);
+
+  result = build(compat, stage);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual((await readdir(stage)).sort(),
+    ["plugin.json", "mcp.json", "README.md", "assets", "skills"].sort());
+  assert.deepEqual(entries(archive(stage)), entries(canonicalZip));
+  assert.equal(JSON.parse(unzipText(archive(stage), "plugin.json")).name, "dim0-jazz");
+});
+
+test("three-file output with a different product identity is never replaced", async () => {
+  const stage = join(qa, "legacy-impostor", "stage");
+  const oldBuilder = await originalLegacyBuilder();
+  const original = build(oldBuilder, stage);
+  assert.equal(original.status, 0, original.stderr);
+  const previousZip = sha(await readFile(archive(stage)));
+  const manifestPath = join(stage, "plugin.json");
+  const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+  manifest.name = "not-dim0";
+  await writeFile(manifestPath, JSON.stringify(manifest));
+  const fail = build(canonical, stage);
+  assert.notEqual(fail.status, 0);
+  assert.match(fail.stderr, /without verified Dim0 package identity/);
+  assert.equal(JSON.parse(await readFile(manifestPath, "utf8")).name, "not-dim0");
+  assert.equal(sha(await readFile(archive(stage))), previousZip);
 });

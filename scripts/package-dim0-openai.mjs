@@ -167,18 +167,31 @@ async function assertReplaceableOutput(target) {
       }
     }
   }
-  await check(target, ["plugin.json", "mcp.json", "README.md"], ["assets", "skills"]);
-  await check(join(target, "assets"), ["icon.png", "logo.png"]);
-  await check(join(target, "skills"), [], ["dim0-board"]);
-  await check(join(target, "skills", "dim0-board"), ["SKILL.md"]);
+  const isLegacy = JSON.stringify(entries.slice().sort()) ===
+    JSON.stringify(["plugin.json", "mcp.json", "README.md"].sort());
+  if (isLegacy) {
+    // The original, pre-modular Dim0 packager only emitted these three
+    // files. Permit an in-place upgrade after validating its exact layout
+    // and embedded product identity. Never accept any extra caller file.
+    await check(target, ["plugin.json", "mcp.json", "README.md"]);
+  } else {
+    await check(target, ["plugin.json", "mcp.json", "README.md"], ["assets", "skills"]);
+    await check(join(target, "assets"), ["icon.png", "logo.png"]);
+    await check(join(target, "skills"), [], ["dim0-board"]);
+    await check(join(target, "skills", "dim0-board"), ["SKILL.md"]);
+  }
   const manifest = await json(join(target, "plugin.json"));
   const mcp = await json(join(target, "mcp.json"));
   if (manifest.name !== "dim0-jazz" ||
+      !/^\d+\.\d+\.\d+$/.test(manifest.version) ||
       manifest.$schema !== "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json" ||
       Object.keys(mcp.mcpServers ?? {}).join(",") !== "dim0" ||
       mcp.mcpServers.dim0.type !== "streamable-http") {
     throw new Error("Refusing to replace output without verified Dim0 package identity");
   }
+  // Validate the canonical MCP location as well as the manifest name;
+  // an unrelated ZIP with a forged name must not be overwritten.
+  validateEndpoint(mcp.mcpServers.dim0.url, { release: false, warnFixture: false });
   return true;
 }
 

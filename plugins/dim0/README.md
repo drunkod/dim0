@@ -27,8 +27,9 @@ Default outputs: `integrations/dim0-mcp-plugin/dist/dim0-jazz/` (extracted
 portable root) and `integrations/dim0-mcp-plugin/dist/dim0-jazz-mcp-plugin.zip`.
 `DIM0_PLUGIN_OUTPUT_DIR` changes the extracted root; the ZIP is always placed
 in its parent, preserving the old interface. A failed build preserves the last
-successful ZIP. The builder refuses to replace any output directory containing unrecognized
-or caller-owned files, including nested files. Build failures preserve the
+successful ZIP. The builder recognizes previously generated modular packages and exact
+legacy three-file Dim0 packages for in-place upgrades, but refuses any output
+directory containing unrecognized or caller-owned files, including nested files. Build failures preserve the
 previous stage and ZIP. A release build rejects fixtures and temporary tunnels
 and requires a matching explicitly approved permanent HTTPS origin:
 
