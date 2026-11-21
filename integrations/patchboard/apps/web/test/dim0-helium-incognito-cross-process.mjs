@@ -50,17 +50,17 @@ try {
   privateContext=await privateBrowser.newContext({viewport:{width:1280,height:850}});
   const guest=await privateContext.newPage();
   guest.on("pageerror",e=>userErrors.push("Helium incognito: "+String(e)));
+  await guest.goto(link,{waitUntil:"domcontentloaded",timeout:50000});
+  await expect(guest.getByRole("button",{name:"Sign in"})).toBeVisible({timeout:55000});
+  await guest.getByRole("button",{name:"Sign in"}).click();
+  await guest.getByRole("link",{name:"Create an account"}).click();
+  await expect(guest.getByRole("button",{name:"Create account with passkey"})).toBeVisible({timeout:55000});
   const cdp=await privateContext.newCDPSession(guest);
   await cdp.send("WebAuthn.enable");
   await cdp.send("WebAuthn.addVirtualAuthenticator",{options:{
     protocol:"ctap2",transport:"internal",hasResidentKey:true,hasUserVerification:true,
     isUserVerified:true,automaticPresenceSimulation:true
   }});
-  await guest.goto(link,{waitUntil:"domcontentloaded",timeout:50000});
-  await expect(guest.getByRole("button",{name:"Sign in"})).toBeVisible({timeout:55000});
-  await guest.getByRole("button",{name:"Sign in"}).click();
-  await guest.getByRole("link",{name:"Create an account"}).click();
-  await expect(guest.getByRole("button",{name:"Create account with passkey"})).toBeVisible({timeout:55000});
   await guest.bringToFront();
   await guest.getByRole("button",{name:"Create account with passkey"}).click();
   await expect.poll(()=>new URL(guest.url()).pathname,{timeout:65000,intervals:[1000,1500,2500]})

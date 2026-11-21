@@ -270,10 +270,10 @@ try {
     console.log("TRANSIENT_INVITE_RETRY_AND_CLEAR_PASS");
   } finally { await staleTab.close(); }
 
-  const returning = B.page;
-  await returning.getByRole("button", { name: "Sign out" }).click();
-  await expect(returning).toHaveURL(origin + "/signin");
-  assert.equal((await readCanvas(returning, boardId)).status, 401);
+  await B.page.getByRole("button", { name: "Sign out" }).click();
+  await expect(B.page).toHaveURL(origin + "/signin");
+  assert.equal((await readCanvas(B.page, boardId)).status, 401);
+  const returning = await B.context.newPage();
   await returning.goto(origin + "/boards/" + boardId);
   await expect(returning.getByRole("button", { name: "Sign in with passkey" })).toBeVisible();
   assert.ok(B.credential, "Missing test passkey from verified friend registration");
