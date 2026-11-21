@@ -1,0 +1,100 @@
+{
+  "name": "dim0-jazz",
+  "version": "0.1.0",
+  "description": "Read and edit shared Dim0 canvas boards using board-scoped OAuth and Jazz.",
+  "author": {
+    "name": "Dim0 Jazz integration",
+    "url": "https://github.com/drunkod/dim0"
+  },
+  "homepage": "https://github.com/drunkod/dim0",
+  "repository": "https://github.com/drunkod/dim0",
+  "license": "MIT",
+  "keywords": [
+    "dim0",
+    "collaborative-board",
+    "jazz",
+    "mcp",
+    "canvas",
+    "applets"
+  ],
+  "mcpServers": "./.mcp.json",
+  "skills": "./skills",
+  "interface": {
+    "displayName": "Dim0 Jazz Board",
+    "shortDescription": "Collaborate on your shared canvas with AI",
+    "longDescription": "Connect an assistant to one Dim0 board you explicitly authorize. Read canvas cards and links, create and rename cards, update applet code and shared state, and collaborate with people while preserving Jazz role permissions and version history. Each person signs into their own Dim0 account to approve a board; ChatGPT tool calls act as that person.",
+    "developerName": "Dim0 Jazz integration",
+    "category": "Productivity",
+    "capabilities": [
+      "List authorized boards",
+      "Read and search canvas entities",
+      "Create, rename and update cards and links",
+      "Edit and inspect applets",
+      "Read or update shared applet state",
+      "Respect editor/viewer roles and optimistic versions"
+    ],
+    "websiteURL": "https://github.com/drunkod/dim0",
+    "supportURL": "https://github.com/drunkod/dim0/issues",
+    "defaultPrompt": [
+      "List the cards on my authorized Dim0 board.",
+      "Create a canvas card titled Sprint checklist on my board.",
+      "Rename the selected board card after checking its version.",
+      "Show and update the shared counter applet state."
+    ],
+    "composerIcon": "./assets/icon.png",
+    "logo": "./assets/logo.png"
+  },
+  "extensions": {
+    "com.openai": {
+      "review": {
+        "test_cases": {
+          "positive": [
+            {
+              "description": "Read the approved board",
+              "prompt": "List the cards in my connected Dim0 board.",
+              "tools_triggered": "list_boards, list_canvas_entities",
+              "expected_behavior": "Only lists the board approved for this OAuth connection and its readable canvas entities."
+            },
+            {
+              "description": "Create a visible canvas card",
+              "prompt": "Create a board card titled Sprint checklist.",
+              "tools_triggered": "list_boards, create_canvas_entity",
+              "expected_behavior": "Creates one versioned canvas node in the authorized board and returns its ID."
+            },
+            {
+              "description": "Rename a card",
+              "prompt": "Rename the Sprint checklist card to Sprint complete.",
+              "tools_triggered": "list_canvas_entities, get_canvas_entity, update_canvas_entity",
+              "expected_behavior": "Reads full payload and current version, edits only the intended title, preserves the entity ID and other fields, and reports the new version."
+            },
+            {
+              "description": "Read shared applet state",
+              "prompt": "What is the current shared counter value?",
+              "tools_triggered": "list_canvas_entities, get_applet_state",
+              "expected_behavior": "Returns the authorized applet state and its version, without modifying it."
+            }
+          ],
+          "negative": [
+            {
+              "description": "Another board is not automatically in scope",
+              "prompt": "Read a different Dim0 board I did not approve."
+            },
+            {
+              "description": "Viewer cannot write",
+              "prompt": "Delete a card when I only have viewer access."
+            },
+            {
+              "description": "A concurrent overwrite should fail",
+              "prompt": "Overwrite a stale card version without checking its latest state."
+            }
+          ]
+        },
+        "commerce": false,
+        "commerce_description": "The plugin does not sell products or process payments."
+      },
+      "publication": {
+        "release_notes": "Private preview: OAuth-bound Dim0 canvas and shared applet operations."
+      }
+    }
+  }
+}

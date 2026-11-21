@@ -1,0 +1,39 @@
+name: Dim0 MCP plugin package
+
+on:
+  push:
+    paths:
+      - ".github/workflows/dim0-plugin-package.yml"
+      - "plugins/dim0/**"
+      - "scripts/package-dim0-openai.mjs"
+      - "scripts/test-package-dim0-openai.mjs"
+      - "integrations/dim0-mcp-plugin/scripts/build.mjs"
+  pull_request:
+    paths:
+      - ".github/workflows/dim0-plugin-package.yml"
+      - "plugins/dim0/**"
+      - "scripts/package-dim0-openai.mjs"
+      - "scripts/test-package-dim0-openai.mjs"
+      - "integrations/dim0-mcp-plugin/scripts/build.mjs"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Validate portable + legacy ZIP
+    runs-on: ubuntu-latest
+    steps:
+      # The upgrade test loads the real pre-modular packager from b6f4c579.
+      # Pull-request merge checkouts default to depth 1 and omit that commit.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verify zip utilities
+        run: command -v zip && command -v unzip
+      - name: Validate the portable package, legacy compatibility and failure rollback
+        run: node --test scripts/test-package-dim0-openai.mjs

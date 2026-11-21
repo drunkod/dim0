@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "dim0": {
+      "type": "http",
+      "url": "https://dim0.example.invalid/patchboard-private-mcp"
+    }
+  }
+}
