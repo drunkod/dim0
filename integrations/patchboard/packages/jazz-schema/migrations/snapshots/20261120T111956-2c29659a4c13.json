@@ -1,0 +1,638 @@
+{
+  "agentRuns": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "boardId",
+        "nullable": false,
+        "references": "boards"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "agentId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "action",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "running",
+            "complete",
+            "failed"
+          ]
+        },
+        "name": "status",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Json"
+        },
+        "name": "input",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Json"
+        },
+        "name": "result",
+        "nullable": true
+      }
+    ],
+    "indexed_columns": [
+      "boardId"
+    ],
+    "relations": {
+      "board": {
+        "kind": "forward",
+        "table": "boards",
+        "column": "boardId"
+      }
+    }
+  },
+  "boardInvites": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "boardId",
+        "nullable": false,
+        "references": "boards"
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "token",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "viewer",
+            "editor"
+          ]
+        },
+        "name": "role",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Boolean"
+        },
+        "default": {
+          "type": "Boolean",
+          "value": false
+        },
+        "name": "singleUse",
+        "nullable": false
+      }
+    ],
+    "indexed_columns": [
+      "boardId",
+      "token"
+    ],
+    "relations": {
+      "board": {
+        "kind": "forward",
+        "table": "boards",
+        "column": "boardId"
+      }
+    }
+  },
+  "boardMembers": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "boardId",
+        "nullable": false,
+        "references": "boards"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "userId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "viewer",
+            "editor",
+            "admin",
+            "agent"
+          ]
+        },
+        "name": "role",
+        "nullable": false
+      }
+    ],
+    "indexed_columns": [
+      "boardId",
+      "userId"
+    ],
+    "relations": {
+      "board": {
+        "kind": "forward",
+        "table": "boards",
+        "column": "boardId"
+      }
+    }
+  },
+  "boards": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "title",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "ownerId",
+        "nullable": false
+      }
+    ],
+    "relations": {
+      "membersViaBoard": {
+        "kind": "reverse",
+        "table": "boardMembers",
+        "relation": "board"
+      },
+      "shapesViaBoard": {
+        "kind": "reverse",
+        "table": "shapes",
+        "relation": "board"
+      },
+      "tasksViaBoard": {
+        "kind": "reverse",
+        "table": "tasks",
+        "relation": "board"
+      },
+      "proposalsViaBoard": {
+        "kind": "reverse",
+        "table": "proposals",
+        "relation": "board"
+      },
+      "checkpointsViaBoard": {
+        "kind": "reverse",
+        "table": "checkpoints",
+        "relation": "board"
+      },
+      "cursorsViaBoard": {
+        "kind": "reverse",
+        "table": "cursors",
+        "relation": "board"
+      },
+      "invitesViaBoard": {
+        "kind": "reverse",
+        "table": "boardInvites",
+        "relation": "board"
+      }
+    }
+  },
+  "checkpoints": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "boardId",
+        "nullable": false,
+        "references": "boards"
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "label",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Json"
+        },
+        "name": "snapshot",
+        "nullable": false
+      }
+    ],
+    "indexed_columns": [
+      "boardId"
+    ],
+    "relations": {
+      "board": {
+        "kind": "forward",
+        "table": "boards",
+        "column": "boardId"
+      }
+    }
+  },
+  "comments": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "taskId",
+        "nullable": false,
+        "references": "tasks"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "authorId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "body",
+        "nullable": false
+      }
+    ],
+    "indexed_columns": [
+      "taskId"
+    ],
+    "relations": {
+      "task": {
+        "kind": "forward",
+        "table": "tasks",
+        "column": "taskId"
+      }
+    }
+  },
+  "cursors": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "boardId",
+        "nullable": false,
+        "references": "boards"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "userId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "name",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Double"
+        },
+        "name": "x",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Double"
+        },
+        "name": "y",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Boolean"
+        },
+        "default": {
+          "type": "Boolean",
+          "value": false
+        },
+        "name": "active",
+        "nullable": false
+      }
+    ],
+    "indexed_columns": [
+      "boardId",
+      "userId"
+    ],
+    "relations": {
+      "board": {
+        "kind": "forward",
+        "table": "boards",
+        "column": "boardId"
+      }
+    }
+  },
+  "mcpRequests": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "boardId",
+        "nullable": false,
+        "references": "boards"
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "requestId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "textHash",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "noteId",
+        "nullable": false
+      }
+    ],
+    "indexed_columns": [
+      "boardId",
+      "requestId"
+    ],
+    "relations": {
+      "board": {
+        "kind": "forward",
+        "table": "boards",
+        "column": "boardId"
+      }
+    }
+  },
+  "proposals": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "boardId",
+        "nullable": false,
+        "references": "boards"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "proposerId",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "targetId",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "create_note",
+            "move_shape",
+            "create_task"
+          ]
+        },
+        "name": "operation",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Json"
+        },
+        "name": "payload",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "pending",
+            "approved",
+            "rejected"
+          ]
+        },
+        "name": "status",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "reviewedBy",
+        "nullable": true
+      }
+    ],
+    "indexed_columns": [
+      "boardId",
+      "status"
+    ],
+    "relations": {
+      "board": {
+        "kind": "forward",
+        "table": "boards",
+        "column": "boardId"
+      }
+    }
+  },
+  "shapes": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "boardId",
+        "nullable": false,
+        "references": "boards"
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "note",
+            "rect"
+          ]
+        },
+        "name": "kind",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "text",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Double"
+        },
+        "name": "x",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Double"
+        },
+        "name": "y",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Double"
+        },
+        "name": "width",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Double"
+        },
+        "name": "height",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "fill",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Integer"
+        },
+        "name": "zIndex",
+        "nullable": false
+      }
+    ],
+    "indexed_columns": [
+      "boardId",
+      "zIndex"
+    ],
+    "relations": {
+      "board": {
+        "kind": "forward",
+        "table": "boards",
+        "column": "boardId"
+      },
+      "tasksViaShape": {
+        "kind": "reverse",
+        "table": "tasks",
+        "relation": "shape"
+      }
+    }
+  },
+  "tasks": {
+    "columns": [
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "boardId",
+        "nullable": false,
+        "references": "boards"
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "shapeId",
+        "nullable": true,
+        "references": "shapes"
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "title",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Text"
+        },
+        "name": "notes",
+        "nullable": true
+      },
+      {
+        "column_type": {
+          "type": "Enum",
+          "variants": [
+            "todo",
+            "doing",
+            "review",
+            "done"
+          ]
+        },
+        "name": "status",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Double"
+        },
+        "name": "rank",
+        "nullable": false
+      },
+      {
+        "column_type": {
+          "type": "Uuid"
+        },
+        "name": "assigneeId",
+        "nullable": true
+      }
+    ],
+    "indexed_columns": [
+      "boardId",
+      "status",
+      "rank"
+    ],
+    "relations": {
+      "board": {
+        "kind": "forward",
+        "table": "boards",
+        "column": "boardId"
+      },
+      "shape": {
+        "kind": "forward",
+        "table": "shapes",
+        "column": "shapeId"
+      },
+      "commentsViaTask": {
+        "kind": "reverse",
+        "table": "comments",
+        "relation": "task"
+      }
+    }
+  }
+}
