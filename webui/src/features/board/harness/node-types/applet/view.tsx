@@ -37,6 +37,53 @@ export interface AppletViewProps {
 }
 
 
+/** A transient status must intercept native canvas pointer capture to be clickable. */
+function AppletSaveNotice({ status, onRetry }: {
+  status: "saving" | "saved" | "unsaved" | "conflict"
+  onRetry: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  useStopCanvasGesture(ref)
+  return (
+    <div
+      ref={ref}
+      role={status === "unsaved" ? "alert" : "status"}
+      className="absolute right-1 top-1 z-20 flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1 text-xs pointer-events-auto"
+    >
+      <span>{status === "saved" ? "Saved" : status === "unsaved" ? "Unsaved" : "Saving…"}</span>
+      {status === "unsaved" && (
+        <button type="button" className="font-medium underline" onClick={onRetry}>
+          Retry
+        </button>
+      )}
+    </div>
+  )
+}
+
+
+/** Keep the remote value visible and retain the draft until an explicit action. */
+function AppletConflictNotice({ shared, onCopy, onRefresh }: {
+  shared: Record<string, unknown> | null
+  onCopy: () => void
+  onRefresh: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  useStopCanvasGesture(ref)
+  return (
+    <div ref={ref} role="alert" className="absolute inset-x-1 top-1 z-20 rounded-lg border border-amber-500 bg-background p-2 text-xs pointer-events-auto">
+      State conflict: another editor saved first. Your local draft is preserved.
+      {shared && <span className="ml-1">Shared value: {JSON.stringify(shared)}</span>}
+      <button type="button" className="ml-2 underline" onClick={onCopy}>
+        Copy local draft
+      </button>
+      <button type="button" className="ml-2 underline" onClick={onRefresh}>
+        Reload shared state
+      </button>
+    </div>
+  )
+}
+
+
 /**
  * Canvas view for an applet note. Loads persisted state, then renders the applet
  * inline; interaction is enabled only when the node is selected so board gestures
@@ -73,7 +120,8 @@ export function AppletNodeView({ id }: AppletViewProps) {
   // saved state instead of flashing defaults then re-mounting (shared with the
   // inspect surface).
   const { initialState, stateLoaded, stateRevision, persistState, hasConflict,
-    refreshSharedState } = useAppletInitialState(noteId, shouldMount || isSelected)
+    refreshSharedState, saveStatus, retrySave, copyLocalDraft,
+    conflictingSharedValue } = useAppletInitialState(noteId, shouldMount || isSelected)
 
   // Persistence and remote revision checks are coordinated in one hook.
   // A stale writer gets an explicit conflict instead of overwriting a peer.
@@ -115,12 +163,14 @@ export function AppletNodeView({ id }: AppletViewProps) {
           )}
         >
           {hasConflict && (
-            <div role="alert" className="absolute inset-x-1 top-1 z-20 rounded-lg border border-amber-500 bg-background p-2 text-xs pointer-events-auto">
-              State conflict: another editor saved first. Copy the local state from the notification before refreshing.
-              <button type="button" className="ml-2 underline" onClick={() => void refreshSharedState()}>
-                Reload shared state
-              </button>
-            </div>
+            <AppletConflictNotice
+              shared={conflictingSharedValue}
+              onCopy={() => { void copyLocalDraft() }}
+              onRefresh={() => { void refreshSharedState() }}
+            />
+          )}
+          {!hasConflict && saveStatus !== "idle" && (
+            <AppletSaveNotice status={saveStatus} onRetry={() => { void retrySave() }} />
           )}
           {live ? (
             appletEl

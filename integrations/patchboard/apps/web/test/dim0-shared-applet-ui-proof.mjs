@@ -45,6 +45,12 @@ async function waitApplet(page, id, count) {
 }
 try {
   const owner=await actor("owner");
+  if (process.env.DIM0_TRACE_APPLET_QA === "1") {
+    owner.on("request", req => { if (req.url().includes("/api/applet-state")) console.log("OWNER_APPLET_REQUEST", req.method(), new URL(req.url()).pathname); });
+    owner.on("response", res => { if (res.url().includes("/api/applet-state")) console.log("OWNER_APPLET_RESPONSE", res.request().method(), res.status()); });
+    owner.on("requestfailed", req => { if (req.url().includes("/api/applet-state")) console.log("OWNER_APPLET_FAILED", req.failure()); });
+    owner.on("pageerror", err => console.log("OWNER_PAGEERROR", String(err)));
+  }
   const editor=await actor("editor");
   const newBoard=await call(owner,"boards",{title:"2-browser Jazz applet state QA"});
   assert.equal(newBoard.status,201,JSON.stringify(newBoard.body));
@@ -82,6 +88,66 @@ try {
   assert.equal(state.body.version,2);
   assert.deepEqual(errors,[]);
   console.log("JAZZ_SHARED_APPLET_UI_ACCEPTANCE_PASS",JSON.stringify({boardId,nodeId,count:2,version:2}));
+
+  if (process.env.DIM0_FAULT_QA === "1") {
+    assert.ok(origin.startsWith("http://localhost:"), "Fault injection must never run on the presentation server");
+
+    // The first POST fails before commit: the owner must get an actionable
+    // Unsaved / Retry status without changing the remote editor's value.
+    let rejectOnce = true;
+    await owner.route("**/patchboard-private/api/applet-state", async route => {
+      if (route.request().method() === "POST" && rejectOnce) {
+        rejectOnce = false;
+        await route.fulfill({ status: 503, contentType: "application/json", body: '{"error":"qa outage"}' });
+      } else await route.continue();
+    });
+    await ownerRoot.getByText("Increment").evaluate(el => el.click());
+    await expect(ownerRoot.getByTestId("jazz-shared-count")).toHaveText("3");
+    const retry = owner.getByRole("button", { name: "Retry" });
+    await expect(retry).toBeVisible({ timeout: 12000 });
+    await expect(editorReloaded.getByTestId("jazz-shared-count")).toHaveText("2");
+    console.log("JAZZ_APPLET_FAULT_503_UNSAVED_VISIBLE_PASS");
+    await retry.click();
+    await expect(owner.getByText("Saved", { exact: true })).toBeVisible({ timeout: 10000 });
+    await expect(editorReloaded.getByTestId("jazz-shared-count")).toHaveText("3", { timeout: 25000 });
+    const recovered = await call(owner, "applet-state?board_id=" + boardId + "&note_id=" + nodeId);
+    assert.equal(recovered.body.version, 3);
+    assert.deepEqual(recovered.body.value, { count: 3 });
+    console.log("JAZZ_APPLET_FAULT_503_RETRY_SYNC_PASS");
+
+    // Let one GET fetch the now-stale v3, but hold its response until the
+    // editor commits v4 and the owner has accepted a newer v4 poll.
+    let hold = true;
+    let releaseOld;
+    const oldReleased = new Promise(resolve => { releaseOld = resolve; });
+    let markHeld;
+    const held = new Promise(resolve => { markHeld = resolve; });
+    await owner.route("**/patchboard-private/api/applet-state?*", async route => {
+      if (hold && route.request().method() === "GET") {
+        hold = false;
+        const response = await route.fetch();
+        const payload = await response.json();
+        assert.equal(payload.version, 3);
+        markHeld();
+        await oldReleased;
+        await route.fulfill({ response });
+      } else await route.continue();
+    });
+    await Promise.race([held, new Promise((_, reject) => setTimeout(() => reject(new Error("poll was not captured")), 15000))]);
+    await editorReloaded.getByText("Increment").evaluate(el => el.click());
+    await expect(editorReloaded.getByTestId("jazz-shared-count")).toHaveText("4");
+    await expect(ownerRoot.getByTestId("jazz-shared-count")).toHaveText("4", { timeout: 20000 });
+    releaseOld();
+    await owner.waitForTimeout(350);
+    await expect(ownerRoot.getByTestId("jazz-shared-count")).toHaveText("4");
+    await ownerRoot.getByText("Increment").evaluate(el => el.click());
+    await expect(ownerRoot.getByTestId("jazz-shared-count")).toHaveText("5");
+    await expect(editorReloaded.getByTestId("jazz-shared-count")).toHaveText("5", { timeout: 20000 });
+    const final = await call(owner, "applet-state?board_id=" + boardId + "&note_id=" + nodeId);
+    assert.equal(final.body.version, 5);
+    assert.deepEqual(final.body.value, { count: 5 });
+    console.log("JAZZ_APPLET_FAULT_DELAYED_POLL_IGNORED_PASS");
+  }
 } finally {
   await Promise.all(contexts.map(c=>c.close().catch(()=>{})));
   await browser.close();
