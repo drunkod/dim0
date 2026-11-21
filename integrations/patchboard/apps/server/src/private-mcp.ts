@@ -13,7 +13,7 @@ import {
 } from "./board-service.ts";
 import { auth } from "./private-auth/auth.ts";
 import {
-  listCanvasEntities, getCanvasEntity, createCanvasEntity,
+  canvasEntityIdPattern, listCanvasEntities, getCanvasEntity, createCanvasEntity,
   updateCanvasEntity, deleteCanvasEntity,
   CanvasPermissionDenied, CanvasConflict, CanvasInvalid, type CanvasPayload,
 } from "./canvas-entity-service.ts";
@@ -111,7 +111,7 @@ async function executePrivateMcp(
   );
   // Values reached this handler as JSON over HTTP; Zod 3 lacks z.json().
   const canvasEntity = z.record(z.string(), z.unknown()).transform((value): CanvasPayload => value as CanvasPayload);
-  const canvasId = z.string().uuid();
+  const canvasId = z.string().regex(canvasEntityIdPattern);
 
   if (canRead()) mcpServer.registerTool("list_canvas_entities", {
     description: "List up to 500 Dim0 board nodes and links stored in Jazz.",

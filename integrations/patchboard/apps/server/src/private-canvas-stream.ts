@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Db } from "jazz-tools";
 import { app } from "@patchboard/jazz-schema";
 import { auth } from "./private-auth/auth.ts";
-import { canvasBoardRole, CanvasPermissionDenied } from "./canvas-entity-service.ts";
+import { canvasBoardRole, projectCanvasEntity, CanvasPermissionDenied } from "./canvas-entity-service.ts";
 
 const BOARD_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -93,8 +93,7 @@ export function handlePrivateCanvasStream(
             close();
             return;
           }
-          const entities = rows.map(({ id, boardId, kind, payload, version, updatedBy }) =>
-            ({ id, boardId, kind, payload, version, updatedBy }));
+          const entities = rows.map(projectCanvasEntity);
           res.write(`event: snapshot\ndata: ${JSON.stringify({ board_id: boardId, entities, role })}\n\n`);
         }).catch(close);
       },

@@ -8,8 +8,8 @@ import { createJazz, sqlite } from "jazz-tools/backend";
 import { app } from "@patchboard/jazz-schema";
 import privatePermissions from "@patchboard/jazz-schema/private.permissions.json" with { type: "json" };
 import {
-  createCanvasEntity, updateCanvasEntity, listCanvasEntities,
-  deleteCanvasEntity, CanvasConflict, CanvasPermissionDenied,
+  canvasBoardRole, createCanvasEntity, updateCanvasEntity, listCanvasEntities,
+  getCanvasEntity, jazzCanvasStorageId, deleteCanvasEntity, CanvasConflict, CanvasPermissionDenied,
 } from "../src/canvas-entity-service.ts";
 
 process.env.JAZZ_APP_DIR = new URL("../../../packages/jazz-schema", import.meta.url).pathname;
@@ -35,11 +35,42 @@ test("Jazz persists all Dim0 node/link fields, enforces roles and version checks
     await dbServer.db.insert(app.boardMembers, { boardId, userId: editorId, role: "editor" }).wait({ tier: "global" });
     await dbServer.db.insert(app.boardMembers, { boardId, userId: viewerId, role: "viewer" }).wait({ tier: "global" });
 
+    assert.equal(await canvasBoardRole(dbServer.db, boardId, ownerId), "owner");
+    assert.equal(await canvasBoardRole(dbServer.db, boardId, editorId), "member");
+    assert.equal(await canvasBoardRole(dbServer.db, boardId, viewerId), "viewer");
+    await assert.rejects(
+      () => canvasBoardRole(dbServer.db, boardId, randomUUID()),
+      CanvasPermissionDenied,
+    );
+    await assert.rejects(
+      () => canvasBoardRole(dbServer.db, randomUUID(), ownerId),
+      CanvasPermissionDenied,
+    );
+
     const created = await createCanvasEntity(dbServer.db, {
       boardId, actorId: editorId, kind: "node", payload: note,
     });
     assert.equal(created.id, nodeId);
     assert.equal(created.version, 1);
+
+    // Dim0 generates 32-hex UUIDs for local canvas entities. The Jazz row
+    // must use a canonical UUID without changing the external payload ID.
+    const compactId = randomUUID().replaceAll("-", "");
+    const compact = { ...note, id: compactId, label: { markdown: "Compact Dim0 ID" } };
+    const compactCreated = await createCanvasEntity(dbServer.db, {
+      boardId, actorId: ownerId, kind: "node", payload: compact,
+    });
+    assert.equal(compactCreated.id, compactId);
+    assert.equal((await dbServer.db.one(app.canvasEntities.where({ id: jazzCanvasStorageId(compactId) })))?.payload.id, compactId);
+    assert.equal((await getCanvasEntity(dbServer.db, boardId, viewerId, compactId))?.id, compactId);
+    assert.ok((await listCanvasEntities(dbServer.db, boardId, ownerId)).some((entity) => entity.id === compactId));
+    const compactUpdated = await updateCanvasEntity(dbServer.db, {
+      boardId, actorId: ownerId, id: compactId, expectedVersion: 1,
+      payload: { ...compact, label: { markdown: "Compact changed" } },
+    });
+    assert.equal(compactUpdated.version, 2);
+    await deleteCanvasEntity(dbServer.db, { boardId, actorId: ownerId, id: compactId, expectedVersion: 2 });
+    assert.equal(await getCanvasEntity(dbServer.db, boardId, ownerId, compactId), null);
 
     const link = {
       id: linkId, type: "link", version: 1, graphUid: boardId,

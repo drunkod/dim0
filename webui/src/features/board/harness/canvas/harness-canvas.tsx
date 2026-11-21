@@ -296,6 +296,14 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
     onReady: () => {
       setIsLoading(false)
       setReady(true)
+      setBoardVisibility("private")
+      if (boardId) {
+        void fetch(`/patchboard-private/api/board?board_id=${encodeURIComponent(boardId)}`, {
+          credentials: "include", cache: "no-store",
+        }).then((response) => response.ok ? response.json() : Promise.reject(response.status))
+          .then((data: { title?: string }) => setBoardLabel(data.title ?? "Jazz board"))
+          .catch(() => setBoardLabel("Jazz board"))
+      }
     },
     onError: (error) => {
       console.error("[jazz-canvas]", error)
@@ -628,6 +636,7 @@ function HarnessCanvasInner({
 }: InnerProps) {
   const renderView = useRenderCustomNodeView()
   const isBoard = viewMode === "board"
+  const jazzMode = import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1"
   // Hide non-essential chrome (toolbar, viewport controls, minimap)
   // during presentation so the canvas reads as a clean slide. Other
   // already-self-hiding chrome (readonly chip, top-right strip) stays
@@ -683,7 +692,7 @@ function HarnessCanvasInner({
           )}
           {!presenting && <HarnessViewportControls />}
           <StyleSidebar />
-          {canCollab && <RemoteCursors />}
+          {canCollab && !jazzMode && <RemoteCursors />}
           <EmptyBoardCoachmarks ready={ready} />
         </>
       ) : viewMode === "files" ? (
@@ -701,12 +710,16 @@ function HarnessCanvasInner({
           canvas overlay, above the surface backdrop so it stays crisp +
           interactive while a sheet is open; desktop renders it in the reserved
           title bar (see SidebarLabel), which the backdrop never covers. */}
-      {!presenting && !isTauri() && (
+      {!presenting && !isTauri() && (jazzMode ? (
+        <a href="/jazz-signin" className="absolute left-4 top-4 z-[60] rounded-md border bg-background/80 px-3 py-2 text-xs font-medium backdrop-blur">
+          ← Jazz boards
+        </a>
+      ) : (
         <BoardBreadcrumb
           local={!canCollab}
           className="absolute left-14 top-4 z-[60] max-w-[calc(100vw-8rem)]"
         />
-      )}
+      ))}
       {/*
         Top-right chrome row: save status + share button live in one
         flex container so they never overlap (z-stack collisions cost
@@ -714,13 +727,14 @@ function HarnessCanvasInner({
         — the container is invisible when empty.
       */}
       <div className="absolute right-3 top-3 z-50 flex items-center gap-2">
-        {canCollab && <HarnessPeerChip />}
+        {canCollab && !jazzMode && <HarnessPeerChip />}
         <HarnessReadonlyChip />
         {/* Local boards have no collab chrome, so surface an explicit
             "On device" badge so they're not mistaken for synced. */}
         {!canCollab && <BoardKindBadge kind="local-only" />}
-        {canCollab && <HarnessCollabStatus />}
-        {canCollab && <ShareButton />}
+        {jazzMode && <span className="rounded-md border bg-background/90 px-3 py-2 text-xs font-medium shadow-sm">Jazz · MCP</span>}
+        {canCollab && !jazzMode && <HarnessCollabStatus />}
+        {canCollab && !jazzMode && <ShareButton />}
       </div>
       <NodeSurfaceHost />
       <SlidesSheet />

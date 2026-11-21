@@ -25,6 +25,17 @@ export class CanvasInvalid extends Error {
   constructor(message: string) { super(message); this.name = "CanvasInvalid"; }
 }
 
+/** Dim0 emits 32-character UUIDs; Jazz requires canonical 36-character keys. */
+export const canvasEntityIdPattern =
+  /^(?:[a-f0-9]{32}|[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12})$/i;
+
+/** Map an original Dim0 entity ID to the deterministic Jazz row ID. */
+export function jazzCanvasStorageId(id: string): string {
+  if (!canvasEntityIdPattern.test(id)) throw new CanvasInvalid("Canvas entity must have a UUID");
+  const hex = id.replace(/-/g, "").toLowerCase();
+  return [hex.slice(0, 8), hex.slice(8, 12), hex.slice(12, 16), hex.slice(16, 20), hex.slice(20)].join("-");
+}
+
 /** Reject mismatched graph IDs and malformed payloads before touching Jazz. */
 export function validateCanvasPayload(
   boardId: string, kind: CanvasEntityKind, payload: unknown,
@@ -33,7 +44,7 @@ export function validateCanvasPayload(
     throw new CanvasInvalid("Canvas payload must be a JSON object");
   }
   const obj = payload as Record<string, unknown>;
-  if (typeof obj.id !== "string" || !/^[a-f0-9-]{36}$/i.test(obj.id)) {
+  if (typeof obj.id !== "string" || !canvasEntityIdPattern.test(obj.id)) {
     throw new CanvasInvalid("Canvas entity must have a UUID");
   }
   if (obj.graphUid !== boardId) {
@@ -66,11 +77,17 @@ async function checkAccess(
   }
 }
 
-function projection(row: {
+/** Expose the original Dim0 entity ID, never the canonical Jazz storage key. */
+export function projectCanvasEntity(row: {
   id: string; boardId: string; kind: CanvasEntityKind; payload: unknown;
   version: number; updatedBy: string;
 }): CanvasEntity {
-  return { ...row, payload: row.payload as CanvasPayload };
+  const payload = row.payload as CanvasPayload;
+  const originalId = payload?.id;
+  if (typeof originalId !== "string" || jazzCanvasStorageId(originalId) !== row.id.toLowerCase()) {
+    throw new CanvasInvalid("Stored Jazz entity ID mismatch");
+  }
+  return { id: originalId, boardId: row.boardId, kind: row.kind, payload, version: row.version, updatedBy: row.updatedBy };
 }
 
 /** Derive a Dim0 edit role from Jazz membership, never from a client claim. */
@@ -92,7 +109,7 @@ export async function listCanvasEntities(
   await checkAccess(db, boardId, actorId, false);
   const rows = await db.all(app.canvasEntities.where({ boardId }).limit(501));
   if (rows.length > 500) throw new CanvasInvalid("Canvas exceeds snapshot limit; use pagination");
-  return rows.map(projection);
+  return rows.map(projectCanvasEntity);
 }
 
 /** Read one entity without exposing another board's IDs. */
@@ -100,8 +117,8 @@ export async function getCanvasEntity(
   db: Db, boardId: string, actorId: string, id: string,
 ): Promise<CanvasEntity | null> {
   await checkAccess(db, boardId, actorId, false);
-  const row = await db.one(app.canvasEntities.where({ id }));
-  return row?.boardId === boardId ? projection(row) : null;
+  const row = await db.one(app.canvasEntities.where({ id: jazzCanvasStorageId(id) }));
+  return row?.boardId === boardId ? projectCanvasEntity(row) : null;
 }
 
 /** Atomically create a complete node/link with its original Dim0 ID. */
@@ -111,13 +128,14 @@ export async function createCanvasEntity(
 ): Promise<CanvasEntity> {
   validateCanvasPayload(input.boardId, input.kind, input.payload);
   const payload = input.payload;
+  const storageId = jazzCanvasStorageId(payload.id as string);
   const result = await db.serializableTransaction(async (tx) => {
     await checkAccess(tx, input.boardId, input.actorId, true);
-    if (await tx.one(app.canvasEntities.where({ id: payload.id as string }))) throw new CanvasConflict();
+    if (await tx.one(app.canvasEntities.where({ id: storageId }))) throw new CanvasConflict();
     tx.insert(app.canvasEntities, {
       boardId: input.boardId, kind: input.kind, payload,
       version: 1, updatedBy: input.actorId,
-    }, { id: payload.id as string });
+    }, { id: storageId });
     return { id: payload.id as string, boardId: input.boardId, kind: input.kind,
       payload, version: 1, updatedBy: input.actorId };
   });
@@ -132,13 +150,13 @@ export async function updateCanvasEntity(
 ): Promise<CanvasEntity> {
   const result = await db.serializableTransaction(async (tx) => {
     await checkAccess(tx, input.boardId, input.actorId, true);
-    const entity = await tx.one(app.canvasEntities.where({ id: input.id }));
+    const entity = await tx.one(app.canvasEntities.where({ id: jazzCanvasStorageId(input.id) }));
     if (!entity || entity.boardId !== input.boardId) throw new CanvasPermissionDenied();
     if (entity.version !== input.expectedVersion) throw new CanvasConflict();
     validateCanvasPayload(input.boardId, entity.kind, input.payload);
     if (input.payload.id !== input.id) throw new CanvasInvalid("Cannot change entity ID");
     const version = entity.version + 1;
-    tx.update(app.canvasEntities, input.id, {
+    tx.update(app.canvasEntities, jazzCanvasStorageId(input.id), {
       payload: input.payload, version, updatedBy: input.actorId,
     });
     return { id: input.id, boardId: input.boardId, kind: entity.kind,
@@ -155,10 +173,10 @@ export async function deleteCanvasEntity(
 ): Promise<{ id: string; deleted: true }> {
   const result = await db.serializableTransaction(async (tx) => {
     await checkAccess(tx, input.boardId, input.actorId, true);
-    const entity = await tx.one(app.canvasEntities.where({ id: input.id }));
+    const entity = await tx.one(app.canvasEntities.where({ id: jazzCanvasStorageId(input.id) }));
     if (!entity || entity.boardId !== input.boardId) throw new CanvasPermissionDenied();
     if (entity.version !== input.expectedVersion) throw new CanvasConflict();
-    tx.delete(app.canvasEntities, input.id);
+    tx.delete(app.canvasEntities, jazzCanvasStorageId(input.id));
     return { id: input.id, deleted: true as const };
   });
   await result.wait({ timeoutMs: 10_000 });

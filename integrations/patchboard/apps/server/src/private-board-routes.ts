@@ -5,7 +5,7 @@ import type { Db } from "jazz-tools";
 import { app } from "@patchboard/jazz-schema";
 import { auth } from "./private-auth/auth.ts";
 import {
-  canvasBoardRole, listCanvasEntities, getCanvasEntity, createCanvasEntity,
+  canvasEntityIdPattern, canvasBoardRole, listCanvasEntities, getCanvasEntity, createCanvasEntity,
   updateCanvasEntity, deleteCanvasEntity,
   CanvasPermissionDenied, CanvasConflict, CanvasInvalid, type CanvasPayload,
 } from "./canvas-entity-service.ts";
@@ -15,6 +15,7 @@ import {
 } from "./board-service.ts";
 
 const boardIdSchema = z.string().uuid();
+const entityIdSchema = z.string().regex(canvasEntityIdPattern);
 const textSchema = z.string().trim().min(1).max(2000);
 const requestSchema = z.string().trim().min(1).max(128);
 const inviteSchema = z.string().regex(/^[\w-]{43}$/);
@@ -160,7 +161,7 @@ export async function privateBoardRequest(
     }
     if (pathname === "/patchboard-private/api/canvas/entity" && request.method === "GET") {
       const boardId = boardIdSchema.parse(url.searchParams.get("board_id"));
-      const entityId = boardIdSchema.parse(url.searchParams.get("entity_id"));
+      const entityId = entityIdSchema.parse(url.searchParams.get("entity_id"));
       return json(await getCanvasEntity(db, boardId, accountId, entityId));
     }
     if (pathname === "/patchboard-private/api/canvas/create" && request.method === "POST") {
@@ -174,7 +175,7 @@ export async function privateBoardRequest(
     }
     if (pathname === "/patchboard-private/api/canvas/update" && request.method === "POST") {
       const parsed = z.object({
-        board_id: boardIdSchema, entity_id: boardIdSchema,
+        board_id: boardIdSchema, entity_id: entityIdSchema,
         expected_version: z.number().int().positive(),
         payload: canvasPayloadSchema,
       }).strict().parse(await safeJson(request, 131_072));
@@ -185,7 +186,7 @@ export async function privateBoardRequest(
     }
     if (pathname === "/patchboard-private/api/canvas/delete" && request.method === "POST") {
       const parsed = z.object({
-        board_id: boardIdSchema, entity_id: boardIdSchema,
+        board_id: boardIdSchema, entity_id: entityIdSchema,
         expected_version: z.number().int().positive(),
       }).strict().parse(await safeJson(request));
       return json(await deleteCanvasEntity(db, {

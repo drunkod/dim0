@@ -172,3 +172,85 @@ test("Jazz SSE subscribes with session cookies, validates board scope and closes
     else globalThis.EventSource = previous;
   }
 });
+
+test("Jazz SSE rejects malformed JSON without delivering a snapshot", () => {
+  const previous = globalThis.EventSource;
+  let source;
+  class FakeEventSource {
+    constructor() {
+      this.handlers = new Map();
+      source = this;
+    }
+    addEventListener(event, callback) { this.handlers.set(event, callback); }
+    emit(data) { this.handlers.get("snapshot")?.({ data }); }
+    close() {}
+  }
+  globalThis.EventSource = FakeEventSource;
+  const snapshots = [];
+  const failures = [];
+  try {
+    subscribeJazzCanvas(boardId, (snapshot) => snapshots.push(snapshot), (error) => failures.push(error));
+    source.emit("{");
+    assert.deepEqual(snapshots, []);
+    assert.equal(failures.length, 1);
+    assert.ok(failures[0] instanceof SyntaxError);
+  } finally {
+    if (previous === undefined) delete globalThis.EventSource;
+    else globalThis.EventSource = previous;
+  }
+});
+
+test("Jazz SSE rejects mismatched entity IDs without delivering a snapshot", () => {
+  const previous = globalThis.EventSource;
+  let source;
+  class FakeEventSource {
+    constructor() {
+      this.handlers = new Map();
+      source = this;
+    }
+    addEventListener(event, callback) { this.handlers.set(event, callback); }
+    emit(payload) { this.handlers.get("snapshot")?.({ data: JSON.stringify(payload) }); }
+    close() {}
+  }
+  globalThis.EventSource = FakeEventSource;
+  const snapshots = [];
+  const failures = [];
+  try {
+    subscribeJazzCanvas(boardId, (snapshot) => snapshots.push(snapshot), (error) => failures.push(error));
+    source.emit({ board_id: boardId, entities: [{
+      id: nodeId, boardId, kind: "node", version: 1, updatedBy: nodeId,
+      payload: { id: linkId, graphUid: boardId, type: "note" },
+    }] });
+    assert.deepEqual(snapshots, []);
+    assert.equal(failures.length, 1);
+    assert.match(failures[0].message, /scope mismatch/);
+  } finally {
+    if (previous === undefined) delete globalThis.EventSource;
+    else globalThis.EventSource = previous;
+  }
+});
+
+test("credentialed Jazz EventSource unsubscribe closes its source", () => {
+  const previous = globalThis.EventSource;
+  let source;
+  class FakeEventSource {
+    constructor(_url, options) {
+      this.options = options;
+      this.closed = false;
+      this.handlers = new Map();
+      source = this;
+    }
+    addEventListener(event, callback) { this.handlers.set(event, callback); }
+    close() { this.closed = true; }
+  }
+  globalThis.EventSource = FakeEventSource;
+  try {
+    const unsubscribe = subscribeJazzCanvas(boardId, () => {});
+    assert.equal(source.options.withCredentials, true);
+    unsubscribe();
+    assert.equal(source.closed, true);
+  } finally {
+    if (previous === undefined) delete globalThis.EventSource;
+    else globalThis.EventSource = previous;
+  }
+});

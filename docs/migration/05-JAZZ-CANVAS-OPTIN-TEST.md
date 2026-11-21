@@ -20,7 +20,7 @@ cd integrations/patchboard
 pnpm install --frozen-lockfile
 PATCHBOARD_PRIVATE_DEV=1 \
 PATCHBOARD_PRIVATE_ROOT=/tmp/dim0-jazz-isolated-fixture \
-PATCHBOARD_PRIVATE_ORIGIN=http://127.0.0.1:5178 \
+PATCHBOARD_PRIVATE_ORIGIN=http://localhost:5178 \
 PATCHBOARD_PRIVATE_PORT=8798 \
 pnpm demo:private
 ```
@@ -33,7 +33,7 @@ npm ci
 VITE_DIM0_JAZZ_CANVAS=1 PATCHBOARD_PRIVATE_PORT=8798 APP_PORT=5178 npm run dev
 ```
 
-Sign in at `http://127.0.0.1:5178/jazz-signin` (links to the private passkey sign-in via Vite proxy), create/access a **Jazz-backed** board, then navigate to `http://127.0.0.1:5178/boards/<JAZZ_BOARD_UUID>`. The URL uses the Jazz board UUID, not the ID of an existing Dim0 Postgres graph.
+Sign in at `http://localhost:5178/jazz-signin` (links to the private passkey sign-in via Vite proxy), create/access a **Jazz-backed** board, then navigate to `http://localhost:5178/boards/<JAZZ_BOARD_UUID>`. The URL uses the Jazz board UUID, not the ID of an existing Dim0 Postgres graph.
 
 ## Acceptance gates still REQUIRED
 
