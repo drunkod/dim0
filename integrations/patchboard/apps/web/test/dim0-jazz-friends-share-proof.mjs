@@ -118,7 +118,7 @@ try {
   const create = await api(ownerPage, "boards", { title: "Friends collaboration QA · " + randomUUID().slice(0, 8) });
   assert.equal(create.status, 201, JSON.stringify(create.body));
   const boardId = create.body.board_id;
-  await ownerPage.goto(origin + "/boards/" + boardId);
+  await ownerPage.goto(origin + "/boards/" + boardId, { waitUntil: "domcontentloaded" });
   await expect(ownerPage.getByRole("button", { name: "Share this board" }))
     .toBeVisible({ timeout: 25000 });
   const shareLink = await createLink(ownerPage);
@@ -132,7 +132,7 @@ try {
   // without turning a temporary 503 into a terminal/revoked link.
   const retryTab = await B.context.newPage();
   try {
-    await retryTab.goto(shareLink);
+    await retryTab.goto(shareLink, { waitUntil: "domcontentloaded" });
     await expect(retryTab.getByRole("button", { name: "Open board" }))
       .toBeVisible({ timeout: 20000 });
     await retryTab.route("**/patchboard-private/api/join", route => route.fulfill({
@@ -187,7 +187,7 @@ try {
     payload: { ...payload, version: 2, content: { markdown: "Stale edit must not overwrite" } },
   });
   assert.equal(conflict.status, 409, JSON.stringify(conflict.body));
-  await A.page.reload();
+  await A.page.reload({ waitUntil: "domcontentloaded" });
   const afterReload = await readCanvas(A.page, boardId);
   assert.equal(afterReload.body.entities.find(e => e.id === entityId)?.payload?.content?.markdown,
     "Friend B edited live");
@@ -229,7 +229,10 @@ try {
     });
   assert.equal(removedWrite.status(), 403);
   await expect(A.page).toHaveURL(origin + "/boards?access=removed", { timeout: 20000 });
-  await expect(A.page.getByRole("alert")).toContainText(/Access to that board was removed/);
+  // The canonical 403 and URL change are already verified above. Wait for
+  // the board-list screen to hydrate before checking its explanation.
+  await expect(A.page.getByRole("alert")).toContainText(
+    /Access to that board was removed/, { timeout: 30000 });
   console.log("MEMBER_REMOVAL_EXITS_OPEN_BOARD_PASS");
 
   // Revoking the editor link blocks a newcomer but preserves existing B.
@@ -257,8 +260,22 @@ try {
   const deniedDisable = await api(B.page, "invites/revoke-all", { board_id: boardId });
   assert.equal(deniedDisable.status, 403);
   await ownerPage.getByRole("button", { name: "Share this board" }).click();
-  ownerPage.once("dialog", prompt => prompt.accept());
+  // The owner tab is controlled by both the launch-side Playwright session and
+  // this CDP-connected session. Native confirm dialogs may be auto-dismissed
+  // by one connection before the other can call dialog.accept(). Stub only
+  // window.confirm in this disposable QA tab, assert its wording, then test
+  // the real Disable sharing button, Jazz transaction and subsequent denial.
+  await ownerPage.evaluate(() => {
+    const capture = window;
+    capture.__dim0QaConfirmMessage = "";
+    window.confirm = message => {
+      capture.__dim0QaConfirmMessage = message;
+      return true;
+    };
+  });
   await ownerPage.getByRole("button", { name: "Disable sharing" }).click();
+  assert.match(await ownerPage.evaluate(() => window.__dim0QaConfirmMessage),
+    /Disable sharing\?.*Existing members keep access/i);
   await expect(ownerPage.getByRole("button", { name: "Revoke", exact: true })).toHaveCount(0);
 
   assert.equal((await api(V.page, "join", { board_id: boardId, token: viewerToken })).status, 404);
@@ -281,7 +298,7 @@ try {
   await newPage.goto(shareLink, { waitUntil: "domcontentloaded", timeout: 60000 });
   // With original Dim0-style public preview, a confirmed revoked token
   // correctly shows a terminal error BEFORE making the user register.
-  await expect(newPage.getByText(/Invitation expired or revoked/))
+  await expect(newPage.getByText(/This invitation has expired or been revoked/))
     .toBeVisible({ timeout: 20000 });
   await newPage.getByRole("button", { name: "Back home" }).click();
   await expect(newPage).toHaveURL(/\/signin/, { timeout: 20000 });
@@ -299,11 +316,16 @@ try {
   // A verified owner with a stale link must not be portrayed as logged out.
   const staleTab = await ownerPage.context().newPage();
   try {
-    await staleTab.goto(origin + "/boards");
+    await staleTab.goto(origin + "/boards", { waitUntil: "domcontentloaded" });
+    // Finish the initial identity/invitation effect before seeding the next
+    // invitation. Otherwise the first render can consume the code between
+    // sessionStorage.setItem and reload, leaving no error on the new page.
+    await expect(staleTab.getByRole("heading", { name: "Your boards" }))
+      .toBeVisible({ timeout: 30000 });
     await staleTab.evaluate(({ boardId, code }) => sessionStorage.setItem(
       "dim0:jazz:pendingInvite", JSON.stringify({ boardId, token: code }),
     ), { boardId, code });
-    await staleTab.reload();
+    await staleTab.reload({ waitUntil: "domcontentloaded" });
     await expect(staleTab.getByText(/Invitation expired or revoked/))
       .toBeVisible({ timeout: 20000 });
     await expect(staleTab.getByRole("heading", { name: "Your boards" }))
@@ -318,7 +340,7 @@ try {
     await staleTab.route("**/patchboard-private/api/join", async route => {
       await route.fulfill({ status: 503, contentType: "application/json", body: "{}" });
     });
-    await staleTab.reload();
+    await staleTab.reload({ waitUntil: "domcontentloaded" });
     await expect(staleTab.getByRole("button", { name: "Retry invitation" }))
       .toBeVisible({ timeout: 20000 });
     assert.ok(await staleTab.evaluate(() => sessionStorage.getItem("dim0:jazz:pendingInvite")));
@@ -334,7 +356,7 @@ try {
   await expect(B.page).toHaveURL(origin + "/signin");
   assert.equal((await readCanvas(B.page, boardId)).status, 401);
   const returning = await B.context.newPage();
-  await returning.goto(origin + "/boards/" + boardId);
+  await returning.goto(origin + "/boards/" + boardId, { waitUntil: "domcontentloaded" });
   await expect(returning.getByRole("button", { name: "Sign in with passkey" })).toBeVisible();
   assert.ok(B.credential, "Missing test passkey from verified friend registration");
   // Helium permits a single internal virtual authenticator per environment.
@@ -365,6 +387,6 @@ try {
   }));
 } finally {
   await Promise.all(actors.map(c => c.close().catch(() => {})));
-  await ownerPage.goto(origin + "/boards/" + originalBoardId).catch(() => {});
+  await ownerPage.goto(origin + "/boards/" + originalBoardId, { waitUntil: "domcontentloaded" }).catch(() => {});
   await browser.close();
 }
