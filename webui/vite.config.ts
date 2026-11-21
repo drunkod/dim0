@@ -165,7 +165,16 @@ export default defineConfig({
         // It's a real document, not an SPA route — without this the nav fallback
         // serves the host app shell into the iframe once the SW is active, so
         // every mini-app would render the host app instead of the widget.
-        navigateFallbackDenylist: [/^\/mini-app\//],
+        // Auth, OAuth/MCP metadata, and private Jazz UI are served by the
+        // same-origin backend. Workbox must never turn their navigation into
+        // the Dim0 SPA shell (which breaks ChatGPT's OAuth reconnect flow).
+        navigateFallbackDenylist: [
+          /^\/mini-app\//,
+          /^\/patchboard-auth(?:\/|$)/,
+          /^\/patchboard-private(?:\/|$)/,
+          /^\/patchboard-private-mcp(?:\/|$)/,
+          /^\/\.well-known(?:\/|$)/,
+        ],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         // Never precache these — both would trip Workbox's 2 MiB cache-entry
         // limit and (because that's fatal here) fail the prod build:

@@ -157,7 +157,10 @@ export const linkToEdge = (link: Link, nodes: Map<string, Node>): Edge => {
     id: asEdgeId(link.id),
     source: sourceResolved.end,
     target: targetResolved.end,
-    pathStyle: link.style.pathStyle,
+    // MCP agents may create a valid sparse link with style: {}. The canvas
+    // renderer requires a concrete pathStyle; absent values make samplesFor
+    // return undefined and edgeAABBFromSamples crash when reading .length.
+    pathStyle: link.style.pathStyle ?? "bezier",
     control,
     z: 0,
     groups: (link.style.groupIds ?? []).map(asGroupId),

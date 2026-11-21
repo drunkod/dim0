@@ -19,7 +19,7 @@ import {
 } from "./canvas-entity-service.ts";
 import { privateAuthConfig } from "./private-auth/config.ts";
 import { privateAuthDatabase } from "./private-auth/db.ts";
-import { requireBoardGrant, type VerifiedBoardGrant } from "./private-auth/grants.ts";
+import { requireConsentBoundBoardGrant, type VerifiedBoardGrant } from "./private-auth/grants.ts";
 
 const boardId = z.string().uuid();
 const scopes = ["board:read", "board:write"] as const;
@@ -223,13 +223,27 @@ export function handlePrivateMcp(
     let subject: string | undefined;
     let grant: VerifiedBoardGrant | null = null;
     let grantedScopes: Set<string> = new Set();
+    const debugAuth = process.env.PATCHBOARD_MCP_AUTH_DEBUG === "1";
+    let claimsReached = false;
     const verification = await requireMcpAuth(auth, (_request, claims) => {
+      claimsReached = true;
       if (typeof claims.sub !== "string" || !claims.sub) {
         return new Response(null, { status: 401 });
       }
-      const verified = requireBoardGrant(claims.patchboard_grant_id, claims.sub,
-        claims.azp ?? claims.client_id);
-      if (!verified) return new Response(null, { status: 401, headers: { "cache-control": "no-store" } });
+      const verified = requireConsentBoundBoardGrant(claims.patchboard_grant_id, claims.sub,
+        claims.azp ?? claims.client_id, claims.scope);
+      if (verified && !claims.patchboard_grant_id && debugAuth) {
+        console.info("PRIVATE_MCP_CONSENT_RECOVERY_PASS");
+      }
+      if (!verified) {
+        if (debugAuth) console.warn("PRIVATE_MCP_GRANT_REJECT", JSON.stringify({
+          hasSubject: typeof claims.sub === "string",
+          hasGrantClaim: typeof claims.patchboard_grant_id === "string",
+          hasAzp: typeof claims.azp === "string",
+          hasClientId: typeof claims.client_id === "string",
+        }));
+        return new Response(null, { status: 401, headers: { "cache-control": "no-store" } });
+      }
       subject = claims.sub;
       grant = verified;
       grantedScopes = new Set(typeof claims.scope === "string" ? claims.scope.split(/\s+/).filter(Boolean) : []);
@@ -237,6 +251,12 @@ export function handlePrivateMcp(
     }, { resource: resource(), challengeScopes: scopes })(verificationRequest);
 
     if (verification.status !== 204 || !subject || !grant) {
+      if (debugAuth) console.warn("PRIVATE_MCP_AUTH_REJECT", JSON.stringify({
+        status: verification.status,
+        bearerPresent: typeof req.headers.authorization === "string" &&
+          req.headers.authorization.startsWith("Bearer "),
+        claimsReached,
+      }));
       for (const [name, value] of verification.headers) res.setHeader(name, value);
       res.setHeader("Cache-Control", "no-store");
       res.writeHead(verification.status);

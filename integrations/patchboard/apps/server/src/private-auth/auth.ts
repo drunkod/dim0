@@ -10,6 +10,19 @@ import { resolveRegistrationIntent } from "./enrollment.ts";
 import { finalizeVerifiedPasskeyRegistration } from "./finalize-registration.ts";
 
 const config = privateAuthConfig();
+// ChatGPT’s custom MCP connector currently requests board:read/write without
+// offline_access. Keep the production 15-minute default, but allow an explicit,
+// bounded extension for a time-limited live presentation (never disable OAuth).
+const accessTokenSeconds = (() => {
+  const configured = process.env.PATCHBOARD_MCP_ACCESS_TOKEN_SECONDS;
+  if (configured === undefined) return 900;
+  const seconds = Number(configured);
+  if (!Number.isInteger(seconds) || seconds < 900 || seconds > 21600) {
+    throw new Error("PATCHBOARD_MCP_ACCESS_TOKEN_SECONDS must be 900..21600");
+  }
+  return seconds;
+})();
+
 export const auth = betterAuth({
   baseURL: config.origin,
   basePath: "/patchboard-auth",
@@ -43,7 +56,7 @@ export const auth = betterAuth({
       clientRegistrationRequirePKCE: true,
       clientRegistrationDefaultScopes: ["board:read", "board:write"],
       clientRegistrationAllowedScopes: ["offline_access"],
-      accessTokenExpiresIn: 900,
+      accessTokenExpiresIn: accessTokenSeconds,
       refreshTokenExpiresIn: 604800,
     }) as unknown as import("better-auth").BetterAuthPlugin,
     // OAuth Provider 1.7.1 exposes strict OpenAPI schema metadata which is not

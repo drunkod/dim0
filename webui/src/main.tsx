@@ -15,7 +15,21 @@ import { isTauri, isWebKitWebview } from './platform'
  * not a web origin, so the offline SW is both unnecessary and unsupported there.
  */
 if (!isTauri()) {
-  registerSW({ immediate: true })
+  if (import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1") {
+    // The private Jazz MVP shares an origin with OAuth/MCP endpoints. Disable
+    // offline SPA navigation hijacking and remove older test SW registrations;
+    // a stale Workbox fallback can otherwise serve Dim0 at /patchboard-auth.
+    const manager = navigator.serviceWorker
+    if (manager) {
+      void manager.getRegistrations().then((registrations) =>
+        Promise.all(registrations
+          .filter((registration) => registration.scope === `${location.origin}/`)
+          .map((registration) => registration.unregister())),
+      ).catch(() => { /* Browser may block SW operations; normal fetch still works. */ })
+    }
+  } else {
+    registerSW({ immediate: true })
+  }
 } else {
   // Desktop shell is frameless (decorations: false) with our own title bar +
   // window controls. This class drives the rounded-window CSS + title-bar chrome.
