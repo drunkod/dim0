@@ -17,6 +17,7 @@ import {
   updateCanvasEntity, deleteCanvasEntity,
   CanvasPermissionDenied, CanvasConflict, CanvasInvalid, type CanvasPayload,
 } from "./canvas-entity-service.ts";
+import { getSharedAppletState, saveSharedAppletState } from "./applet-state-service.ts";
 import { privateAuthConfig } from "./private-auth/config.ts";
 import { privateAuthDatabase } from "./private-auth/db.ts";
 import { requireConsentBoundBoardGrant, type VerifiedBoardGrant } from "./private-auth/grants.ts";
@@ -180,6 +181,36 @@ async function executePrivateMcp(
     try {
       return output(await deleteCanvasEntity(db, {
         boardId: board_id, actorId, id: entity_id, expectedVersion: expected_version,
+      }));
+    } catch (error) { return canvasFailure(error); }
+  });
+
+  // Applet runtime data uses a separate Jazz state revision so a counter
+  // click never mutates its canvas geometry/source version.
+  if (canRead()) mcpServer.registerTool("get_applet_state", {
+    description: "Read the shared runtime state of a Dim0 persist applet on the OAuth-approved board.",
+    annotations: { readOnlyHint: true },
+    inputSchema: z.object({ board_id: boardId, note_id: canvasId }).strict(),
+  }, async ({ board_id, note_id }) => {
+    if (board_id !== grant.boardId) return errorText("BOARD_ACCESS_DENIED");
+    try { return output(await getSharedAppletState(db, board_id, actorId, note_id)); }
+    catch (error) { return canvasFailure(error); }
+  });
+
+  if (canWrite()) mcpServer.registerTool("update_applet_state", {
+    description: "Set a shared Dim0 applet state JSON object. Read get_applet_state first and pass its exact version; conflict returns VERSION_CONFLICT.",
+    annotations: { readOnlyHint: false, destructiveHint: false },
+    inputSchema: z.object({
+      board_id: boardId, note_id: canvasId,
+      expected_version: z.number().int().nonnegative(),
+      value: z.record(z.string(), z.unknown()),
+    }).strict(),
+  }, async ({ board_id, note_id, expected_version, value }) => {
+    if (board_id !== grant.boardId) return errorText("BOARD_ACCESS_DENIED");
+    try {
+      return output(await saveSharedAppletState(db, {
+        boardId: board_id, noteId: note_id,
+        actorId, expectedVersion: expected_version, value,
       }));
     } catch (error) { return canvasFailure(error); }
   });

@@ -7,6 +7,17 @@
       "update": "false",
       "delete": "false"
     },
+    "appletStates": {
+      "read": {
+        "anyOf": [
+          "exists boards(id = this.boardId, ownerId = session.user)",
+          "exists boardMembers(boardId = this.boardId, userId = session.user)"
+        ]
+      },
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
     "boardInvites": {
       "read": "false",
       "insert": "false",

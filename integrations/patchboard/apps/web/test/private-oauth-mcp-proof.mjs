@@ -355,7 +355,7 @@ try {
   try {
     await connectReader();
     const available = (await reader.listTools()).tools.map(t => t.name).sort();
-    assert.deepEqual(available, ["get_canvas_entity", "list_boards", "list_canvas_entities", "read_board"], "read-only grant must hide write tools");
+    assert.deepEqual(available, ["get_applet_state", "get_canvas_entity", "list_boards", "list_canvas_entities", "read_board"], "read-only grant must hide write tools");
     const list = await reader.callTool({ name: "list_boards", arguments: {} });
     assert.equal(list.isError, undefined, JSON.stringify(list));
     const listed = JSON.parse(list.content[0].text);
@@ -387,7 +387,7 @@ try {
   try {
     await connectWriter();
     assert.deepEqual((await writer.listTools()).tools.map(t => t.name).sort(),
-      ["create_canvas_entity", "create_note", "delete_canvas_entity", "get_canvas_entity", "list_boards", "list_canvas_entities", "read_board", "update_canvas_entity"]);
+      ["create_canvas_entity", "create_note", "delete_canvas_entity", "get_applet_state", "get_canvas_entity", "list_boards", "list_canvas_entities", "read_board", "update_applet_state", "update_canvas_entity"]);
     // New Dim0 entity API: an actual OAuth MCP client can mutate full
     // applet/note JSON through Jazz, with CAS and board scope enforced.
     const canvasId = randomUUID();
@@ -428,6 +428,37 @@ try {
     });
     assert.equal(crossBoard.isError, true);
     assert.match(crossBoard.content[0].text, /BOARD_ACCESS_DENIED/);
+    // The ChatGPT applet runtime uses the same Jazz CAS service as Dim0 React.
+    const initialApplet = await writer.callTool({
+      name: "get_applet_state", arguments: { board_id: boardId, note_id: canvasId },
+    });
+    assert.equal(initialApplet.isError, undefined, JSON.stringify(initialApplet));
+    assert.deepEqual(JSON.parse(initialApplet.content[0].text).value, null);
+    const appletWrite = await writer.callTool({
+      name: "update_applet_state", arguments: {
+        board_id: boardId, note_id: canvasId, expected_version: 0, value: { count: 1 },
+      },
+    });
+    assert.equal(appletWrite.isError, undefined, JSON.stringify(appletWrite));
+    assert.equal(JSON.parse(appletWrite.content[0].text).version, 1);
+    const staleApplet = await writer.callTool({
+      name: "update_applet_state", arguments: {
+        board_id: boardId, note_id: canvasId, expected_version: 0, value: { count: 999 },
+      },
+    });
+    assert.equal(staleApplet.isError, true);
+    assert.match(staleApplet.content[0].text, /VERSION_CONFLICT/);
+    const rereadApplet = await writer.callTool({
+      name: "get_applet_state", arguments: { board_id: boardId, note_id: canvasId },
+    });
+    assert.deepEqual(JSON.parse(rereadApplet.content[0].text).value, { count: 1 });
+    const appletWrongBoard = await writer.callTool({
+      name: "get_applet_state", arguments: { board_id: secondBoardId, note_id: canvasId },
+    });
+    assert.equal(appletWrongBoard.isError, true);
+    assert.match(appletWrongBoard.content[0].text, /BOARD_ACCESS_DENIED/);
+    console.log("DIM0_JAZZ_OAUTH_MCP_APPLET_STATE_PASS", canvasId);
+
     const canvasDelete = await writer.callTool({
       name: "delete_canvas_entity",
       arguments: { board_id: boardId, entity_id: canvasId, expected_version: 2 },

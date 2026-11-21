@@ -65,7 +65,7 @@ export function validateCanvasPayload(
 }
 
 /** Performs the permission check within the same Jazz transaction as a mutation. */
-async function checkAccess(
+export async function checkAccess(
   reader: Pick<Db, "one">, boardId: string, actorId: string, write: boolean,
 ) {
   const board = await reader.one(app.boards.where({ id: boardId }));
@@ -177,6 +177,10 @@ export async function deleteCanvasEntity(
     if (!entity || entity.boardId !== input.boardId) throw new CanvasPermissionDenied();
     if (entity.version !== input.expectedVersion) throw new CanvasConflict();
     tx.delete(app.canvasEntities, jazzCanvasStorageId(input.id));
+    // A deleted applet must not leak runtime state into a later node with the
+    // same ID. This cleanup is atomic with its authoritative Canvas deletion.
+    const state = await tx.one(app.appletStates.where({ id: jazzCanvasStorageId(input.id) }));
+    if (state && state.boardId === input.boardId) tx.delete(app.appletStates, state.id);
     return { id: input.id, deleted: true as const };
   });
   await result.wait({ timeoutMs: 10_000 });

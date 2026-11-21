@@ -35,6 +35,17 @@ describe("static rendering", () => {
 })
 
 
+describe("shared Jazz revision hydration", () => {
+  it("remounts the interpreter state when a peer saves a new revision", () => {
+    const source = `<Widget state={{ count: 0 }} persist><div><span data-testid="shared-count">{count}</span><button onClick={set("count", count + 1)}>+</button></div></Widget>`
+    const { rerender } = render(<AppletRenderer source={source}
+      initialState={{ count: 3 }} stateRevision={1} />)
+    expect(screen.getByTestId("shared-count").textContent).toBe("3")
+    rerender(<AppletRenderer source={source} initialState={{ count: 7 }} stateRevision={2} />)
+    expect(screen.getByTestId("shared-count").textContent).toBe("7")
+  })
+})
+
 describe("interactivity", () => {
   it("counter: set updates state and re-renders", () => {
     render(

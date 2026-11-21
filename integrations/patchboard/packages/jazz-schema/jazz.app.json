@@ -2,7 +2,7 @@
   "$schema": "https://jazz.tools/schemas/jazz.app.v1.json",
   "$generated": {
     "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
-    "sha256": "187b48e918c02035a2ad389c5e6e17ba2bff976a0a93c8e2898cbc3ff69e8ccc"
+    "sha256": "f74dddd7648576ad3a2dae1b2e4984326468e163be067abb3b28494ac52574af"
   },
   "tables": {
     "agentRuns": {
@@ -16,6 +16,17 @@
       },
       "relations": { "board": { "rel": "boards", "column": "boardId" } },
       "indexes": ["boardId"]
+    },
+    "appletStates": {
+      "columns": {
+        "boardId": "uuid",
+        "noteId": "uuid",
+        "value": { "json": true },
+        "version": "int",
+        "updatedBy": "uuid"
+      },
+      "relations": { "board": { "rel": "boards", "column": "boardId" } },
+      "indexes": ["boardId", "noteId"]
     },
     "boardInvites": {
       "columns": {
@@ -41,6 +52,7 @@
     "boards": {
       "columns": { "title": "string", "ownerId": "uuid" },
       "relations": {
+        "appletStatesViaBoard": { "reverse": "appletStates", "relation": "board" },
         "checkpointsViaBoard": { "reverse": "checkpoints", "relation": "board" },
         "cursorsViaBoard": { "reverse": "cursors", "relation": "board" },
         "invitesViaBoard": { "reverse": "boardInvites", "relation": "board" },
@@ -460,6 +472,127 @@
           "indexes": ["boardId", "status", "rank"]
         }
       }
+    },
+    "f32d81e25494": {
+      "tables": {
+        "agentRuns": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "agentId": "uuid",
+            "action": "string",
+            "status": { "enum": ["running", "complete", "failed"] },
+            "input": { "json": true },
+            "result": { "json": true, "optional": true }
+          },
+          "indexes": ["boardId"]
+        },
+        "boardInvites": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "token": "string",
+            "role": { "enum": ["viewer", "editor"] },
+            "singleUse": { "type": "boolean", "default": false },
+            "expiresAtEpochMs": "float?",
+            "intendedUserId": "uuid?"
+          },
+          "indexes": ["boardId", "token"]
+        },
+        "boardMembers": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "userId": "uuid",
+            "role": { "enum": ["viewer", "editor", "admin", "agent"] }
+          },
+          "indexes": ["boardId", "userId"]
+        },
+        "boards": { "columns": { "title": "string", "ownerId": "uuid" } },
+        "canvasEntities": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "kind": { "enum": ["node", "link"] },
+            "payload": { "json": true },
+            "version": "int",
+            "updatedBy": "uuid"
+          },
+          "indexes": ["boardId", "kind"]
+        },
+        "checkpoints": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "label": "string",
+            "snapshot": { "json": true }
+          },
+          "indexes": ["boardId"]
+        },
+        "comments": {
+          "columns": {
+            "taskId": { "type": "uuid", "references": "tasks" },
+            "authorId": "uuid",
+            "body": "string"
+          },
+          "indexes": ["taskId"]
+        },
+        "cursors": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "userId": "uuid",
+            "name": "string",
+            "x": "float",
+            "y": "float",
+            "active": { "type": "boolean", "default": false }
+          },
+          "indexes": ["boardId", "userId"]
+        },
+        "mcpRequests": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "requestId": "string",
+            "textHash": "string",
+            "noteId": "uuid"
+          },
+          "indexes": ["boardId", "requestId"]
+        },
+        "proposals": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "proposerId": "uuid",
+            "targetId": "uuid?",
+            "operation": { "enum": ["create_note", "move_shape", "create_task"] },
+            "payload": { "json": true },
+            "status": { "enum": ["pending", "approved", "rejected"] },
+            "reviewedBy": "uuid?"
+          },
+          "indexes": ["boardId", "status"]
+        },
+        "shapes": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "kind": { "enum": ["note", "rect"] },
+            "text": "string",
+            "authorId": "uuid?",
+            "authorName": "string?",
+            "x": "float",
+            "y": "float",
+            "width": "float",
+            "height": "float",
+            "fill": "string",
+            "zIndex": "int"
+          },
+          "indexes": ["boardId", "zIndex"]
+        },
+        "tasks": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "shapeId": { "type": "uuid", "optional": true, "references": "shapes" },
+            "title": "string",
+            "notes": "string?",
+            "status": { "enum": ["todo", "doing", "review", "done"] },
+            "rank": "float",
+            "assigneeId": "uuid?"
+          },
+          "indexes": ["boardId", "status", "rank"]
+        }
+      }
     }
   },
   "migrations": [
@@ -478,6 +611,7 @@
         }
       }
     },
-    { "from": "5658a06fb349", "createTables": ["canvasEntities"] }
+    { "from": "5658a06fb349", "to": "f32d81e25494", "createTables": ["canvasEntities"] },
+    { "from": "f32d81e25494", "createTables": ["appletStates"] }
   ]
 }

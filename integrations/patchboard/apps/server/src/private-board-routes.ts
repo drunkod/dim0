@@ -10,6 +10,7 @@ import {
   updateCanvasEntity, deleteCanvasEntity,
   CanvasPermissionDenied, CanvasConflict, CanvasInvalid, type CanvasPayload,
 } from "./canvas-entity-service.ts";
+import { getSharedAppletState, saveSharedAppletState } from "./applet-state-service.ts";
 import {
   changePrivateNote, createMcpNote, DemoBoardMissing, PrivatePermissionDenied,
   readBoard, RequestIdConflict, requirePrivateBoardAccess,
@@ -217,6 +218,24 @@ export async function privateBoardRequest(
       return json(await changePrivateNote(db, {
         noteId: parsed.note_id, actorId: accountId,
         fields: { x: parsed.x, y: parsed.y },
+      }));
+    }
+    // Isolated applet runtime values live in their own Jazz rows, with
+    // independent optimistic versions from the board geometry.
+    if (pathname === "/patchboard-private/api/applet-state" && request.method === "GET") {
+      const boardId = boardIdSchema.parse(url.searchParams.get("board_id"));
+      const noteId = entityIdSchema.parse(url.searchParams.get("note_id"));
+      return json(await getSharedAppletState(db, boardId, accountId, noteId));
+    }
+    if (pathname === "/patchboard-private/api/applet-state" && request.method === "POST") {
+      const parsed = z.object({
+        board_id: boardIdSchema, note_id: entityIdSchema,
+        expected_version: z.number().int().nonnegative(),
+        value: z.record(z.string(), z.unknown()),
+      }).strict().parse(await safeJson(request, 20_480));
+      return json(await saveSharedAppletState(db, {
+        boardId: parsed.board_id, noteId: parsed.note_id,
+        actorId: accountId, expectedVersion: parsed.expected_version, value: parsed.value,
       }));
     }
     // Dim0 canvas transport: all entities are persisted in Jazz and scoped to the

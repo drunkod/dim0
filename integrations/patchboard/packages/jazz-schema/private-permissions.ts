@@ -42,6 +42,12 @@ export const privatePermissions = definePermissions({
     update: false,
     delete: false,
   },
+  appletStates: {
+    read: (row) => mayRead(row.boardId),
+    insert: false,
+    update: false,
+    delete: false,
+  },
   mcpRequests: { read: false, insert: false, update: false, delete: false },
   tasks: { read: false, insert: false, update: false, delete: false },
   comments: { read: false, insert: false, update: false, delete: false },

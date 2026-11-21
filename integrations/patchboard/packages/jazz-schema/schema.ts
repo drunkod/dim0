@@ -16,6 +16,7 @@ export const schema = s.defineSchema({
       checkpointsViaBoard: s.reverse("checkpoints", "board"),
       cursorsViaBoard: s.reverse("cursors", "board"),
       invitesViaBoard: s.reverse("boardInvites", "board"),
+      appletStatesViaBoard: s.reverse("appletStates", "board"),
     },
   ),
   boardMembers: s.table(
@@ -66,6 +67,13 @@ export const schema = s.defineSchema({
     },
     { board: s.rel("boards", "boardId") },
   ).indexOnly(["boardId", "kind"]),
+  /** Per-applet shared runtime state, separate from versioned Canvas geometry.
+   * Serializability and optimistic CAS prevent lost counter updates. */
+  appletStates: s.table(
+    { boardId: s.uuid(), noteId: s.uuid(), value: s.json(),
+      version: s.int(), updatedBy: s.uuid() },
+    { board: s.rel("boards", "boardId") },
+  ).indexOnly(["boardId", "noteId"]),
   /** Backend-only idempotency receipt, committed atomically with the note. */
   mcpRequests: s.table(
     { boardId: s.uuid(), requestId: s.string(), textHash: s.string(), noteId: s.uuid() },
@@ -159,6 +167,12 @@ export const permissions = definePermissions({
     delete: true,
   },
   canvasEntities: {
+    read: (row) => member(row.boardId),
+    insert: false,
+    update: false,
+    delete: false,
+  },
+  appletStates: {
     read: (row) => member(row.boardId),
     insert: false,
     update: false,
