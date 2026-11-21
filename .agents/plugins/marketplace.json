@@ -1,0 +1,20 @@
+{
+  "name": "dim0",
+  "interface": {
+    "displayName": "Dim0 Jazz Board"
+  },
+  "plugins": [
+    {
+      "name": "dim0-jazz",
+      "source": {
+        "source": "local",
+        "path": "./plugins/dim0"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
+      "category": "Productivity"
+    }
+  ]
+}
