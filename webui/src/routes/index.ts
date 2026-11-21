@@ -30,6 +30,7 @@ import { InstallScreen } from "@/features/install/screens/install-screen"
 import { ShareLandingScreen } from "@/features/sharing/screens/share-landing"
 import { LocalBoardScreen } from "@/features/board/local/local-board-screen"
 import { JazzSignInPage } from "@/features/board/jazz/jazz-signin-page"
+import { JazzInviteLandingPage } from "@/features/board/jazz/jazz-invite-landing-page"
 
 
 export const rootRoute = createRootRoute({
@@ -93,6 +94,7 @@ const requireBoardAuth = async () => {
 const signinRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/signin",
+  beforeLoad: () => { if (import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1") throw redirect({ to: "/jazz-signin" }) },
   component: SigninPage,
 })
 
@@ -100,6 +102,14 @@ const jazzSigninRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/jazz-signin",
   component: JazzSignInPage,
+})
+
+// A friend may arrive before sign-in. The signed-in Jazz server redeems the
+// fragment-borne secret; no legacy Dim0 token or account is required.
+const jazzInviteRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/jazz-invite/$id",
+  component: JazzInviteLandingPage,
 })
 
 // DEV-only spike: snapDOM whole-applet capture on WKWebView (throwaway — PR 0 of the
@@ -113,6 +123,7 @@ const captureSpikeRoute = createRoute({
 const signupRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/signup",
+  beforeLoad: () => { if (import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1") throw redirect({ to: "/jazz-signin" }) },
   component: SignupPage,
 })
 
@@ -149,6 +160,7 @@ const indexRoute = createRoute({
   // missing OR stale/expired token is treated as logged-out (clear + fall
   // through) so the front door never bounces to /signin.
   beforeLoad: async () => {
+    if (import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1") throw redirect({ to: "/jazz-signin" })
     const token = getAccessToken()
     if (!token) return
     try {
@@ -195,8 +207,8 @@ export const DashboardUrl = "/boards"
 const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: DashboardUrl,
-  beforeLoad: requireVerifiedAuth,
-  component: DashboardScreen,
+  beforeLoad: requireBoardAuth,
+  component: import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" ? JazzSignInPage : DashboardScreen,
 })
 
 // /boards/:id (protected). Surface routes (sheets/$noteId,
@@ -390,6 +402,7 @@ const routeTree = rootRoute.addChildren([
   ...(import.meta.env.DEV ? [captureSpikeRoute] : []),
   signinRoute,
   jazzSigninRoute,
+  jazzInviteRoute,
   signupRoute,
   googleCallbackRoute,
   verifyEmailRoute,

@@ -1,43 +1,78 @@
 import { useEffect, useState, type FormEvent } from "react"
 import { useNavigate } from "@tanstack/react-router"
+import {
+  createJazzAccount, currentJazzIdentity, signInToJazz, signOutOfJazz,
+  redeemPendingJazzInvitation, readPendingJazzInvitation, continueJazzOAuth,
+  type JazzIdentity,
+} from "./jazz-auth-client"
 
-type Session = { signedIn: boolean; name?: string }
+type Board = { board_id: string; title: string; role: string }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
-/** Small standalone launchpad for the opt-in Jazz-backed Dim0 prototype.
- * It creates boards through the authenticated private backend, not Dim0 SQL.
+/**
+ * The only login/dashboard for the experimental Jazz-powered Dim0.
+ * Does not load the old Patchboard application or legacy Dim0 SQL endpoints.
  */
 export function JazzSignInPage() {
   const navigate = useNavigate()
-  const [session, setSession] = useState<Session | null>(null)
-  const [title, setTitle] = useState("Dim0 + Jazz prototype")
+  const [session, setSession] = useState<JazzIdentity | null | undefined>(undefined)
+  const [boards, setBoards] = useState<Board[]>([])
+  const [title, setTitle] = useState("My collaborative board")
   const [boardId, setBoardId] = useState("")
-  const [recentBoard, setRecentBoard] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
 
+  const openBoard = (id: string) => {
+    if (!UUID.test(id)) { setError("Enter a valid Jazz board ID"); return }
+    void navigate({ to: "/boards/$id", params: { id } })
+  }
+
+  const loadBoards = async () => {
+    const response = await fetch("/patchboard-private/api/boards", {
+      credentials: "include", cache: "no-store",
+    })
+    if (!response.ok) throw new Error("Cannot load your Jazz boards")
+    const data = await response.json() as { boards: Board[] }
+    setBoards(data.boards)
+  }
+
+  const afterIdentity = async (identity: JazzIdentity) => {
+    setSession(identity)
+    // An invitation is redeemed by the authenticated Jazz server, atomically.
+    // Only navigate when the server confirms the membership.
+    const acceptedBoard = await redeemPendingJazzInvitation()
+    if (acceptedBoard) { openBoard(acceptedBoard); return }
+    if (continueJazzOAuth()) return
+    await loadBoards()
+  }
+
   useEffect(() => {
     let cancelled = false
-    try {
-      const stored = localStorage.getItem("dim0:jazz:recent-board")
-      if (stored && UUID.test(stored)) setRecentBoard(stored)
-    } catch { /* Private browsing may disable storage. */ }
-    void fetch("/patchboard-private/api/me", {
-      credentials: "include",
-      cache: "no-store",
-    }).then(async (res) => {
-      if (!res.ok) throw new Error("Private Jazz service is unavailable")
-      const next = await res.json() as Session
-      if (!cancelled) setSession(next)
-    }).catch(() => { if (!cancelled) setError("Private Jazz service is unavailable") })
+    void currentJazzIdentity().then(async (identity) => {
+      if (cancelled) return
+      if (identity) await afterIdentity(identity)
+      else setSession(null)
+    }).catch((cause) => {
+      if (!cancelled) {
+        setError(cause instanceof Error ? cause.message : "Jazz sign-in unavailable")
+        setSession(null)
+      }
+    })
     return () => { cancelled = true }
+    // The landing page handles changes by navigation, not by re-running effects.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const openBoard = (id: string) => {
-    const value = id.trim()
-    if (!UUID.test(value)) { setError("Enter a valid Jazz board UUID"); return }
-    try { localStorage.setItem("dim0:jazz:recent-board", value) } catch { /* optional */ }
-    void navigate({ to: "/boards/$id", params: { id: value } })
+  const authenticate = async (action: "create" | "login") => {
+    if (busy) return
+    setBusy(true)
+    setError("")
+    try {
+      const identity = action === "create" ? await createJazzAccount() : await signInToJazz()
+      await afterIdentity(identity)
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Passkey sign-in failed")
+    } finally { setBusy(false) }
   }
 
   const createBoard = async (event: FormEvent<HTMLFormElement>) => {
@@ -47,8 +82,7 @@ export function JazzSignInPage() {
     setError("")
     try {
       const response = await fetch("/patchboard-private/api/boards", {
-        method: "POST",
-        credentials: "include",
+        method: "POST", credentials: "include",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ title: title.trim() }),
       })
@@ -58,50 +92,93 @@ export function JazzSignInPage() {
       openBoard(created.board_id)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not create board")
-    } finally {
-      setBusy(false)
-    }
+    } finally { setBusy(false) }
   }
 
+  const signOut = async () => {
+    setBusy(true)
+    try {
+      await signOutOfJazz()
+      setSession(null)
+      setBoards([])
+      setError("")
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Could not sign out")
+    } finally { setBusy(false) }
+  }
+
+  const pendingInvite = readPendingJazzInvitation()
+  const oauthLogin = new URLSearchParams(location.search).has("client_id")
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-5 px-6 text-foreground">
-      <div className="text-xs font-medium uppercase tracking-widest text-muted-foreground">Experimental local MVP</div>
-      <h1 className="text-3xl font-semibold">Dim0 + Jazz canvas</h1>
+    <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-5 px-6 py-10 text-foreground">
+      <div className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
+        Dim0 · Jazz collaborative workspace
+      </div>
+      <h1 className="text-3xl font-semibold">Your collaborative canvas</h1>
       <p className="text-sm text-muted-foreground">
-        A live Dim0 whiteboard backed by the private Jazz database and MCP canvas tools.
-        This prototype runs on your MacBook; offline recovery is still in development.
+        All board entities, invitations and memberships use Jazz Tools. Sign in with a
+        passkey to collaborate in Dim0 and authorize your own ChatGPT MCP connection.
       </p>
-      {error && <div role="alert" className="rounded-md border border-destructive p-3 text-sm">{error}</div>}
-      {session === null ? (
-        <p role="status" className="text-sm">Checking private Jazz sign-in…</p>
-      ) : !session.signedIn ? (
-        <div className="flex flex-col gap-3">
-          <p>Use your private Patchboard passkey to create a Jazz session.</p>
-          <a href="/patchboard-private/" className="rounded-lg bg-primary px-4 py-3 text-center font-medium text-primary-foreground">
-            Sign in or create passkey
-          </a>
-          <p className="text-xs text-muted-foreground">After signing in, return to /jazz-signin to create or open a board.</p>
+      {pendingInvite && (
+        <div role="status" className="rounded-lg border bg-muted/30 p-3 text-sm">
+          Your invitation is ready. Sign in to join the board.
         </div>
+      )}
+      {oauthLogin && (
+        <div role="status" className="rounded-lg border bg-muted/30 p-3 text-sm">
+          Sign in to continue authorizing the board for your ChatGPT account.
+        </div>
+      )}
+      {error && <p role="alert" className="rounded-lg border border-destructive p-3 text-sm text-destructive">{error}</p>}
+      {session === undefined ? (
+        <p role="status" className="text-sm">Checking Jazz session…</p>
+      ) : session === null ? (
+        <section className="flex flex-col gap-3">
+          <button type="button" onClick={() => void authenticate("create")} disabled={busy}
+            className="rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground disabled:opacity-50">
+            {busy ? "Please wait…" : "Create account with passkey"}
+          </button>
+          <button type="button" onClick={() => void authenticate("login")} disabled={busy}
+            className="rounded-lg border bg-background px-4 py-3 font-medium disabled:opacity-50">
+            Sign in with passkey
+          </button>
+        </section>
       ) : (
         <>
-          <p role="status" className="text-sm">Signed in as {session.name || "Jazz account"}</p>
-          <form onSubmit={createBoard} className="flex flex-col gap-3">
-            <label htmlFor="jazz-board-title" className="font-medium">New board</label>
-            <input id="jazz-board-title" className="rounded-lg border bg-background px-3 py-3" value={title}
-              maxLength={80} onChange={(event) => setTitle(event.target.value)} />
+          <div className="flex items-center justify-between gap-3 text-sm">
+            <p role="status">Signed in as <strong>{session.name}</strong></p>
+            <button type="button" disabled={busy} onClick={() => void signOut()}
+              className="underline underline-offset-2">Sign out</button>
+          </div>
+          {boards.length > 0 && (
+            <section className="space-y-2">
+              <h2 className="font-medium">Your Jazz boards</h2>
+              {boards.map((board) => (
+                <button type="button" key={board.board_id} onClick={() => openBoard(board.board_id)}
+                  className="flex w-full items-center justify-between gap-2 rounded-lg border bg-background p-3 text-left hover:bg-muted">
+                  <span className="truncate">{board.title}</span>
+                  <span className="text-xs text-muted-foreground">{board.role === "owner" ? "Owner" : board.role === "member" ? "Editor" : "Viewer"}</span>
+                </button>
+              ))}
+            </section>
+          )}
+          <form onSubmit={(event) => void createBoard(event)} className="flex flex-col gap-3">
+            <label htmlFor="jazz-board-title" className="font-medium">Create a board</label>
+            <input id="jazz-board-title" className="rounded-lg border bg-background px-3 py-3"
+              value={title} maxLength={80} onChange={(event) => setTitle(event.target.value)} />
             <button type="submit" disabled={busy || !title.trim()}
               className="rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground disabled:opacity-50">
               {busy ? "Creating…" : "Create Jazz board"}
             </button>
           </form>
-          <form onSubmit={(event) => { event.preventDefault(); openBoard(boardId) }} className="flex flex-col gap-3">
-            <label htmlFor="jazz-board-id" className="font-medium">Open an existing Jazz board</label>
-            <input id="jazz-board-id" className="rounded-lg border bg-background px-3 py-3" value={boardId}
-              placeholder="Board UUID" onChange={(event) => setBoardId(event.target.value)} />
+          <form onSubmit={(event) => { event.preventDefault(); openBoard(boardId.trim()) }}
+            className="flex flex-col gap-2">
+            <label htmlFor="jazz-board-id" className="text-sm font-medium">Open by board ID</label>
+            <input id="jazz-board-id" className="rounded-lg border bg-background px-3 py-3"
+              value={boardId} placeholder="Board UUID" onChange={(event) => setBoardId(event.target.value)} />
             <button type="submit" className="rounded-lg border px-4 py-3 font-medium">Open board</button>
           </form>
-          {recentBoard && <button type="button" onClick={() => openBoard(recentBoard)}
-            className="text-left text-sm underline">Reopen recent board: {recentBoard}</button>}
         </>
       )}
     </main>

@@ -3,6 +3,7 @@ import { useState } from "react"
 import { ShareIcon } from "@/components/icons"
 import { useBoardAppStore } from "@/features/board/harness/store/board-app-store"
 import { ShareDialog } from "./share-dialog"
+import { JazzShareDialog } from "./jazz-share-dialog"
 
 
 /**
@@ -15,7 +16,7 @@ import { ShareDialog } from "./share-dialog"
  * top-right surfaces use elsewhere (border + backdrop-blurred bg +
  * subtle shadow).
  */
-export function ShareButton() {
+export function ShareButton({ jazz = false }: { jazz?: boolean } = {}) {
   const boardId = useBoardAppStore((s) => s.boardId)
   const boardRole = useBoardAppStore((s) => s.boardRole)
   const boardLabel = useBoardAppStore((s) => s.boardLabel)
@@ -42,12 +43,13 @@ export function ShareButton() {
         <ShareIcon className="size-3.5 shrink-0" />
         Share
       </button>
-      <ShareDialog
-        boardId={boardId}
-        boardLabel={boardLabel}
-        open={open}
-        onOpenChange={setOpen}
-      />
+      {jazz ? (
+        <JazzShareDialog boardId={boardId} boardLabel={boardLabel}
+          open={open} onOpenChange={setOpen} />
+      ) : (
+        <ShareDialog boardId={boardId} boardLabel={boardLabel}
+          open={open} onOpenChange={setOpen} />
+      )}
     </>
   )
 }

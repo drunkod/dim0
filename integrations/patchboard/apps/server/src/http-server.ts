@@ -78,6 +78,17 @@ export async function startBoardServer(
       response.end("ok");
       return;
     }
+    // In the Dim0 unified deployment, the old Patchboard frontend must not
+    // appear during sign-in. Its Jazz WebSocket and auth APIs remain available.
+    if (process.env.PATCHBOARD_PRIVATE_DIM0_ONLY === "1" && staticDir &&
+        request.method === "GET" &&
+        /^\/patchboard-private(?:\/|\/index\.html)?(?:\?.*)?$/.test(request.url ?? "")) {
+      const query = (request.url ?? "").split("?")[1] ?? "";
+      response.writeHead(302, { Location: "/jazz-signin" + (query ? "?" + query : ""),
+        "cache-control": "no-store" });
+      response.end();
+      return;
+    }
     if (staticDir && request.method === "GET" && request.url?.startsWith(publicPath)) {
       const requested = decodeURIComponent(request.url.slice(publicPath.length).split("?")[0] || "/");
       const relative = requested === "/" ? "index.html" : requested.replace(/^\/+/, "");

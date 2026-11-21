@@ -16,7 +16,8 @@ export async function oauthConsentPage(
   const session = await auth.api.getSession({ headers: request.headers });
   const url = new URL(request.url);
   if (!session) {
-    const login = new URL("/patchboard-private/", url);
+    const login = new URL(process.env.PATCHBOARD_PRIVATE_DIM0_ONLY === "1"
+      ? "/jazz-signin" : "/patchboard-private/", url);
     login.search = url.search; // signed authorization continuation, not an arbitrary redirect
     return Response.redirect(login, 302);
   }
@@ -29,15 +30,16 @@ export async function oauthConsentPage(
     '<option value="' + escapeHtml(board.board_id) + '">' +
     escapeHtml(board.title) + " (" + escapeHtml(board.role) + ")</option>"
   ).join("");
+  const appName = process.env.PATCHBOARD_PRIVATE_DIM0_ONLY === "1" ? "Dim0" : "Patchboard";
   const content = [
     '<!doctype html><html lang="en"><head><meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width,initial-scale=1">',
-    '<title>Patchboard — authorize MCP</title>',
+    '<title>' + appName + ' — authorize MCP</title>',
     '<style>body{font:16px system-ui,sans-serif;background:#f5f6fa;color:#17212e;margin:0;padding:4rem 1rem}',
     'main{max-width:550px;margin:auto;background:white;border-radius:14px;padding:2rem}',
     'button{padding:.7rem 1.3rem;border-radius:7px;border:1px solid #3a5268;cursor:pointer}',
     'button.approve{background:#12365e;color:white}#status{color:#a23d39}code{overflow-wrap:anywhere}</style>',
-    '</head><body><main><h1>Authorize a Patchboard connection</h1>',
+    '</head><body><main><h1>Authorize a ' + appName + ' connection</h1>',
     '<p>A third-party MCP client requests access as <strong>', escapeHtml(session.user.name), '</strong>.</p>',
     '<p><strong>Client ID</strong>: <code>', clientId, '</code></p>',
     '<p>Requested scopes:</p><ul>', scopeList || "<li>No board permissions requested</li>", '</ul>',
@@ -46,7 +48,9 @@ export async function oauthConsentPage(
     '<label for="board">Approved board</label> ',
     '<select id="board" required><option value="">Select a board...</option>', options, '</select>',
     '<p>A viewer may read the selected board, never write it. Your passkey session ',
-    'is not an MCP credential. Access tokens expire after 15 minutes.</p>',
+    'is not an MCP credential. Access tokens expire after ',
+    String(Math.round(Number(process.env.PATCHBOARD_MCP_ACCESS_TOKEN_SECONDS ?? '900') / 60)),
+    ' minutes.</p>',
     '<button class="approve" id="approve" disabled>Authorize selected board</button> ',
     '<button id="deny">Deny</button><p role="alert" id="status"></p></main>',
     '<script nonce="', nonce, '">',

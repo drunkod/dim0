@@ -261,6 +261,22 @@ export const update = (model: Model, message: Message) =>
     }),
   });
 
+/** The Jazz Canvas invite keeps its secret in the URL fragment. Passkey
+ * registration can reload Patchboard; recover the invitation from same-tab
+ * sessionStorage only for explicit canvas joins. */
+const initialPrivateInviteToken = (): string => {
+  if (!privateMode || typeof window === "undefined") return "";
+  const query = new URLSearchParams(window.location.search);
+  if (query.get("invite")) return query.get("invite")!;
+  if (query.get("canvas") !== "1") return "";
+  try {
+    const raw = sessionStorage.getItem("dim0:jazz:pendingInvite");
+    const saved = raw ? JSON.parse(raw) as { boardId?: string; token?: string } : null;
+    return saved?.boardId === query.get("board") && typeof saved?.token === "string"
+      ? saved.token : "";
+  } catch { return ""; }
+};
+
 export const init: Runtime.ApplicationInit<Model, Message> = () => ({
   model: {
     connection: ConnectionState.Connecting(),
@@ -279,9 +295,7 @@ export const init: Runtime.ApplicationInit<Model, Message> = () => ({
     privateAuthName: "",
     privateAuthId: "",
     privateAuthError: "",
-    inviteToken: privateMode && typeof window !== "undefined"
-      ? new URLSearchParams(window.location.search).get("invite") ?? ""
-      : "",
+    inviteToken: initialPrivateInviteToken(),
     inviteUrl: "",
   },
   ...(privateMode ? { commands: [CheckPrivateAccount()] } : {}),
@@ -429,8 +443,15 @@ export const FinishPrivateInvite = Command.define("FinishPrivateInvite", {
   messages: [Message.SucceededSetBoardUrl],
   execute: Effect.sync(() => {
     const url = new URL(window.location.href);
-    url.searchParams.delete("invite");
-    window.location.replace(url.toString());
+    const boardId = url.searchParams.get("board");
+    if (url.searchParams.get("canvas") === "1" && boardId &&
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(boardId)) {
+      sessionStorage.removeItem("dim0:jazz:pendingInvite");
+      window.location.replace("/boards/" + encodeURIComponent(boardId));
+    } else {
+      url.searchParams.delete("invite");
+      window.location.replace(url.toString());
+    }
     return Message.SucceededSetBoardUrl();
   }),
 });

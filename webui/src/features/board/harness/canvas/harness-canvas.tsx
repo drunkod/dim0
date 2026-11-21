@@ -734,7 +734,7 @@ function HarnessCanvasInner({
         {!canCollab && <BoardKindBadge kind="local-only" />}
         {jazzMode && <span className="rounded-md border bg-background/90 px-3 py-2 text-xs font-medium shadow-sm">Jazz · MCP</span>}
         {canCollab && !jazzMode && <HarnessCollabStatus />}
-        {canCollab && !jazzMode && <ShareButton />}
+        {canCollab && <ShareButton jazz={jazzMode} />}
       </div>
       <NodeSurfaceHost />
       <SlidesSheet />

@@ -35,7 +35,8 @@ export const auth = betterAuth({
     jwt(),
     mcp({
       resource: config.origin + "/patchboard-private-mcp",
-      loginPage: "/patchboard-private/",
+      loginPage: process.env.PATCHBOARD_PRIVATE_DIM0_ONLY === "1"
+        ? "/jazz-signin" : "/patchboard-private/",
       consentPage: "/patchboard-private/oauth-consent",
       // The installed Better Auth OAuth provider preserves consent referenceId
       // across the authorization code and refresh token. AsyncLocalStorage
@@ -64,7 +65,7 @@ export const auth = betterAuth({
     // Preserve the official runtime plugin; do not weaken token verification.
     passkey({
       rpID: new URL(config.origin).hostname,
-      rpName: "Patchboard",
+      rpName: process.env.PATCHBOARD_PRIVATE_DIM0_ONLY === "1" ? "Dim0" : "Patchboard",
       origin: config.origin,
       authenticatorSelection: {
         residentKey: "required",

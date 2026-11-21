@@ -7,6 +7,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 JAZZ_PRIVATE_PORT="${JAZZ_PRIVATE_PORT:-8798}"
 APP_PORT="${APP_PORT:-5178}"
 export PATCHBOARD_PRIVATE_DEV=1
+# Only the Dim0 React UI is shown; the Patchboard-derived code is backend-only.
+export PATCHBOARD_PRIVATE_DIM0_ONLY=1
 export PATCHBOARD_PRIVATE_PORT="$JAZZ_PRIVATE_PORT"
 export PATCHBOARD_PRIVATE_ROOT="${PATCHBOARD_PRIVATE_ROOT:-/tmp/dim0-jazz-mvp-local}"
 export PATCHBOARD_PRIVATE_ORIGIN="http://localhost:$APP_PORT"
@@ -28,7 +30,7 @@ test -d "$ROOT/integrations/patchboard/apps/server/node_modules" || {
 }
 
 if [[ ! -f "$ROOT/integrations/patchboard/apps/web/dist/index.html" ]]; then
-  echo "Building isolated Patchboard passkey sign-in..."
+  echo "Building backend Jazz WebSocket asset base (legacy UI redirects to Dim0)..."
   (
     cd "$ROOT/integrations/patchboard"
     PATCHBOARD_WEB_BASE=/patchboard-private/ \
