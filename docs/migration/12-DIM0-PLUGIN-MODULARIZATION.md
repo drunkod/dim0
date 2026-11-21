@@ -179,3 +179,13 @@ rollback assertion.
 
 The presentation deployment and public Jazz service were not modified by
 this packaging-only change.
+
+
+## CI checkout portability note
+
+The first GitHub Actions run for the new legacy-upgrade test failed because
+`actions/checkout@v4` defaults to a depth-one checkout of the synthetic
+pull-request merge, which does not include the original `b6f4c579`
+pre-modular commit used by the test. The package workflow now uses
+`fetch-depth: 0` so it can verify the actual historical packager.
+This changes the CI checkout only, not the plugin payload or live deployment.

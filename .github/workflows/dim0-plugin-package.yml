@@ -25,7 +25,11 @@ jobs:
     name: Validate portable + legacy ZIP
     runs-on: ubuntu-latest
     steps:
+      # The upgrade test loads the real pre-modular packager from b6f4c579.
+      # Pull-request merge checkouts default to depth 1 and omit that commit.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
