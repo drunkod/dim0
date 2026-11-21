@@ -11,7 +11,7 @@
         "path": "./plugins/dim0"
       },
       "policy": {
-        "installation": "AVAILABLE",
+        "installation": "NOT_AVAILABLE",
         "authentication": "ON_USE"
       },
       "category": "Productivity"

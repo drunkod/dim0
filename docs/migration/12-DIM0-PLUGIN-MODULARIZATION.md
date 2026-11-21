@@ -1,6 +1,6 @@
 # Dim0 plugin packaging · isolated sprint handoff
 
-Date: 21 November 2026
+Date: 21 November 2026 (packaging-safety update: 22 November 2026)
 Source: architectural specification `Dim0-plugin-architecture(1).md`
 Reference design: `teableio/teable-mcp@5446050`
 Branch: `sprint/dim0-plugin-modular-20261121`, based on `5d899993`
@@ -17,10 +17,10 @@ live presentation data**. It changes only source/plugin packaging and tests.
 | `plugins/dim0/README.md` | Per-account OAuth, real invite redemption, tool list and installation guidance |
 | `plugins/dim0/skills/dim0-board/SKILL.md` | Version-checked card edits, applets, identity proof and conflict handling |
 | `plugins/dim0/assets/` | Original Dim0 MIT-licensed icon and logo copied from this repository |
-| `.agents/plugins/marketplace.json` | Local Codex marketplace registration (source install pending permanent endpoint) |
+| `.agents/plugins/marketplace.json` | Local Codex marketplace registration; `NOT_AVAILABLE` until a permanent source endpoint is configured |
 | `scripts/package-dim0-openai.mjs` | Source-to-portable transformation, validation, staged ZIP, atomic promotion |
 | `integrations/dim0-mcp-plugin/scripts/build.mjs` | Backwards-compatible wrapper using the **same** canonical packaging code |
-| `scripts/test-package-dim0-openai.mjs` | 7 automated packaging, compatibility, failure and rollback tests |
+| `scripts/test-package-dim0-openai.mjs` | Packaging, ownership, release-gate and rollback tests |
 | `scripts/test-dim0-plugin-oauth-discovery.mjs` | Live, read-only OAuth challenge/metadata/DCR/PKCE verification |
 | `.github/workflows/dim0-plugin-package.yml` | Self-contained packaging CI for branch/PR updates |
 
@@ -51,8 +51,14 @@ cd integrations/patchboard && pnpm install --offline --frozen-lockfile && pnpm t
 cd ../..
 
 export DIM0_MCP_URL=https://barbie-discovery-bingo-system.trycloudflare.com/patchboard-private-mcp
-DIM0_PLUGIN_RELEASE=1 node scripts/package-dim0-openai.mjs
-DIM0_PLUGIN_RELEASE=1 node integrations/dim0-mcp-plugin/scripts/build.mjs
+# Private preview only; release mode rejects the temporary tunnel:
+node scripts/package-dim0-openai.mjs
+node integrations/dim0-mcp-plugin/scripts/build.mjs
+
+# Only after approving and verifying a permanent HTTPS origin:
+# export DIM0_MCP_URL=https://YOUR-PERMANENT-HOST/patchboard-private-mcp
+# export DIM0_PLUGIN_APPROVED_ORIGIN=https://YOUR-PERMANENT-HOST
+# DIM0_PLUGIN_RELEASE=1 node scripts/package-dim0-openai.mjs
 
 node scripts/test-dim0-plugin-oauth-discovery.mjs
 unzip -t integrations/dim0-mcp-plugin/dist/dim0-jazz-mcp-plugin.zip
@@ -65,30 +71,51 @@ The original build default is preserved: extracted files at
 If `DIM0_PLUGIN_OUTPUT_DIR` is supplied, extracted files go there and the ZIP
 goes in its parent. Both invocation paths build the same JSON, assets, skills,
 and archive entry names. If validation or zipping fails, the previous
-successful ZIP remains available.
+successful ZIP remains available. The extracted output is replaced only if
+it is absent, empty, or matches the known generated Dim0 layout. Unknown or
+caller-owned files cause refusal without deletion. If stage promotion fails
+after the old stage is moved, it is restored before cleanup; if restoration
+itself fails, the backup directory is retained with a printed recovery path.
 
 ## Verification performed
 
 - **PASS:** new and compatibility builder ZIP entries and parsed JSON agree.
-- **PASS:** seven automated packaging tests, including malicious/invalid URLs,
-  missing icon, invalid skill frontmatter, and last-good-ZIP preservation.
+- **PASS:** 14 packaging tests, including invalid URLs, source-install
+  restrictions, temporary-tunnel release rejection, approved origin matching,
+  caller-owned file preservation, promotion rollback, missing icons, malformed
+  skill metadata, and last-good-ZIP preservation.
 - **PASS:** clean offline `pnpm` install and the full private OAuth/MCP
   regression suite in this isolated worktree. Includes two distinct Jazz
   actors, versioned CRUD, viewer denial, reauthorization/restart, scopes.
 - **PASS:** live HTTPS MCP returns an RFC 9728 `401` bearer challenge,
   discovers the matching resource and authorization issuer path, offers
   dynamic client registration and PKCE S256.
-- **PASS:** a private plugin candidate ZIP is generated for the current
-  Cloudflare origin at `integrations/dim0-mcp-plugin/dist/dim0-jazz-mcp-plugin.zip`.
-  SHA-256 of this exact build: `888fcef8cc8fb8411fd691bb3e47f1baae986973e44d6a57286d3e2849c8c61c`.
-  ZIP timestamps can change between rebuilds, so re-check its hash if rebuilt.
+- **PASS (22 November 2026):** rebuilt private ZIP at
+  `integrations/dim0-mcp-plugin/dist/dim0-jazz-mcp-plugin.zip`;
+  SHA-256: `1f8d13f88d8dc614c2d4612c21614ebca0871d6445854803047e48a15a5106ef`.
+  This remains a **private** temporary-Cloudflare endpoint build, not a release.
+- **PRESERVED:** the prior c6348aa3 ZIP was copied to
+  `integrations/dim0-mcp-plugin/dist/dim0-jazz-mcp-plugin-c6348aa3-preserved.zip`;
+  original SHA-256: `888fcef8cc8fb8411fd691bb3e47f1baae986973e44d6a57286d3e2849c8c61c`.
+  ZIP timestamps can change between rebuilds; always verify the hash of the
+  particular file being installed.
+- **PASS (22 November 2026):** 14/14 packaging regressions, a fresh
+  `pnpm test:private:ci` OAuth/MCP suite including distinct Jazz writers and
+  persistence after restart, plus live public OAuth/DCR/PKCE discovery.
+- **NOT DONE:** a genuine clean ChatGPT ZIP installation and independent
+  friend's authorization/update remain manual acceptance checks.
 - **NOT TESTED:** installing the ZIP into a **fresh ChatGPT account** through
   the plugin install UI. A direct MCP connection is not equivalent.
 - **NOT TESTED:** an actual friend connecting **their own ChatGPT and Dim0
   accounts** and renaming a card. Two automated passkeys/Jazz actors are
   useful regressions but not this human acceptance criterion.
 - **PENDING:** owned permanent HTTPS origin, real publisher/legal policy
-  URLs, public plugin submission.
+  URLs, public plugin submission. Source marketplace installation is explicitly
+  `NOT_AVAILABLE` while the checked-in descriptor is `.invalid`.
+- **RELEASE GATE:** `DIM0_PLUGIN_RELEASE=1` rejects `*.trycloudflare.com`,
+  `*.loca.lt` and `*.ngrok-free.app` origins even when named as approved,
+  and requires a matching bare HTTPS `DIM0_PLUGIN_APPROVED_ORIGIN`. This
+  variable does not itself verify domain ownership or reachability.
 
 ## Real-account acceptance script
 

@@ -10,23 +10,36 @@ server, database or personal credentials are bundled in this plugin**.
 ## Install a private preview
 
 The canonical source descriptor `.mcp.json` intentionally points to
-`dim0.example.invalid`. **Do not install the source directory unchanged**:
+`dim0.example.invalid`. The marketplace therefore marks direct source
+installation `NOT_AVAILABLE`. **Do not install the source directory unchanged**:
 that hostname is not live. Until you own a persistent HTTPS hostname, build a
 private portable ZIP with an explicit endpoint:
 
 ```sh
 DIM0_MCP_URL="https://YOUR-VERIFIED-HOST/patchboard-private-mcp" \
-  DIM0_PLUGIN_RELEASE=1 node scripts/package-dim0-openai.mjs
+  node scripts/package-dim0-openai.mjs
 # or use the backwards-compatible command:
 DIM0_MCP_URL="https://YOUR-VERIFIED-HOST/patchboard-private-mcp" \
-  DIM0_PLUGIN_RELEASE=1 node integrations/dim0-mcp-plugin/scripts/build.mjs
+  node integrations/dim0-mcp-plugin/scripts/build.mjs
 ```
 
 Default outputs: `integrations/dim0-mcp-plugin/dist/dim0-jazz/` (extracted
 portable root) and `integrations/dim0-mcp-plugin/dist/dim0-jazz-mcp-plugin.zip`.
 `DIM0_PLUGIN_OUTPUT_DIR` changes the extracted root; the ZIP is always placed
 in its parent, preserving the old interface. A failed build preserves the last
-successful ZIP. A release build rejects `.invalid`, loopback and fixture hosts.
+successful ZIP. The builder refuses to replace any output directory containing unrecognized
+or caller-owned files, including nested files. Build failures preserve the
+previous stage and ZIP. A release build rejects fixtures and temporary tunnels
+and requires a matching explicitly approved permanent HTTPS origin:
+
+```sh
+export DIM0_MCP_URL=https://YOUR-PERMANENT-HOST/patchboard-private-mcp
+export DIM0_PLUGIN_APPROVED_ORIGIN=https://YOUR-PERMANENT-HOST
+DIM0_PLUGIN_RELEASE=1 node scripts/package-dim0-openai.mjs
+```
+
+The approval variable is a maintainer guard, not proof of DNS ownership;
+verify control of the hostname and live OAuth discovery before release.
 
 Upload the ZIP through your available ChatGPT plugin testing/installation
 workflow; do not mistake an already configured MCP URL for an installation

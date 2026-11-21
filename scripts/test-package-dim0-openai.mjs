@@ -3,8 +3,8 @@
 import assert from "node:assert/strict";
 import { execFileSync, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { cp, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { test, after } from "node:test";
 
@@ -179,14 +179,136 @@ test("bad image, skill header and source endpoint never replace a prior good ZIP
   assert.equal(await readFile(join(stage, "plugin.json"), "utf8"), referenceStage);
 });
 
-test("production override passes release validation without changing canonical source", () => {
-  const stage = join(qa, "release-good", "stage");
+test("temporary Cloudflare tunnel is allowed for private packages but rejected for release", () => {
   const endpoint = "https://barbie-discovery-bingo-system.trycloudflare.com/patchboard-private-mcp";
-  // This is a syntax-only package test; a live/discoverable endpoint is verified separately.
+  const privateStage = join(qa, "tunnel-private", "stage");
+  const preview = build(canonical, privateStage, { DIM0_MCP_URL: endpoint });
+  assert.equal(preview.status, 0, preview.stderr);
+  assert.match(preview.stderr, /DIM0_PLUGIN_PRIVATE_TUNNEL_ONLY/);
+  assert.equal(JSON.parse(unzipText(archive(privateStage), "mcp.json")).mcpServers.dim0.url, endpoint);
+
+  for (const approved of ["", "https://barbie-discovery-bingo-system.trycloudflare.com"]) {
+    const release = build(canonical, join(qa, "tunnel-release-" + approved.length, "stage"), {
+      DIM0_MCP_URL: endpoint, DIM0_PLUGIN_RELEASE: "1",
+      DIM0_PLUGIN_APPROVED_ORIGIN: approved,
+    });
+    assert.notEqual(release.status, 0);
+    assert.match(release.stderr, /temporary tunnel origin/);
+  }
+});
+
+test("release requires exact explicitly approved permanent HTTPS origin", () => {
+  // Syntax-only fixture: this test does not claim DNS ownership or reachability.
+  const endpoint = "https://mcp.dim0-release-qa.net/patchboard-private-mcp";
+  const origin = "https://mcp.dim0-release-qa.net";
+  for (const [label, approved, error] of [
+    ["missing", "", /requires DIM0_PLUGIN_APPROVED_ORIGIN/],
+    ["mismatch", "https://other.dim0-release-qa.net", /does not match/],
+    ["with-path", origin + "/wrong", /bare HTTPS origin/],
+    ["insecure", "http://mcp.dim0-release-qa.net", /bare HTTPS origin/],
+  ]) {
+    const failure = build(canonical, join(qa, "release-" + label, "stage"), {
+      DIM0_MCP_URL: endpoint, DIM0_PLUGIN_RELEASE: "1",
+      DIM0_PLUGIN_APPROVED_ORIGIN: approved,
+    });
+    assert.notEqual(failure.status, 0, label);
+    assert.match(failure.stderr, error);
+  }
+  const stage = join(qa, "release-approved", "stage");
   const result = build(canonical, stage, {
     DIM0_MCP_URL: endpoint, DIM0_PLUGIN_RELEASE: "1",
+    DIM0_PLUGIN_APPROVED_ORIGIN: origin,
   });
   assert.equal(result.status, 0, result.stderr);
   const mcp = JSON.parse(unzipText(archive(stage), "mcp.json"));
   assert.equal(mcp.mcpServers.dim0.url, endpoint);
+});
+
+test("marketplace blocks unusable direct source installation", async () => {
+  const marketplace = JSON.parse(await readFile(join(root, ".agents/plugins/marketplace.json"), "utf8"));
+  const descriptor = JSON.parse(await readFile(join(source, ".mcp.json"), "utf8"));
+  assert.match(descriptor.mcpServers.dim0.url, /\.invalid\/patchboard-private-mcp$/);
+  assert.equal(marketplace.plugins.find(p => p.name === "dim0-jazz").policy.installation, "NOT_AVAILABLE");
+});
+
+test("refuses caller-owned output files without deleting them or replacing ZIP", async () => {
+  const stage = join(qa, "caller-owned", "stage");
+  let result = build(canonical, stage);
+  assert.equal(result.status, 0, result.stderr);
+  const zip = archive(stage);
+  const originalZip = sha(await readFile(zip));
+  const originalManifest = await readFile(join(stage, "plugin.json"), "utf8");
+  const callerFile = join(stage, "caller-owned.txt");
+  await writeFile(callerFile, "DO NOT DELETE");
+  result = build(canonical, stage);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Refusing to replace unowned plugin output files/);
+  assert.equal(await readFile(callerFile, "utf8"), "DO NOT DELETE");
+  assert.equal(sha(await readFile(zip)), originalZip);
+  assert.equal(await readFile(join(stage, "plugin.json"), "utf8"), originalManifest);
+
+  await rm(callerFile);
+  const nested = join(stage, "assets", "caller-owned.png");
+  await writeFile(nested, "NOT OUR ASSET");
+  result = build(canonical, stage);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Refusing to replace unowned plugin output files/);
+  assert.equal(await readFile(nested, "utf8"), "NOT OUR ASSET");
+  assert.equal(sha(await readFile(zip)), originalZip);
+});
+
+test("failed stage promotion restores previous stage and leaves ZIP intact", async () => {
+  const stage = join(qa, "promotion-failure", "stage");
+  let result = build(canonical, stage);
+  assert.equal(result.status, 0, result.stderr);
+  const previousZip = sha(await readFile(archive(stage)));
+  const previousManifest = await readFile(join(stage, "plugin.json"), "utf8");
+  result = build(canonical, stage, {
+    DIM0_PLUGIN_TEST_MODE: "1", DIM0_PLUGIN_TEST_FAIL_PROMOTE: "1",
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Injected stage promotion failure/);
+  assert.equal(sha(await readFile(archive(stage))), previousZip);
+  assert.equal(await readFile(join(stage, "plugin.json"), "utf8"), previousManifest);
+  assert.deepEqual((await readdir(stage)).sort(),
+    ["README.md", "assets", "mcp.json", "plugin.json", "skills"].sort());
+});
+
+test("unowned nonempty output directory is rejected unchanged", async () => {
+  const stage = join(qa, "unowned-output", "stage");
+  await mkdir(stage, { recursive: true });
+  await writeFile(join(stage, "caller-owned.txt"), "sentinel");
+  const result = build(canonical, stage);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Refusing to replace unowned plugin output files/);
+  assert.equal(await readFile(join(stage, "caller-owned.txt"), "utf8"), "sentinel");
+});
+
+
+test("rebuild replaces an existing owned stage and ZIP successfully", async () => {
+  const stage = join(qa, "owned-rebuild", "stage");
+  let result = build(canonical, stage);
+  assert.equal(result.status, 0, result.stderr);
+  const oldZip = await readFile(archive(stage));
+  result = build(compat, stage);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(entries(archive(stage)), entries(canonicalZip));
+  assert.equal(sha(await readFile(archive(stage))), sha(oldZip));
+  assert.deepEqual((await readdir(dirname(stage))).filter(name => name.startsWith(".dim0-plugin-")),
+    [], "successful promotion must clean up its previous-stage backup");
+});
+
+test("failed ZIP promotion also rolls back the promoted stage", async () => {
+  const stage = join(qa, "zip-promotion-failure", "stage");
+  let result = build(canonical, stage);
+  assert.equal(result.status, 0, result.stderr);
+  const previousZip = sha(await readFile(archive(stage)));
+  const previousManifest = await readFile(join(stage, "plugin.json"), "utf8");
+  result = build(canonical, stage, {
+    DIM0_PLUGIN_TEST_MODE: "1", DIM0_PLUGIN_TEST_FAIL_ZIP_PROMOTE: "1",
+  });
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Injected ZIP promotion failure/);
+  assert.equal(sha(await readFile(archive(stage))), previousZip);
+  assert.equal(await readFile(join(stage, "plugin.json"), "utf8"), previousManifest);
 });

@@ -6,7 +6,7 @@
  */
 import { execFileSync } from "node:child_process";
 import {
-  access, copyFile, lstat, mkdir, mkdtemp, readFile, readdir, rename,
+  copyFile, lstat, mkdir, mkdtemp, readFile, readdir, rename,
   rm, writeFile,
 } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
@@ -46,7 +46,28 @@ function validateEndpoint(raw, { release = isRelease, warnFixture = true } = {})
   if (fixture && release) {
     throw new Error("Release plugin cannot use a fixture, localhost or example host");
   }
+  // Private previews can use temporary tunnels; public releases cannot.
+  const ephemeral = h === "trycloudflare.com" || h.endsWith(".trycloudflare.com") ||
+    h === "loca.lt" || h.endsWith(".loca.lt") ||
+    h.endsWith(".ngrok-free.app");
+  if (release && ephemeral) {
+    throw new Error("Release plugin cannot use a temporary tunnel origin");
+  }
+  if (release) {
+    const approved = process.env.DIM0_PLUGIN_APPROVED_ORIGIN;
+    let approvedUrl;
+    try { approvedUrl = new URL(approved); }
+    catch { throw new Error("Release plugin requires DIM0_PLUGIN_APPROVED_ORIGIN (permanent HTTPS origin)"); }
+    if (approvedUrl.protocol !== "https:" || approved !== approvedUrl.origin ||
+        approvedUrl.username || approvedUrl.password || approvedUrl.hash || approvedUrl.search) {
+      throw new Error("DIM0_PLUGIN_APPROVED_ORIGIN must be a bare HTTPS origin");
+    }
+    if (approvedUrl.origin !== url.origin) {
+      throw new Error("Release endpoint does not match DIM0_PLUGIN_APPROVED_ORIGIN");
+    }
+  }
   if (fixture && warnFixture) console.warn("DIM0_PLUGIN_QA_ENDPOINT_ONLY", url.origin);
+  if (ephemeral && warnFixture) console.warn("DIM0_PLUGIN_PRIVATE_TUNNEL_ONLY", url.origin);
   return url;
 }
 
@@ -110,6 +131,57 @@ async function verifySkills(stage) {
   }
 }
 
+/**
+ * Only replace our own previous extracted plugin. Unrecognized files at any
+ * depth could belong to the caller: refuse rather than deleting them.
+ * Legacy (pre-marker) stages are recognized by their exact portable layout.
+ */
+async function assertReplaceableOutput(target) {
+  let stat;
+  try { stat = await lstat(target); }
+  catch (error) {
+    if (error?.code === "ENOENT") return false;
+    throw error;
+  }
+  if (!stat.isDirectory() || stat.isSymbolicLink()) {
+    throw new Error("Refusing to replace non-directory or symlink output: " + target);
+  }
+  const entries = await readdir(target);
+  if (!entries.length) return true;
+  async function check(directory, expectedFiles, expectedDirectories = []) {
+    const expected = [...expectedFiles, ...expectedDirectories].sort();
+    const actual = (await readdir(directory)).sort();
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+      throw new Error("Refusing to replace unowned plugin output files in " + directory);
+    }
+    for (const name of expectedFiles) {
+      const item = await lstat(join(directory, name));
+      if (!item.isFile() || item.isSymbolicLink()) {
+        throw new Error("Refusing to replace unexpected plugin output file: " + name);
+      }
+    }
+    for (const name of expectedDirectories) {
+      const item = await lstat(join(directory, name));
+      if (!item.isDirectory() || item.isSymbolicLink()) {
+        throw new Error("Refusing to replace unexpected plugin output directory: " + name);
+      }
+    }
+  }
+  await check(target, ["plugin.json", "mcp.json", "README.md"], ["assets", "skills"]);
+  await check(join(target, "assets"), ["icon.png", "logo.png"]);
+  await check(join(target, "skills"), [], ["dim0-board"]);
+  await check(join(target, "skills", "dim0-board"), ["SKILL.md"]);
+  const manifest = await json(join(target, "plugin.json"));
+  const mcp = await json(join(target, "mcp.json"));
+  if (manifest.name !== "dim0-jazz" ||
+      manifest.$schema !== "https://agent-plugins.org/schemas/1.0.0/plugin.schema.json" ||
+      Object.keys(mcp.mcpServers ?? {}).join(",") !== "dim0" ||
+      mcp.mcpServers.dim0.type !== "streamable-http") {
+    throw new Error("Refusing to replace output without verified Dim0 package identity");
+  }
+  return true;
+}
+
 /** Build in the ZIP's filesystem so rename is atomic; retain old ZIP on failure. */
 async function main() {
   const canonical = await json(join(source, ".codex-plugin", "plugin.json"));
@@ -167,6 +239,7 @@ async function main() {
   const candidateZip = join(tempRoot, "dim0-jazz-mcp-plugin.zip");
   const priorStage = join(tempRoot, "previous-stage");
   let movedPrevious = false;
+  let promotedStage = false;
   try {
     await mkdir(stage);
     await copyTree(join(source, "assets"), join(stage, "assets"));
@@ -185,26 +258,51 @@ async function main() {
     ], { cwd: stage });
     execFileSync("unzip", ["-tqq", candidateZip]);
 
+    // Validate before moving the old stage. Refuse directories with any
+    // caller-owned or unrecognized content, including nested files.
+    const hasPrevious = await assertReplaceableOutput(outDir);
     try {
-      await access(outDir);
-      await rename(outDir, priorStage);
-      movedPrevious = true;
-    } catch (error) {
-      if (error?.code !== "ENOENT") throw error;
-    }
-    await rename(stage, outDir);
-    try {
-      // This is atomic on the same filesystem: no intermediate missing ZIP.
+      if (hasPrevious) {
+        await rename(outDir, priorStage);
+        movedPrevious = true;
+      }
+      // Test-only injection exercises failure AFTER moving the old stage.
+      if (process.env.DIM0_PLUGIN_TEST_MODE === "1" &&
+          process.env.DIM0_PLUGIN_TEST_FAIL_PROMOTE === "1") {
+        throw new Error("Injected stage promotion failure");
+      }
+      await rename(stage, outDir);
+      promotedStage = true;
+      if (process.env.DIM0_PLUGIN_TEST_MODE === "1" &&
+          process.env.DIM0_PLUGIN_TEST_FAIL_ZIP_PROMOTE === "1") {
+        throw new Error("Injected ZIP promotion failure");
+      }
+      // Atomic on the same filesystem: the prior ZIP stays until this point.
       await rename(candidateZip, archive);
+      // Promotion committed. The previous generated stage is disposable now.
+      movedPrevious = false;
     } catch (error) {
-      await rm(outDir, { recursive: true, force: true });
-      if (movedPrevious) await rename(priorStage, outDir);
+      try {
+        if (promotedStage) await rm(outDir, { recursive: true, force: true });
+        if (movedPrevious) {
+          await rename(priorStage, outDir);
+          movedPrevious = false;
+        }
+      } catch (rollbackError) {
+        // Keep priorStage for manual recovery if restoration itself fails.
+        throw new AggregateError([error, rollbackError],
+          "Plugin output rollback failed; backup retained at " + priorStage);
+      }
       throw error;
     }
     console.log("DIM0_MCP_PLUGIN_PACKAGED", archive);
   } finally {
-    // Never delete the promoted stage; only temporary build material.
-    await rm(tempRoot, { recursive: true, force: true });
+    if (movedPrevious) {
+      console.error("DIM0_PLUGIN_PREVIOUS_STAGE_RETAINED", priorStage);
+    } else {
+      // Never delete a backup if rollback itself failed.
+      await rm(tempRoot, { recursive: true, force: true });
+    }
   }
 }
 await main();
