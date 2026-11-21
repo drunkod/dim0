@@ -56,6 +56,13 @@ try {
   await expect(page.getByText(/grants permission to view and edit/i)).toBeVisible();
   assert.ok(page.url().endsWith(invite));
   console.log("JAZZ_INVITATION_RETRY_KEEPS_LINK_PASS");
+  await page.getByRole("button", { name: "Sign in", exact: true }).click();
+  await expect(page).toHaveURL(base + "/signin", { timeout: 30000 });
+  await expect(page.getByRole("button", { name: "Sign in with passkey" }))
+    .toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole("link", { name: "Create an account" }))
+    .toBeVisible({ timeout: 30000 });
+  console.log("INVITATION_TO_ORIGINAL_DIM0_SIGNIN_PASS");
   await page.unroute("**/patchboard-private/api/invites/preview");
 
   assert.deepEqual(errors, [], "No unhandled errors should reach the browser");

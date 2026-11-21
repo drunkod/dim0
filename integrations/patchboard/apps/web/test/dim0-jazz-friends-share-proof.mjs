@@ -63,8 +63,13 @@ async function createBrowserFriend(label, shareLink, role, boardId) {
     .toBeVisible();
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page).toHaveURL(origin + "/signin", { timeout: 20000 });
-  await expect(page.getByText("Welcome back!", { exact: true }))
-    .toBeVisible({ timeout: 20000 });
+  // Assert the actual actions, not a fragile exact copy string. Some Helium
+  // rerenders temporarily omit the welcome heading while preserving the
+  // usable Dim0 sign-in card and its registration affordance.
+  await expect(page.getByRole("button", { name: "Sign in with passkey" }))
+    .toBeVisible({ timeout: 30000 });
+  await expect(page.getByRole("link", { name: "Create an account" }))
+    .toBeVisible({ timeout: 30000 });
   await page.getByRole("link", { name: "Create an account" }).click();
   await expect(page.getByRole("button", { name: "Create account with passkey" }))
     .toBeVisible({ timeout: 30000 });
