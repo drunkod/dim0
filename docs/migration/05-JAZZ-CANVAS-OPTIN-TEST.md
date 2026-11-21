@@ -1,14 +1,14 @@
 # Opt-in Dim0 ↔ Jazz canvas integration — engineering test guide
 
-Status: **experimental development branch, not a delivered migration**. Existing Dim0 boards use their original storage/sync unless the environment variable below is set. This development path does NOT yet support durable offline writes, group/frame metadata, cross-layer subtree operations, all agent writes, Jazz-only authentication storage, or full MCP/Tailscale acceptance.
+Status: **browser-verified experimental MVP, not a complete migration**. Existing Dim0 boards use their original storage/sync unless the environment variable below is set. This development path does NOT yet support durable offline writes, group/frame metadata, cross-layer subtree operations, all agent writes, Jazz-only authentication storage, or full MCP/Tailscale acceptance.
 
 ## Safety boundaries
 
 - Use a **fresh empty Jazz test data directory**, **unused local ports**, and a **throwaway Jazz board**. Do not point this test at a working Patchboard database, current Funnel, or existing Dim0 users.
-- Private Patchboard Jazz backend binds to loopback; Dim0's Vite development proxy routes `/patchboard-private` and `/patchboard-auth` to that private origin. There are no new exposed Tailscale endpoints here.
+- Private Patchboard Jazz backend binds to loopback; Dim0's Vite development or preview proxy routes `/patchboard-private`, `/patchboard-auth`, the OAuth MCP resource and `/.well-known` metadata to the private origin. There are no new exposed Tailscale endpoints here.
 - `VITE_DIM0_JAZZ_CANVAS=1` globally selects Jazz for **non-local** Dim0 board URLs. It does not migrate local-only boards or replace other database-backed APIs. Stop before deployment.
 - In this mode `/boards/$id` checks the Better Auth session at `/patchboard-private/api/me`, not a Dim0 JWT, then server-sides validate membership on every canvas access. The `/jazz-signin` page links to the existing Patchboard passkey sign-in, not a second auth implementation.
-- JSON node/link payloads are versioned with CAS on writes. The live server uses `Db.subscribe` to emit full snapshots over authenticated SSE, revalidating session and membership.
+- JSON node/link payloads are versioned with CAS on writes. The live server uses `Db.subscribe` to emit full snapshots over authenticated SSE, revalidating session and membership. The browser also hydrates via REST and polls every 1.5 seconds as a fallback for edge proxies that buffer event streams.
 - For now, **all writes should be treated as at-risk on a network outage**. Conflicting writes suspend editing rather than silently overwriting another user, but there is no durable offline outbox.
 
 ## Reproducible local test (new isolated fixture only)

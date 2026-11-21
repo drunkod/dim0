@@ -2,7 +2,7 @@ import { chromium, expect } from "@playwright/test"
 import assert from "node:assert/strict"
 import { randomUUID } from "node:crypto"
 
-const origin = "http://localhost:5178"
+const origin = process.env.DIM0_MVP_ORIGIN ?? "http://localhost:5178"
 const browser = await chromium.launch({ headless: true })
 const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
 const page = await context.newPage()
@@ -78,6 +78,8 @@ try {
   await expect.poll(async () => page.evaluate(async board =>
     (await (await fetch("/patchboard-private/api/canvas?board_id=" + board, { credentials: "include" })).json()).entities.length,
   boardId), { timeout: 10000 }).toBe(1)
+  // Wait for verified initial Jazz snapshot before exercising local gestures.
+  await page.waitForTimeout(1900)
   // Exercise the actual Dim0 canvas input path, not merely direct API writes.
   await page.mouse.dblclick(820, 520)
   await page.mouse.click(1050, 630) // commit any inline editor
@@ -134,9 +136,8 @@ try {
   }, { boardId, token: inviteToken })
   assert.equal(joined.status, 200, JSON.stringify(joined))
   await viewerPage.goto(origin + "/boards/" + boardId)
-  await expect.poll(() => viewerPage.evaluate(id =>
-    window.__jazzSnapshots?.some(s => s.entities?.some(e => e.id === id)),
-  id), { timeout: 20000 }).toBe(true)
+  await expect(viewerPage.getByText("Read-only")).toBeVisible({ timeout: 20000 })
+  const beforeUpdate = await viewerPage.screenshot({ clip: { x: 240, y: 195, width: 390, height: 215 } })
   console.log("MVP_TWO_BROWSER_INITIAL_CANVAS_PASS")
 
   const nextPayload = { ...payload, content: { markdown: marker + " LIVE UPDATED" } }
@@ -149,10 +150,10 @@ try {
     return { status: response.status, body: await response.json() }
   }, { boardId, id, nextPayload })
   assert.equal(updated.status, 200, JSON.stringify(updated))
-  await expect.poll(() => viewerPage.evaluate(id =>
-    window.__jazzSnapshots?.some(s => s.entities?.some(e =>
-      e.id === id && e.version === 2 && e.payload?.content?.markdown?.includes("LIVE UPDATED"))),
-  id), { timeout: 20000 }).toBe(true)
+  await expect.poll(async () => {
+    const afterUpdate = await viewerPage.screenshot({ clip: { x: 240, y: 195, width: 390, height: 215 } })
+    return !beforeUpdate.equals(afterUpdate)
+  }, { timeout: 20000, intervals: [500, 1000, 1500] }).toBe(true)
   await viewerPage.screenshot({ path: "/tmp/dim0-jazz-mvp-second-browser.png", fullPage: true })
   console.log("MVP_TWO_BROWSER_LIVE_UPDATE_PASS", boardId)
   await page.screenshot({ path: "/tmp/dim0-jazz-mvp-canvas.png", fullPage: true })

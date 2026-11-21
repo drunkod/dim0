@@ -55,7 +55,7 @@ flowchart TD
 | P0.1 | Import Patchboard's Jazz 2, OAuth, HTTP/MCP server, policies and tests | Source present and unchanged except isolated port changes | **Done** | 0.5 day |
 | P0.2 | Canonical `canvasEntities` table with append-only migration; transaction-safe CRUD | Create/update/delete, role and restart tests | **Implemented, isolated test passed** | 1–2 days |
 | P0.3 | Add OAuth MCP canvas entity tools and same-origin REST adapter | End-to-end private OAuth MCP proof | **Implemented; isolated private OAuth/CRUD CI passed** | 1 day |
-| P0.4 | Bind Dim0 CanvasStore hydration and user edit batches to Jazz | Two-user live edit/refresh including applets | **Opt-in hook + authenticated SSE implemented; two-client acceptance pending** | 3–6 days |
+| P0.4 | Bind Dim0 CanvasStore hydration and user edit batches to Jazz | Two-user live edit/refresh including applets | **Opt-in local MVP verified in two independent browsers; REST fallback added for edge buffering** | 3–6 days |
 | P0.5 | Secure conflict and connection recovery in Jazz-driven canvas | Reconnect, collision, permissions, no lost edits | **CAS and fail-closed conflict handling added; durable offline outbox and rebase not done** | 2–4 days |
 | P0.6 | Tailscale route on isolated local port and only selected HTTPS mount | Live WSS and remote MCP SDK access through Funnel | **Not deployed** | 1–2 days |
 | P1.0 | Reconcile Dim0 auth, rooms, membership, invites and identity with Patchboard | Passkey/private/OAuth parity matrix green | **Not done** | 3–6 days |

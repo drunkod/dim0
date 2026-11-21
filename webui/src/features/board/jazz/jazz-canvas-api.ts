@@ -2,8 +2,8 @@
  * Dim0 <-> Patchboard bridge. This is an authenticated HTTP transport over a
  * Jazz-backed domain service, never a second business-data store.
  *
- * The next integration milestone wires this to CanvasStore hydration, local
- * operation batching and Jazz live subscriptions; it is not mounted yet.
+ * Mounted by the opt-in CanvasStore Jazz hook; REST writes are guarded by
+ * optimistic versions, while Jazz live-query snapshots arrive via SSE.
  */
 export type JazzCanvasRecord = {
   id: string

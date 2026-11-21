@@ -48,6 +48,9 @@ export function useJazzCanvasSync(
     let busy = false
     let debounce: ReturnType<typeof setTimeout> | null = null
     let lastSnapshot: JazzCanvasSnapshot | null = null
+    let appliedSignature: string | null = null
+    let refreshing = false
+    let lastReadError = ""
     const dirty = new Set<string>()
     const versions = new Map<string, JazzCanvasRecord>()
 
@@ -56,6 +59,9 @@ export function useJazzCanvasSync(
     /** Paint a full Jazz snapshot as remote operations to avoid write echoes. */
     const applySnapshot = (snapshot: JazzCanvasSnapshot): void => {
       if (disposed || busy || dirty.size > 0 || blocked) return
+      const signature = snapshot.role + ":" + snapshot.entities
+        .map(({ id, version }) => `${id}:${version}`).sort().join("|")
+      if (hydrated && signature === appliedSignature) return
       const { notes, links } = splitJazzCanvasEntities(snapshot)
       const inLayer = (item: Record<string, unknown>) =>
         (item.parentId ?? null) === rootId
@@ -74,10 +80,14 @@ export function useJazzCanvasSync(
       // intentionally treats an EMPTY graph as a transient server failure.
       // A verified complete Jazz stream snapshot is different: empty means
       // all entities were deleted and must clear the board.
-      const mode = !hydrated || (scopedNotes.length === 0 && scopedLinks.length === 0)
-        ? "replace"
-        : "merge"
+      // A complete Jazz snapshot may omit deleted entities while still
+      // containing other nodes. Use replace for removals, merge for updates.
+      const incoming = new Set([...scopedNotes, ...scopedLinks].map((item) => item.id))
+      const removed = [...store.getAllNodes(), ...store.getAllEdges()]
+        .some((item) => !incoming.has(String(item.id)))
+      const mode = !hydrated || removed || incoming.size === 0 ? "replace" : "merge"
       applyGraphToStore(store, graph, { mode })
+      appliedSignature = signature
       versions.clear()
       for (const record of snapshot.entities) versions.set(record.id, record)
       callbacksRef.current.onRole(snapshot.role ?? "viewer")
@@ -181,6 +191,28 @@ export function useJazzCanvasSync(
       debounce = setTimeout(() => { void flush() }, 100)
     })
 
+    // An initial REST load prevents an upstream SSE proxy from blocking the
+    // canvas entirely. Polling is a bounded fallback for edge proxies that
+    // buffer event streams (the server still uses native Jazz Db.subscribe).
+    const refresh = async (): Promise<void> => {
+      if (disposed || refreshing || blocked || busy || dirty.size > 0) return
+      refreshing = true
+      try {
+        const snapshot = await loadJazzCanvas(boardId)
+        lastSnapshot = snapshot
+        applySnapshot(snapshot)
+        lastReadError = ""
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Jazz canvas unavailable"
+        if (message !== lastReadError) callbacksRef.current.onError(message)
+        lastReadError = message
+      } finally {
+        refreshing = false
+      }
+    }
+    void refresh()
+    const fallbackPoll = setInterval(() => { void refresh() }, 1500)
+
     // Jazz Db.subscribe drives this authenticated SSE stream. Stream initial
     // events are full snapshots; on reconnection the same projection converges.
     const unsubscribe = subscribeJazzCanvas(boardId, (snapshot) => {
@@ -188,11 +220,14 @@ export function useJazzCanvasSync(
       lastSnapshot = snapshot
       applySnapshot(snapshot)
     }, (error) => {
-      if (!disposed) callbacksRef.current.onError(error.message)
+      // A transient SSE disconnection is not fatal while authenticated REST
+      // refresh is still available. The polling fallback keeps peers current.
+      if (!disposed && !hydrated) callbacksRef.current.onError(error.message)
     })
 
     return () => {
       disposed = true
+      clearInterval(fallbackPoll)
       if (debounce) clearTimeout(debounce)
       unsubscribe()
       onLocalChange()
