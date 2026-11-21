@@ -3,7 +3,10 @@ import { randomUUID } from "node:crypto";
 import { chromium, expect } from "@playwright/test";
 
 const origin = process.env.DIM0_SHARED_APPLET_QA_ORIGIN ?? "http://localhost:5185";
-assert.ok(origin.startsWith("http://localhost:"), "QA browser test must remain local");
+assert.ok(origin.startsWith("http://localhost:") || (
+  process.env.DIM0_ALLOW_PUBLIC_QA === "1" &&
+  origin === "https://barbie-discovery-bingo-system.trycloudflare.com"
+), "QA requires a loopback server or an explicitly authorized demo origin");
 const browser = await chromium.launch({ headless: true });
 const contexts = [];
 const errors = [];
@@ -62,19 +65,10 @@ try {
   assert.equal((await call(owner,"canvas/create",{board_id:boardId,kind:"node",payload:entity})).status,201);
   for(const p of [owner,editor]) await p.goto(origin+"/boards/"+boardId,{waitUntil:"domcontentloaded",timeout:85000});
   const ownerRoot=await waitApplet(owner,nodeId,0);
-  owner.on("console", msg => { if(msg.text().includes("APPLET_")) console.log("BROWSER_CONSOLE",msg.text()); });
-  owner.on("request", req => { if(req.url().includes("/api/applet-state")) console.log("OWNER_APPLET_REQ",req.method(),req.url().split("?")[0]); });
-  owner.on("response", res => { if(res.url().includes("/api/applet-state")) console.log("OWNER_APPLET_HTTP",res.status()); });
-  console.log("OWNER_JAZZ_ROLE", await owner.evaluate(async () => {
-    const x = await import("/src/features/board/harness/store/board-app-store.ts");
-    const s = x.useBoardAppStore.getState();return {boardId:s.boardId,canEdit:s.canEdit,role:s.boardRole};
-  }));
   const editorRoot=await waitApplet(editor,nodeId,0);
   console.log("JAZZ_SHARED_APPLET_TWO_BROWSERS_RENDER_ZERO_PASS");
   await ownerRoot.getByText("Increment").evaluate(el=>el.click());
   await expect(ownerRoot.getByTestId("jazz-shared-count")).toHaveText("1");
-  await owner.waitForTimeout(2000);
-  console.log("AFTER_CLICK_STATE_API",JSON.stringify(await call(owner,"applet-state?board_id="+boardId+"&note_id="+nodeId)));
   await expect(editorRoot.getByTestId("jazz-shared-count")).toHaveText("1",{timeout:30000});
   console.log("JAZZ_SHARED_APPLET_CROSS_BROWSER_INCREMENT_PASS");
   await editor.reload({waitUntil:"domcontentloaded"});

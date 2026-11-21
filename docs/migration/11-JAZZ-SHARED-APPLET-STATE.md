@@ -48,6 +48,8 @@ IndexedDB. There is **no global legacy-board data import**.
 | MCP applet state read/write/cross-board-denial/version-conflict | PASS |
 | Production Vite build | PASS |
 | Migration of *copy* of current public Jazz store to new schema | PASS |
+| **Public HTTPS production bundle**: two freshly registered browsers, shared counter 0→1→2, reload and server version 2 | **PASS** |
+| Existing authorized ChatGPT MCP grant after restart | PASS: list_boards identifies the presentation board |
 | Public friend with independently connected ChatGPT account | NOT TESTED |
 
 ### Local acceptance commands
@@ -77,7 +79,10 @@ integrity-checked at:
 `~/Library/Application Support/Dim0/PrivateBackups/20261121-202616-pre-shared-applet/`
 
 The old presentation frontend bundle is preserved under
-`~/Library/Application Support/Dim0/PreviousBuilds/` for rollback.
+`~/Library/Application Support/Dim0/PreviousBuilds/20261121-202820-before-shared-applet/dist-jazz-public`
+for rollback. The same HTTPS origin now serves the migrated Jazz schema, the
+updated Dim0 frontend and the two MCP applet-state tools. Production port 8800,
+frontend proxy 5180, and the existing Cloudflare tunnel were kept unchanged.
 
 The existing Cloudflare origin, MCP OAuth issuer and passkey RP ID must
 remain unchanged. Do not repurpose the currently occupied Tailscale Funnel;
