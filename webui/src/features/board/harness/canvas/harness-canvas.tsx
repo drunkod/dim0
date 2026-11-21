@@ -310,6 +310,20 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
       toast.error(error, {
         id: "jazz-canvas-status",
         duration: error.includes("Editing suspended") ? Infinity : 6000,
+        action: error.includes("Editing suspended") ? {
+          label: "Copy local draft",
+          onClick: () => {
+            try {
+              // Explicit user action only: copy a recoverable JSON snapshot
+              // without overwriting the newer Jazz revision on the server.
+              const draft = JSON.stringify({ boardId,
+                nodes: store.getAllNodes(), edges: store.getAllEdges() }, null, 2)
+              void navigator.clipboard.writeText(draft)
+                .then(() => toast.success("Local board draft copied. Save it before reloading."))
+                .catch(() => toast.error("Clipboard unavailable. Keep this tab open."))
+            } catch { toast.error("Could not copy the draft. Keep this tab open.") }
+          },
+        } : undefined,
       })
       setIsLoading(false)
     },

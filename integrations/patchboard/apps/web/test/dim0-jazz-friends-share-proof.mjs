@@ -4,10 +4,19 @@ import { chromium, expect } from "@playwright/test";
 
 const origin = process.env.DIM0_MCP_ORIGIN ??
   "https://barbie-discovery-bingo-system.trycloudflare.com";
-const originalBoardId = "01a1fdec-1b8f-7e30-af11-3a09df695fc5";
-const browser = await chromium.connectOverCDP("http://127.0.0.1:9222");
+const originalBoardId = process.env.DIM0_OWNER_BOARD_ID ??
+  "01a1fdec-1b8f-7e30-af11-3a09df695fc5";
+const cdp = new URL(process.env.DIM0_CDP_URL ?? "http://127.0.0.1:9222");
+assert.ok(["127.0.0.1", "localhost", "[::1]"].includes(cdp.hostname),
+  "CDP must stay on loopback; never expose a browser debugging port publicly");
+const browser = await chromium.connectOverCDP(cdp.href);
 const ownerPage = browser.contexts().flatMap(c => c.pages())
-  .find(p => p.url().includes("/boards/" + originalBoardId));
+  .find(p => {
+    try {
+      const url = new URL(p.url());
+      return url.origin === origin && url.pathname === "/boards/" + originalBoardId;
+    } catch { return false; }
+  });
 assert.ok(ownerPage, "Authenticated owner board is not open in Helium");
 const actors = [];
 
@@ -130,6 +139,18 @@ try {
   }, { timeout: 20000, intervals: [400, 900, 1200] }).toBe("Friend B edited live");
   console.log("SECOND_EDITOR_UPDATE_FIRST_EDITOR_SEES_PASS");
 
+  // Simulate simultaneous edits: the second writer sends an old CAS version.
+  const conflict = await api(A.page, "canvas/update", {
+    board_id: boardId, entity_id: entityId, expected_version: 1,
+    payload: { ...payload, version: 2, content: { markdown: "Stale edit must not overwrite" } },
+  });
+  assert.equal(conflict.status, 409, JSON.stringify(conflict.body));
+  await A.page.reload();
+  const afterReload = await readCanvas(A.page, boardId);
+  assert.equal(afterReload.body.entities.find(e => e.id === entityId)?.payload?.content?.markdown,
+    "Friend B edited live");
+  console.log("STALE_WRITER_409_SURVIVES_RELOAD_PASS");
+
   const viewerLink = await createLink(ownerPage, "viewer");
   const V = await createBrowserFriend("V", viewerLink, "viewer", boardId);
   const denied = await api(V.page, "canvas/create", {
@@ -167,6 +188,65 @@ try {
   const replay = await api(B.page, "join", { board_id: boardId, token: code });
   assert.equal(replay.status, 404);
   console.log("REVOKE_LINK_STOPS_NEW_GRANTS_PASS");
+
+  // A completely new friend can register after following a revoked link;
+  // the invalid link must not trap them or silently sign them out.
+  const newcomer = await browser.newContext({ viewport: { width: 1280, height: 850 } });
+  actors.push(newcomer);
+  const newPage = await newcomer.newPage();
+  const newCDP = await newcomer.newCDPSession(newPage);
+  await newCDP.send("WebAuthn.enable");
+  await newCDP.send("WebAuthn.addVirtualAuthenticator", { options: {
+    protocol: "ctap2", transport: "internal", hasResidentKey: true,
+    hasUserVerification: true, isUserVerified: true,
+    automaticPresenceSimulation: true,
+  } });
+  await newPage.goto(shareLink);
+  await newPage.getByRole("button", { name: "Sign in or create a passkey to join" }).click();
+  await newPage.getByRole("button", { name: "Create account with passkey" }).click();
+  await expect(newPage.getByText(/Invitation expired or revoked/))
+    .toBeVisible({ timeout: 30000 });
+  await expect(newPage.getByRole("button", { name: "Create Jazz board" }))
+    .toBeVisible({ timeout: 20000 });
+  const signedIn = await newPage.evaluate(async () =>
+    (await (await fetch("/patchboard-private/api/me", { credentials: "include" })).json()).signedIn);
+  assert.equal(signedIn, true);
+  assert.equal(await newPage.evaluate(() => sessionStorage.getItem("dim0:jazz:pendingInvite")), null);
+  console.log("NEW_FRIEND_REVOKED_INVITE_SIGNED_IN_DASHBOARD_PASS");
+
+  // A verified owner with a stale link must not be portrayed as logged out.
+  const staleTab = await ownerPage.context().newPage();
+  try {
+    await staleTab.goto(origin + "/jazz-signin");
+    await staleTab.evaluate(({ boardId, code }) => sessionStorage.setItem(
+      "dim0:jazz:pendingInvite", JSON.stringify({ boardId, token: code }),
+    ), { boardId, code });
+    await staleTab.reload();
+    await expect(staleTab.getByText(/Invitation expired or revoked/))
+      .toBeVisible({ timeout: 20000 });
+    await expect(staleTab.getByRole("heading", { name: "Your Jazz boards" }))
+      .toBeVisible({ timeout: 20000 });
+    assert.equal(await staleTab.evaluate(() => sessionStorage.getItem("dim0:jazz:pendingInvite")), null);
+    console.log("STALE_INVITE_404_AUTHENTICATED_DASHBOARD_PASS");
+
+    // Network/server failures preserve the invite and expose Retry/Cancel.
+    await staleTab.evaluate(({ boardId, code }) => sessionStorage.setItem(
+      "dim0:jazz:pendingInvite", JSON.stringify({ boardId, token: code }),
+    ), { boardId, code });
+    await staleTab.route("**/patchboard-private/api/join", async route => {
+      await route.fulfill({ status: 503, contentType: "application/json", body: "{}" });
+    });
+    await staleTab.reload();
+    await expect(staleTab.getByRole("button", { name: "Retry invitation" }))
+      .toBeVisible({ timeout: 20000 });
+    assert.ok(await staleTab.evaluate(() => sessionStorage.getItem("dim0:jazz:pendingInvite")));
+    await staleTab.unroute("**/patchboard-private/api/join");
+    await staleTab.getByRole("button", { name: "Retry invitation" }).click();
+    await expect(staleTab.getByText(/Invitation expired or revoked/))
+      .toBeVisible({ timeout: 20000 });
+    assert.equal(await staleTab.evaluate(() => sessionStorage.getItem("dim0:jazz:pendingInvite")), null);
+    console.log("TRANSIENT_INVITE_RETRY_AND_CLEAR_PASS");
+  } finally { await staleTab.close(); }
 
   console.log("FRIENDS_SHARE_UI_ACCEPTANCE_PASS", JSON.stringify({
     boardId, roles: ["owner", "member", "member", "viewer"],

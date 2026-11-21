@@ -141,8 +141,9 @@ export function useJazzCanvasSync(
                 ? `Jazz ${error.operation} HTTP ${error.status}`
                 : "Jazz write failed"
               callbacksRef.current.onRole("viewer")
-              callbacksRef.current.onError(
-                `${detail}. Editing suspended; local unsaved changes were not discarded.`,
+              callbacksRef.current.onError(error instanceof JazzCanvasApiError && error.status === 409
+                ? `${detail}. Another person or agent changed this card first. Editing suspended; copy your unsaved board draft before reloading. No changes were automatically overwritten.`
+                : `${detail}. Editing suspended; local unsaved changes were not discarded. Copy a draft before refreshing.`
               )
               break
             }

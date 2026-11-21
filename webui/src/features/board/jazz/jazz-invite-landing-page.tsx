@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { useParams } from "@tanstack/react-router"
 import { Button } from "@/components/ui/button"
-import { savePendingJazzInvitation } from "./jazz-auth-client"
+import { clearPendingJazzInvitation, savePendingJazzInvitation } from "./jazz-auth-client"
 
 type Status = "loading" | "signed-out" | "ready" | "joining" | "invalid"
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -51,10 +51,14 @@ export function JazzInviteLandingPage() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ board_id: boardId, token }),
       })
-      if (!res.ok) throw new Error(res.status === 404
-        ? "This link has expired or been revoked. Ask the owner for a new invite."
-        : "Unable to join board (HTTP " + res.status + ").")
-      sessionStorage.removeItem("dim0:jazz:pendingInvite")
+      if (res.status === 404) {
+        clearPendingJazzInvitation({ boardId, token })
+        setError("This link has expired or been revoked. Ask the owner for a new invite.")
+        setStatus("invalid")
+        return
+      }
+      if (!res.ok) throw new Error("Unable to join board (HTTP " + res.status + ").")
+      clearPendingJazzInvitation({ boardId, token })
       window.location.replace("/boards/" + boardId)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not join board")

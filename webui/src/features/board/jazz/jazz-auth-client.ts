@@ -1,5 +1,6 @@
 import { createAuthClient } from "better-auth/client"
 import { passkeyClient } from "@better-auth/passkey/client"
+import { redeemJazzInvite, type JazzInviteRedemption } from "./jazz-invite-lifecycle"
 
 /**
  * Native Dim0 passkey entry point. The verified session and OAuth protocol
@@ -73,19 +74,21 @@ export function readPendingJazzInvitation(): { boardId: string; token: string } 
   return null
 }
 
-export async function redeemPendingJazzInvitation(): Promise<string | null> {
-  const pending = readPendingJazzInvitation()
-  if (!pending) return null
-  const response = await fetch("/patchboard-private/api/join", {
-    method: "POST", credentials: "include",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ board_id: pending.boardId, token: pending.token }),
-  })
-  if (!response.ok) throw new Error(response.status === 404
-    ? "Invitation expired or revoked. Ask for a fresh link."
-    : "Could not join board (" + response.status + ")")
-  sessionStorage.removeItem(pendingKey)
-  return pending.boardId
+export function clearPendingJazzInvitation(expected?: { boardId: string; token: string }): void {
+  if (!expected || (readPendingJazzInvitation()?.boardId === expected.boardId &&
+      readPendingJazzInvitation()?.token === expected.token)) {
+    sessionStorage.removeItem(pendingKey)
+  }
+}
+
+export async function redeemPendingJazzInvitation(): Promise<JazzInviteRedemption> {
+  return redeemJazzInvite(readPendingJazzInvitation(), async (pending) => fetch(
+    "/patchboard-private/api/join", {
+      method: "POST", credentials: "include",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ board_id: pending.boardId, token: pending.token }),
+    },
+  ), clearPendingJazzInvitation)
 }
 
 /** Preserve OAuth PKCE/state, but never follow caller-provided callback URLs. */

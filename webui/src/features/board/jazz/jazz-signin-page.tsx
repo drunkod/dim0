@@ -2,9 +2,10 @@ import { useEffect, useState, type FormEvent } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import {
   createJazzAccount, currentJazzIdentity, signInToJazz, signOutOfJazz,
-  redeemPendingJazzInvitation, readPendingJazzInvitation, continueJazzOAuth,
-  type JazzIdentity,
+  redeemPendingJazzInvitation, readPendingJazzInvitation, clearPendingJazzInvitation,
+  continueJazzOAuth, type JazzIdentity,
 } from "./jazz-auth-client"
+import { continueJazzSignIn } from "./jazz-invite-lifecycle"
 
 type Board = { board_id: string; title: string; role: string }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
@@ -21,6 +22,8 @@ export function JazzSignInPage() {
   const [boardId, setBoardId] = useState("")
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState("")
+  const [pendingInvite, setPendingInvite] = useState(() => readPendingJazzInvitation())
+  const [sessionUnavailable, setSessionUnavailable] = useState(false)
 
   const openBoard = (id: string) => {
     if (!UUID.test(id)) { setError("Enter a valid Jazz board ID"); return }
@@ -38,24 +41,30 @@ export function JazzSignInPage() {
 
   const afterIdentity = async (identity: JazzIdentity) => {
     setSession(identity)
-    // An invitation is redeemed by the authenticated Jazz server, atomically.
-    // Only navigate when the server confirms the membership.
-    const acceptedBoard = await redeemPendingJazzInvitation()
-    if (acceptedBoard) { openBoard(acceptedBoard); return }
-    if (continueJazzOAuth()) return
-    await loadBoards()
+    // An explicitly requested ChatGPT OAuth consent always takes precedence
+    // over a stale invitation left in this tab.
+    const outcome = await continueJazzSignIn(continueJazzOAuth,
+      redeemPendingJazzInvitation, loadBoards)
+    if (outcome.status === "joined") { setPendingInvite(null); openBoard(outcome.boardId) }
+    else if (outcome.status === "invalid") {
+      setPendingInvite(null)
+      setError(outcome.message)
+    } else if (outcome.status === "retryable") setError(outcome.message)
   }
 
   useEffect(() => {
     let cancelled = false
     void currentJazzIdentity().then(async (identity) => {
       if (cancelled) return
-      if (identity) await afterIdentity(identity)
-      else setSession(null)
+      setSession(identity)
+      if (identity) {
+        try { await afterIdentity(identity) }
+        catch (cause) { if (!cancelled) setError(cause instanceof Error ? cause.message : "Unable to load Jazz boards") }
+      }
     }).catch((cause) => {
       if (!cancelled) {
         setError(cause instanceof Error ? cause.message : "Jazz sign-in unavailable")
-        setSession(null)
+        setSessionUnavailable(true)
       }
     })
     return () => { cancelled = true }
@@ -107,7 +116,22 @@ export function JazzSignInPage() {
     } finally { setBusy(false) }
   }
 
-  const pendingInvite = readPendingJazzInvitation()
+  const retryInvite = async () => {
+    if (!session || busy) return
+    setBusy(true)
+    setError("")
+    try { await afterIdentity(session) }
+    catch (cause) { setError(cause instanceof Error ? cause.message : "Could not retry invitation") }
+    finally { setBusy(false) }
+  }
+
+  const cancelInvite = () => {
+    clearPendingJazzInvitation()
+    setPendingInvite(null)
+    setError("")
+    if (session) void loadBoards().catch((cause) => setError(String(cause)))
+  }
+
   const oauthLogin = new URLSearchParams(location.search).has("client_id")
 
   return (
@@ -122,7 +146,14 @@ export function JazzSignInPage() {
       </p>
       {pendingInvite && (
         <div role="status" className="rounded-lg border bg-muted/30 p-3 text-sm">
-          Your invitation is ready. Sign in to join the board.
+          {session ? "Invitation pending. Retry to join or cancel to use your other boards." :
+            "Your invitation is ready. Sign in to join the board."}
+          {session && <div className="mt-2 flex gap-3">
+            <button type="button" disabled={busy} onClick={() => void retryInvite()}
+              className="underline underline-offset-2">Retry invitation</button>
+            <button type="button" disabled={busy} onClick={cancelInvite}
+              className="underline underline-offset-2">Cancel invitation</button>
+          </div>}
         </div>
       )}
       {oauthLogin && (
@@ -132,7 +163,10 @@ export function JazzSignInPage() {
       )}
       {error && <p role="alert" className="rounded-lg border border-destructive p-3 text-sm text-destructive">{error}</p>}
       {session === undefined ? (
-        <p role="status" className="text-sm">Checking Jazz session…</p>
+        <div role="status" className="text-sm">Checking Jazz session…
+          {sessionUnavailable && <button type="button" className="ml-2 underline"
+            onClick={() => window.location.reload()}>Retry connection</button>}
+        </div>
       ) : session === null ? (
         <section className="flex flex-col gap-3">
           <button type="button" onClick={() => void authenticate("create")} disabled={busy}
