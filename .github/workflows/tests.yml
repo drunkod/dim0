@@ -15,6 +15,23 @@ on:
 
 
 jobs:
+  jazz-member-directory:
+    name: Jazz member directory (including conflict recovery)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+
+      - name: Test member identity mapping and conflict recovery
+        run: >-
+          node --experimental-strip-types --test
+          integrations/patchboard/apps/server/test/member-directory.test.mjs
+
   webui:
     name: webui (lint + tests)
     runs-on: ubuntu-latest

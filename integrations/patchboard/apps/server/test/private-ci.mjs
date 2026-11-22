@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { DatabaseSync } from "node:sqlite";
 import { mkdtemp, rm } from "node:fs/promises";
 import { createServer } from "node:net";
 import { tmpdir } from "node:os";
@@ -73,6 +74,19 @@ try {
   serverProcess = started.child;
   await waitForService(serverProcess, started.output);
   console.log("PRIVATE_CI_UI_AND_UNAUTHENTICATED_MCP_PASS");
+  if (process.env.DIM0_TEST_DIRECTORY_FAILURE === "1") {
+    // Disposable store created by this harness. Fault injection must not
+    // mutate a user's long-lived credentials or any public deployment.
+    const fixtureDb = new DatabaseSync(join(root, "auth", "better-auth.sqlite"));
+    try {
+      fixtureDb.exec(`CREATE TRIGGER fail_member_directory_insert
+        BEFORE INSERT ON patchboard_jazz_identity
+        BEGIN
+          SELECT RAISE(ABORT, 'injected member-directory failure');
+        END;`);
+    } finally { fixtureDb.close(); }
+    console.log("PRIVATE_DIRECTORY_WRITE_FAULT_INJECTED");
+  }
   await execScript(["test:private:enrollment"]);
   const proof = await execScript(["test:private:oauth"]);
   for (const line of scrub(proof).split("\n")) {

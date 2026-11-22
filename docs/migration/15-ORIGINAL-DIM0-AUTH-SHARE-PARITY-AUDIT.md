@@ -38,6 +38,13 @@ Candidate branch: fix/dim0-native-jazz-access; keep PR #3 and #4 in review.
 - The full production-build Helium acceptance passed including JAZZ_OWNER_ONLY_MEMBER_DISPLAY_NAMES_PASS: owner and two friends' names matched verified identities, and a viewer received 403 for the member list. Two SQLite unit tests cover scoped lookup, unmapped IDs, remapping and conflicting subjects. Server tests and frontend TypeScript/ESLint also passed.
 - A fresh, disposable private OAuth/MCP CI fixture passed PRIVATE_CI_ACCEPTANCE_PASS after the consent-path mapping was added. Its evidence includes OAuth PKCE, tool calls for shared applet state and canvas CRUD, independently authorized owner/editor writes, viewer write denial, refresh-token board scoping and restart attribution. It is NOT a real friend's ChatGPT UI account acceptance.
 
+## Member-directory failure isolation and rendered-UI regression (22 November 2026)
+
+- Optional directory writes now contain both opening and writing the display-name mapping. A SQLite uniqueness conflict leaves the strict mapping untouched, emits a sanitized warning code, and cannot invalidate a verified /api/me session or a successful Jazz board consent. Genuine Jazz membership and permission denials remain authoritative.
+- Directory tests check that conflicts do not replace another person's name, that a later valid mapping succeeds, and that database-open failures do not log account IDs or private exception text. GitHub Actions runs the directory test directly with Node 24 in a separate jazz-member-directory job.
+- The actual Helium Share dialog has browser assertions for three visible identities, the owner's non-removable row, and the exact user_id in a Remove button's POST request. The other independent editor remains authorized after removal. A viewer and an upgraded editor are each denied access to the owner-only member endpoint.
+- The disposable OAuth CI harness can set DIM0_TEST_DIRECTORY_FAILURE=1, creating a SQLite trigger in its private temporary store so all identity-mapping inserts fail. Normal and injected runs separately exercise signed-in browser identity, OAuth consent, MCP board access, and viewer member-directory denial without touching production data.
+
 ## Verification and rollout
 
 - MacBook isolated QA uses a disposable Better Auth SQLite database, migrated with the repo's auth:migrate:private command, and a separate Jazz SQLite store.

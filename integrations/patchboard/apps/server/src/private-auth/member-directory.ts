@@ -20,6 +20,26 @@ export function rememberJazzMemberIdentity(db: DatabaseSync, jazzAccountId: stri
 }
 
 /**
+ * Recording an optional display label must never break a verified session or
+ * an authorized Jazz board grant. Retain strict uniqueness in the writer so a
+ * conflict cannot change or impersonate anyone else's existing mapping.
+ * Resolve the database lazily to also contain database-open failures.
+ */
+export function tryRememberJazzMemberIdentity(
+  getDatabase: () => DatabaseSync,
+  jazzAccountId: string,
+  authUserId: string,
+): void {
+  try {
+    rememberJazzMemberIdentity(getDatabase(), jazzAccountId, authUserId);
+  } catch (error) {
+    const code = error instanceof Error && "code" in error
+      ? String(error.code) : "unknown";
+    console.warn("Jazz member display-name mapping was skipped", { code });
+  }
+}
+
+/**
  * Call only after the requester has passed the Jazz board owner check.
  * Never accept board-member IDs from the URL as a user-directory lookup.
  */

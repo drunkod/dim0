@@ -5,7 +5,7 @@ import type { Db } from "jazz-tools";
 import { app } from "@patchboard/jazz-schema";
 import { auth } from "./private-auth/auth.ts";
 import { privateAuthDatabase } from "./private-auth/db.ts";
-import { memberDisplayNames, rememberJazzMemberIdentity } from "./private-auth/member-directory.ts";
+import { memberDisplayNames, tryRememberJazzMemberIdentity } from "./private-auth/member-directory.ts";
 import { listPrivateBoards } from "./private-auth/grants.ts";
 import {
   canvasEntityIdPattern, canvasBoardRole, listCanvasEntities, getCanvasEntity, createCanvasEntity,
@@ -50,7 +50,7 @@ export async function privateBoardRequest(
   if (pathname === "/patchboard-private/api/me" && request.method === "GET") {
     if (!session) return json({ signedIn: false });
     const accountId = await jazzAccountFor(session.user.id);
-    rememberJazzMemberIdentity(privateAuthDatabase(), accountId, session.user.id);
+    tryRememberJazzMemberIdentity(privateAuthDatabase, accountId, session.user.id);
     return json({ signedIn: true, id: session.user.id, accountId, name: session.user.name });
   }
   // Match Dim0's original share-link contract: a holder of the

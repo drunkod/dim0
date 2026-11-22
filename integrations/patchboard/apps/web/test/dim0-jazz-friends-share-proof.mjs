@@ -28,6 +28,13 @@ async function readCanvas(page, boardId) {
     return { status: response.status, body };
   }, boardId);
 }
+async function memberDirectoryStatus(page, boardId) {
+  return page.evaluate(async id => (await fetch(
+    "/patchboard-private/api/members?board_id=" + encodeURIComponent(id),
+    { credentials: "include", cache: "no-store" },
+  )).status, boardId);
+}
+
 async function api(page, path, payload) {
   return page.evaluate(async ({ path, payload }) => {
     const response = await fetch("/patchboard-private/api/" + path, {
@@ -200,6 +207,8 @@ try {
   });
   assert.equal(denied.status, 403);
   console.log("VIEWER_CAN_READ_CANNOT_WRITE_PASS");
+  assert.equal(await memberDirectoryStatus(V.page, boardId), 403,
+    "Viewer cannot inspect the owner's member directory");
 
   // Preserve the legacy upgrade-only rule in Jazz: viewer -> editor when
   // accepting an Edit link, and never editor -> viewer on a View link.
@@ -210,6 +219,8 @@ try {
   assert.equal((await api(V.page, "join", { board_id: boardId, token: viewerCode })).status, 200);
   assert.equal((await readCanvas(V.page, boardId)).body.role, "member");
   console.log("JAZZ_INVITE_UPGRADE_ONLY_ROLE_PARITY_PASS");
+  assert.equal(await memberDirectoryStatus(V.page, boardId), 403,
+    "Editor cannot inspect the owner's member directory");
 
   const members = await ownerPage.evaluate(async id =>
     (await (await fetch("/patchboard-private/api/members?board_id=" + id)).json()).members, boardId);
@@ -223,15 +234,47 @@ try {
   const bProfile = await B.page.evaluate(async () =>
     (await (await fetch("/patchboard-private/api/me")).json()));
   assert.equal(members.find(m => m.id === bProfile.accountId)?.name, bProfile.name);
-  const viewerDirectory = await V.page.evaluate(async id =>
-    (await fetch("/patchboard-private/api/members?board_id=" + id)).status, boardId);
-  assert.equal(viewerDirectory, 403, "Viewer cannot inspect the owner's member directory");
   console.log("JAZZ_OWNER_ONLY_MEMBER_DISPLAY_NAMES_PASS");
-  const aIdentity = aProfile.accountId;
-  const removed = await api(ownerPage, "members/remove", {
-    board_id: boardId, user_id: aIdentity,
+  // Assert actual rendered UI labels and row-specific actions rather than
+  // trusting only the /members JSON. Full Jazz account IDs remain the keys.
+  await ownerPage.getByRole("button", { name: "Share this board" }).click();
+  const shareDialog = ownerPage.getByRole("dialog");
+  const memberRow = (profile) => {
+    const label = profile.name.trim() + " · " + profile.accountId.slice(0, 8);
+    return shareDialog.getByRole("listitem").filter({ hasText: label });
+  };
+  const ownerRow = memberRow(ownerIdentity);
+  const aliceRow = memberRow(aProfile);
+  const bobRow = memberRow(bProfile);
+  await expect(ownerRow).toBeVisible({ timeout: 15000 });
+  await expect(ownerRow.getByRole("button", { name: "Remove" })).toHaveCount(0);
+  await expect(aliceRow).toBeVisible({ timeout: 15000 });
+  await expect(bobRow).toBeVisible({ timeout: 15000 });
+  // The parent Helium browser and this CDP client share the owner tab.
+  // Stub only the tab's native confirm to avoid competing dialog handlers.
+  await ownerPage.evaluate(() => {
+    window.__dim0QaRemoveMessage = "";
+    window.confirm = message => {
+      window.__dim0QaRemoveMessage = message;
+      return true;
+    };
   });
-  assert.equal(removed.status, 200);
+  const removedResponse = ownerPage.waitForResponse(response =>
+    new URL(response.url()).pathname === "/patchboard-private/api/members/remove" &&
+    response.request().method() === "POST");
+  await aliceRow.getByRole("button", { name: "Remove", exact: true }).click();
+  const removed = await removedResponse;
+  assert.equal(removed.status(), 200);
+  assert.deepEqual(removed.request().postDataJSON(), {
+    board_id: boardId, user_id: aProfile.accountId,
+  });
+  assert.match(await ownerPage.evaluate(() => window.__dim0QaRemoveMessage),
+    /Remove .* from this board\?/);
+  await expect(aliceRow).toHaveCount(0, { timeout: 15000 });
+  await expect(bobRow).toBeVisible();
+  assert.equal((await readCanvas(B.page, boardId)).status, 200);
+  await ownerPage.keyboard.press("Escape");
+  console.log("OWNER_REMOVED_SELECTED_MEMBER_BY_FULL_JAZZ_ID_PASS");
   const afterRemove = await A.context.request.get(
     origin + "/patchboard-private/api/canvas?board_id=" + boardId);
   assert.equal(afterRemove.status(), 403);
