@@ -9,6 +9,7 @@ import { memberDisplayNames, tryRememberJazzMemberIdentity } from "./private-aut
 import { listPrivateBoards } from "./private-auth/grants.ts";
 import { privateAccountProfileRequest } from "./account-adapters/profile-routes.ts";
 import { changeNativeBoardMemberRole } from "./account-adapters/board-member-role.ts";
+import { claimBearerInvitation } from "./account-adapters/bearer-invitation-claim.ts";
 import { BoardRoleChangeError } from "@patchboard/account-domain/native-board-member";
 import {
   canvasEntityIdPattern, canvasBoardRole, listCanvasEntities, getCanvasEntity, createCanvasEntity,
@@ -243,35 +244,9 @@ export async function privateBoardRequest(
       }).strict().parse(await safeJson(request));
       const digest = createHash("sha256").update(parsed.token).digest("hex");
       try {
-        const write = await db.serializableTransaction(async (tx) => {
-          const invite = await tx.one(app.boardInvites.where({
-            boardId: parsed.board_id, token: digest,
-          }));
-          if (!invite || (invite.expiresAtEpochMs !== null &&
-              invite.expiresAtEpochMs < Date.now()) ||
-              (invite.intendedUserId && invite.intendedUserId !== accountId)) {
-            throw new Error("INVITE_INVALID");
-          }
-          const existing = await tx.one(app.boardMembers.where({
-            boardId: parsed.board_id, userId: accountId,
-          }));
-          if (existing && invite.singleUse) throw new Error("INVITE_INVALID");
-          const board = await tx.one(app.boards.where({ id: parsed.board_id }));
-          if (!board) throw new Error("INVITE_INVALID");
-          if (existing) {
-            // Original Dim0 invitation semantics: upgrade-only, never downgrade.
-            if (existing.role === "viewer" && invite.role === "editor") {
-              tx.update(app.boardMembers, existing.id, { role: "editor" });
-            }
-          } else if (board.ownerId !== accountId) {
-            tx.insert(app.boardMembers, {
-              boardId: parsed.board_id, userId: accountId, role: invite.role,
-            }, { id: randomUUID() });
-          }
-          if (invite.singleUse) tx.delete(app.boardInvites, invite.id);
-          return { role: invite.role };
-        });
-        await write.wait({ timeoutMs: 10000 });
+        // The server-only claim command shares one authoritative transaction
+        // with the owner-role CAS contract and is exercised by its own tests.
+        await claimBearerInvitation(db, parsed.board_id, digest, accountId);
         return json({ joined: true, board_id: parsed.board_id }, 200);
       } catch (error) {
         if (String(error).includes("INVITE_INVALID")) return json({ error: "Invite invalid, used or expired" }, 404);
