@@ -16,7 +16,7 @@ on:
 
 jobs:
   jazz-member-directory:
-    name: Jazz member directory (including conflict recovery)
+    name: Jazz member directory and legacy invite routing
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -27,10 +27,11 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Test member identity mapping and conflict recovery
+      - name: Test member identity mapping and invitation redirects
         run: >-
           node --experimental-strip-types --test
           integrations/patchboard/apps/server/test/member-directory.test.mjs
+          integrations/patchboard/apps/server/test/dim0-entry-location.test.mjs
 
   webui:
     name: webui (lint + tests)

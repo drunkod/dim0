@@ -59,7 +59,9 @@ async function createBrowserFriend(label, shareLink, role, boardId) {
     .toBeVisible({ timeout: 25000 });
   // Match the original Dim0 share semantics: anonymous invitees see their
   // View/Edit permission before they register, without being granted access.
-  const token = new URLSearchParams(new URL(shareLink).hash.slice(1)).get("invite");
+  const landing = new URL(page.url());
+  const token = new URLSearchParams(landing.hash.slice(1)).get("invite");
+  assert.ok(token, "Expected the invitation code on the rendered Dim0 landing page");
   const preview = await api(page, "invites/preview", { board_id: boardId, token });
   assert.equal(preview.status, 200);
   assert.equal(preview.body.role, role === "member" ? "editor" : "viewer");
@@ -128,6 +130,42 @@ try {
   await ownerPage.goto(origin + "/boards/" + boardId, { waitUntil: "domcontentloaded" });
   await expect(ownerPage.getByRole("button", { name: "Share this board" }))
     .toBeVisible({ timeout: 25000 });
+  // Legacy single-use compatibility links must enter the same Dim0 invite
+  // screen, retain the board across registration, and reject a second use.
+  // A separate board keeps the four-person reusable sharing assertions intact.
+  const singleBoard = await api(ownerPage, "boards", {
+    title: "QA single-use compatibility " + randomUUID().slice(0, 8),
+  });
+  assert.equal(singleBoard.status, 201);
+  const singleId = singleBoard.body.board_id;
+  const singleInvite = await api(ownerPage, "invite", {
+    board_id: singleId, role: "editor", reusable: false,
+  });
+  assert.equal(singleInvite.status, 201);
+  const oldUrl = new URL(singleInvite.body.invite_url);
+  assert.equal(oldUrl.origin, origin);
+  assert.equal(oldUrl.pathname, "/patchboard-private/");
+  assert.equal(oldUrl.searchParams.get("board"), singleId);
+  const rawResponse = await ownerPage.context().request.get(oldUrl.href, { maxRedirects: 0 });
+  assert.equal(rawResponse.status(), 302);
+  const destination = new URL(rawResponse.headers().location, origin);
+  assert.equal(destination.pathname, "/share/join/" + singleId);
+  assert.equal(destination.search, "");
+  assert.equal(new URLSearchParams(destination.hash.slice(1)).get("invite"),
+    oldUrl.searchParams.get("invite"), "Redirect must preserve the invitation code");
+  await createBrowserFriend("single-use editor", oldUrl.href, "member", singleId);
+  const secondContext = await browser.newContext();
+  actors.push(secondContext);
+  const secondPage = await secondContext.newPage();
+  await secondPage.goto(oldUrl.href, { waitUntil: "domcontentloaded" });
+  await expect(secondPage.getByText(/expired or been revoked/i).first())
+    .toBeVisible({ timeout: 30000 });
+  const singleReplay = await api(secondPage, "invites/preview", {
+    board_id: singleId, token: oldUrl.searchParams.get("invite"),
+  });
+  assert.equal(singleReplay.status, 404);
+  console.log("SINGLE_USE_DIM0_REDIRECT_JOIN_AND_REPLAY_PASS");
+
   const shareLink = await createLink(ownerPage);
   const A = await createBrowserFriend("A", shareLink, "member", boardId);
   const B = await createBrowserFriend("B", shareLink, "member", boardId);
