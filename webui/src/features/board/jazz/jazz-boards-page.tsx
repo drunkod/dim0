@@ -3,7 +3,7 @@ import { useEffect, useState, type FormEvent } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import {
   currentJazzIdentity,
-  redeemPendingJazzInvitation, readPendingJazzInvitation, clearPendingJazzInvitation,
+  readPendingJazzInvitation, clearPendingJazzInvitation,
   continueJazzOAuth, type JazzIdentity,
 } from "./jazz-auth-client"
 import { continueJazzSignIn } from "./jazz-invite-lifecycle"
@@ -45,12 +45,12 @@ export function JazzBoardsPage() {
     // An explicitly requested ChatGPT OAuth consent always takes precedence
     // over a stale invitation left in this tab.
     const outcome = await continueJazzSignIn(continueJazzOAuth,
-      redeemPendingJazzInvitation, loadBoards)
-    if (outcome.status === "joined") { setPendingInvite(null); openBoard(outcome.boardId) }
-    else if (outcome.status === "invalid") {
-      setPendingInvite(null)
-      setError(outcome.message)
-    } else if (outcome.status === "retryable") setError(outcome.message)
+      () => Boolean(readPendingJazzInvitation()), loadBoards)
+    if (outcome.status === "pending") {
+      // Keep link in this tab only; no membership until a SECOND, explicit
+      // action on the role-preview invitation page.
+      setPendingInvite(readPendingJazzInvitation())
+    }
   }
 
   useEffect(() => {
@@ -94,13 +94,16 @@ export function JazzBoardsPage() {
     } finally { setBusy(false) }
   }
 
-  const retryInvite = async () => {
+  const reviewInvite = () => {
     if (!session || busy) return
-    setBusy(true)
-    setError("")
-    try { await afterIdentity(session) }
-    catch (cause) { setError(cause instanceof Error ? cause.message : "Could not retry invitation") }
-    finally { setBusy(false) }
+    const current = readPendingJazzInvitation()
+    if (!current) { setPendingInvite(null); return }
+    // Fragment never travels in HTTP referrer/server request URL. The landing
+    // page validates the token and role; only the user-selected Accept calls
+    // /api/join. Do NOT do it on page load or after passkey sign-in.
+    const destination = new URL("/jazz-invite/" + current.boardId, location.origin)
+    destination.hash = "invite=" + encodeURIComponent(current.token)
+    location.assign(destination.href)
   }
 
   const cancelInvite = () => {
@@ -120,11 +123,11 @@ export function JazzBoardsPage() {
       )}
       {pendingInvite && (
         <div role="status" className="rounded-lg border bg-muted/30 p-3 text-sm">
-          {session ? "Invitation pending. Retry to join or cancel to use your other boards." :
-            "Your invitation is ready. Sign in to join the board."}
+          {session ? "Invitation pending. Review the role and explicitly accept, or cancel to continue without joining." :
+            "Your invitation is ready. Sign in to review it before joining."}
           {session && <div className="mt-2 flex gap-3">
-            <button type="button" disabled={busy} onClick={() => void retryInvite()}
-              className="underline underline-offset-2">Retry invitation</button>
+            <button type="button" disabled={busy} onClick={reviewInvite}
+              className="underline underline-offset-2">Review invitation</button>
             <button type="button" disabled={busy} onClick={cancelInvite}
               className="underline underline-offset-2">Cancel invitation</button>
           </div>}

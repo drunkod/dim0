@@ -36,16 +36,19 @@ export async function redeemJazzInvite(
 }
 
 /**
- * ChatGPT's signed OAuth flow has precedence over unrelated saved invites.
- * Keeps PKCE/state validation within the existing Better Auth provider.
+ * ChatGPT OAuth consent continues unchanged; pending board invitations do NOT
+ * redeem automatically after authentication. A passkey proves the signed-in
+ * subject, NOT the recipient's acceptance of a forwardable bearer link.
+ * The board page shows an invitation REVIEW control which redirects to the
+ * existing safe preview + explicit Accept screen. Never call /join here.
  */
 export async function continueJazzSignIn(
   resumeOAuth: () => boolean,
-  redeem: () => Promise<JazzInviteRedemption>,
+  hasPendingInvitation: () => boolean,
   loadBoards: () => Promise<void>,
-): Promise<JazzInviteRedemption | { status: "oauth" }> {
+): Promise<{ status: "oauth" | "pending" | "none" }> {
   if (resumeOAuth()) return { status: "oauth" }
-  const result = await redeem()
-  if (result.status !== "joined") await loadBoards()
-  return result
+  const pending = hasPendingInvitation()
+  await loadBoards()
+  return { status: pending ? "pending" : "none" }
 }

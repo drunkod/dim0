@@ -154,6 +154,10 @@ export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenCha
         </div>
 
         <section className="flex flex-col gap-3">
+          <p className="text-xs text-muted-foreground" role="note">
+            Anyone with this link who signs in to Dim0 may request to join with the specified role.
+            Links can be forwarded and do not verify the intended recipient. Share only with people you trust.
+          </p>
           <div className="text-sm text-muted-foreground">Anyone with the link can:</div>
           <div className="flex items-center gap-2">
             <RoleToggle

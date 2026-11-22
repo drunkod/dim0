@@ -36,12 +36,13 @@ export function ReadyPanel({ role, onOpen }: { role?: ShareRole; onOpen: () => v
     <div className="flex flex-col items-center gap-3 text-center">
       <h1 className="text-lg font-semibold">You've been invited</h1>
       <p className="text-sm text-muted-foreground">
-        {role === undefined ? "Open this board to accept the invitation." : role === "member"
+        {role === undefined ? "Review this invitation before joining." : role === "member"
           ? "You'll be able to view and edit this board."
           : "You'll have view-only access to this board."}
       </p>
+      <p className="text-xs text-muted-foreground">By accepting, you join as your current signed-in Dim0 account. A forwarded link is not proof of your identity to the inviter.</p>
       <Button onClick={onOpen} className="mt-2">
-        Open board
+        Accept invitation
       </Button>
     </div>
   )
