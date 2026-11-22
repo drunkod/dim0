@@ -13,8 +13,8 @@ test("OAuth reconnect recovers only one consented board for the same verified cl
   process.env.PATCHBOARD_PRIVATE_DEV = "1";
   const { privateAuthDatabase, closePrivateAuthDatabase } =
     await import("../src/private-auth/db.ts");
-  const { createPendingGrant, requireConsentBoundBoardGrant, revokeBoardGrant } =
-    await import("../src/private-auth/grants.ts");
+  const { createPendingGrant, requireConsentBoundBoardGrant, revokeBoardGrant,
+    tokenBoardGrantClaim } = await import("../src/private-auth/grants.ts");
   try {
     const db = privateAuthDatabase();
     db.exec("CREATE TABLE oauthConsent (userId TEXT, clientId TEXT, referenceId TEXT, scopes TEXT)");
@@ -50,8 +50,17 @@ test("OAuth reconnect recovers only one consented board for the same verified cl
       "explicit valid grant stays scoped to its original board");
 
     revokeBoardGrant(secondGrant);
+    const revokedReference = tokenBoardGrantClaim(secondGrant, user);
+    assert.deepEqual(revokedReference,{patchboard_grant_id:secondGrant},
+      "issuer may not erase a revoked explicit reference and trigger fallback");
+    assert.equal(lookup(revokedReference.patchboard_grant_id,user,client,
+      "board:read board:write"),null,
+      "revoked specific grant cannot fall back to the other consented board");
+    assert.deepEqual(tokenBoardGrantClaim(secondGrant,undefined),
+      {patchboard_grant_id:secondGrant},
+      "issuer refresh with no user object still preserves explicit revoked ID");
     assert.equal(lookup(undefined, user, client, "board:read board:write")?.boardId, board,
-      "revoked grants do not count as authorized boards");
+      "a truly absent reference still follows the constrained legacy recovery");
     revokeBoardGrant(writeGrant);
     assert.equal(lookup(undefined, user, client, "board:read board:write"), null,
       "revoked write grant cannot be reused");

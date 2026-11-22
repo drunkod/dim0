@@ -21,6 +21,7 @@ import { getSharedAppletState, saveSharedAppletState } from "./applet-state-serv
 import { privateAuthConfig } from "./private-auth/config.ts";
 import { privateAuthDatabase } from "./private-auth/db.ts";
 import { requireConsentBoundBoardGrant, type VerifiedBoardGrant } from "./private-auth/grants.ts";
+import { admitVerifiedMcpGrant } from "./account-adapters/grant-admission.ts";
 
 const boardId = z.string().uuid();
 const scopes = ["board:read", "board:write"] as const;
@@ -302,6 +303,18 @@ export function handlePrivateMcp(
     const row = privateAuthDatabase().prepare("SELECT name FROM user WHERE id = ?").get(subject) as
       | { name: string } | undefined;
     if (!row) {
+      res.writeHead(401, { "cache-control": "no-store" });
+      res.end();
+      return;
+    }
+    // Durable server-only SQL admission serializes against the SAME grant row
+    // as revokeBoardGrant. A POST token already admitted before revocation
+    // may finish only if its Jazz command still passes current membership.
+    // Cached descriptors and new requests after the revoke commit deny.
+    const admission = admitVerifiedMcpGrant(
+      privateAuthDatabase(), grant, grantedScopes
+    );
+    if (!admission) {
       res.writeHead(401, { "cache-control": "no-store" });
       res.end();
       return;
