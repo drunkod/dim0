@@ -1,0 +1,26 @@
+{
+  "name": "@patchboard/account-domain",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./contracts": "./src/contracts.ts",
+    "./policy": "./src/policy.ts",
+    "./registry": "./src/registry.ts",
+    "./pending": "./src/pending/index.ts",
+    "./ports": "./src/ports.ts"
+  },
+  "scripts": {
+    "generate": "python3 scripts/generate_acc.py",
+    "verify:generated": "python3 scripts/generate_acc.py --check",
+    "typecheck": "tsc --noEmit",
+    "test:contracts": "tsx --test test/*.test.ts",
+    "test:boundary": "tsx --test test/boundary.test.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "tsx": "4.21.0",
+    "typescript": "catalog:"
+  }
+}

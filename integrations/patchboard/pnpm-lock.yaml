@@ -312,6 +312,18 @@ importers:
         specifier: 'catalog:'
         version: 5.0.2(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(happy-dom@20.14.5)(vite@8.3.1(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.23.15))
 
+  packages/account-domain:
+    devDependencies:
+      '@types/node':
+        specifier: ^26.6.6
+        version: 26.6.6
+      tsx:
+        specifier: 4.21.0
+        version: 4.21.0
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+
   packages/jazz-schema:
     dependencies:
       jazz-tools:
