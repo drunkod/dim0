@@ -15,6 +15,7 @@
     "@better-auth/passkey": "1.7.1",
     "@modelcontextprotocol/sdk": "1.29.0",
     "@patchboard/jazz-schema": "workspace:*",
+    "@patchboard/account-domain": "workspace:*",
     "better-auth": "1.7.1",
     "effect": "catalog:",
     "jazz-tools": "catalog:",

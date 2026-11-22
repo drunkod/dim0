@@ -7,6 +7,7 @@ import { auth } from "./private-auth/auth.ts";
 import { privateAuthDatabase } from "./private-auth/db.ts";
 import { memberDisplayNames, tryRememberJazzMemberIdentity } from "./private-auth/member-directory.ts";
 import { listPrivateBoards } from "./private-auth/grants.ts";
+import { privateAccountProfileRequest } from "./account-adapters/profile-routes.ts";
 import {
   canvasEntityIdPattern, canvasBoardRole, listCanvasEntities, getCanvasEntity, createCanvasEntity,
   updateCanvasEntity, deleteCanvasEntity,
@@ -79,6 +80,16 @@ export async function privateBoardRequest(
     }
   }
   if (!session) return json({ error: "Sign in required" }, 401);
+  // Self-service profile/locale use the verified Better Auth subject but do
+  // not require Jazz network availability just to edit display preferences.
+  const profileResponse = await privateAccountProfileRequest(
+    request, {id:session.user.id,name:session.user.name},
+    privateAuthDatabase(), async (name, headers) => {
+      const response = await auth.api.updateUser({headers,body:{name}});
+      return response.status === true;
+    }
+  );
+  if (profileResponse) return profileResponse;
   const accountId = await jazzAccountFor(session.user.id);
 
   try {

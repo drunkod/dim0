@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { getBillingSummary, type BillingSummary } from "@/features/user-settings/api/billing"
 import { TierBadge } from "@/features/user-settings/components/tier-badge"
+import { JazzAccountProfile } from "@/features/user-settings/components/jazz-account-profile"
 import { useAppStore } from "@/store"
 
 
@@ -14,10 +15,11 @@ export function SettingsScreen() {
   const userEmail = useAppStore(s => s.userEmail)
   const userPlan = useAppStore(s => s.userPlan)
   const billingActive = useAppStore(s => s.billingActive)
+  const passkeyJazz = import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1"
   const [billingSummary, setBillingSummary] = useState<BillingSummary | null>(null)
 
   useEffect(() => {
-    if (!billingActive) return
+    if (!billingActive || passkeyJazz) return
 
     void (async () => {
       try {
@@ -27,7 +29,7 @@ export function SettingsScreen() {
         setBillingSummary(null)
       }
     })()
-  }, [billingActive])
+  }, [billingActive, passkeyJazz])
 
   const expiresAtLabel = useMemo(() => {
     if (!billingSummary?.cancel_at_period_end) return null
@@ -41,14 +43,16 @@ export function SettingsScreen() {
         <Card>
           <CardHeader>
             <CardTitle>Profile</CardTitle>
-            <CardDescription>Basic account details</CardDescription>
+            <CardDescription>{passkeyJazz ? "Passkey account and preferences" : "Basic account details"}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex items-center justify-between gap-4">
-              <span className="text-sm text-muted-foreground">Email</span>
-              <span className="text-sm font-medium">{userEmail}</span>
-            </div>
-            {billingActive ? (
+            {passkeyJazz ? <JazzAccountProfile /> : (
+              <div className="flex items-center justify-between gap-4">
+                <span className="text-sm text-muted-foreground">Email</span>
+                <span className="text-sm font-medium">{userEmail}</span>
+              </div>
+            )}
+            {billingActive && !passkeyJazz ? (
               <div className="flex items-center justify-between gap-4">
                 <span className="text-sm text-muted-foreground">Current plan</span>
                 <div className="flex items-center gap-2">
@@ -64,7 +68,7 @@ export function SettingsScreen() {
           </CardContent>
         </Card>
 
-        {billingActive ? (
+        {billingActive && !passkeyJazz ? (
           <Card className="border-secondary-foreground/60 bg-gradient-to-br from-secondary-foreground/20 via-secondary-foreground/10 to-card">
             <CardHeader>
               <CardTitle>Billing</CardTitle>
