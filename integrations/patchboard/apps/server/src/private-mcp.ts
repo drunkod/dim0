@@ -21,7 +21,10 @@ import { getSharedAppletState, saveSharedAppletState } from "./applet-state-serv
 import { privateAuthConfig } from "./private-auth/config.ts";
 import { privateAuthDatabase } from "./private-auth/db.ts";
 import { requireConsentBoundBoardGrant, type VerifiedBoardGrant } from "./private-auth/grants.ts";
-import { admitVerifiedMcpGrant } from "./account-adapters/grant-admission.ts";
+import {
+  admitVerifiedMcpGrant, authorizeProtectedMcpInvocation,
+  type GrantAdmission,
+} from "./account-adapters/grant-admission.ts";
 
 const boardId = z.string().uuid();
 const scopes = ["board:read", "board:write"] as const;
@@ -43,7 +46,13 @@ async function executePrivateMcp(
   actorName: string,
   grantedScopes: ReadonlySet<string>,
   grant: VerifiedBoardGrant,
+  admission: GrantAdmission,
 ) {
+  // The transport can dispatch multiple/delayed callbacks for one HTTP
+  // request. Guard EACH callback with the immutable server-minted SQL receipt.
+  // It is never accepted from caller parameters or exposed in tool results.
+  const admitted = (scope: "board:read" | "board:write") =>
+    authorizeProtectedMcpInvocation(privateAuthDatabase(), admission, grant, scope);
   const canRead = () => grantedScopes.has("board:read");
   const canWrite = () => grantedScopes.has("board:write");
   const mcpServer = new McpServer({ name: "patchboard-private", version: "0.1.0" });
@@ -54,6 +63,7 @@ async function executePrivateMcp(
     annotations: { readOnlyHint: true },
     inputSchema: {},
   }, async () => {
+    if (!admitted("board:read")) return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
     if (!canRead()) return errorText("INSUFFICIENT_SCOPE: board:read required");
     try {
       await requirePrivateBoardAccess(db, grant.boardId, actorId);
@@ -67,6 +77,7 @@ async function executePrivateMcp(
     annotations: { readOnlyHint: true },
     inputSchema: z.object({ board_id: boardId }).strict(),
   }, async ({ board_id }) => {
+    if (!admitted("board:read")) return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
     if (!canRead()) return errorText("INSUFFICIENT_SCOPE: board:read required");
     try {
       if (board_id !== grant.boardId) return errorText("BOARD_ACCESS_DENIED");
@@ -88,6 +99,7 @@ async function executePrivateMcp(
       request_id: z.string().trim().min(1).max(128),
     }).strict(),
   }, async ({ board_id, text, request_id }) => {
+    if (!admitted("board:write")) return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
     if (!canWrite()) return errorText("INSUFFICIENT_SCOPE: board:write required");
     try {
       if (board_id !== grant.boardId) return errorText("BOARD_ACCESS_DENIED");
@@ -120,6 +132,7 @@ async function executePrivateMcp(
     annotations: { readOnlyHint: true },
     inputSchema: z.object({ board_id: boardId }).strict(),
   }, async ({ board_id }) => {
+    if (!admitted("board:read")) return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
     if (board_id !== grant.boardId) return errorText("BOARD_ACCESS_DENIED");
     try {
       const entities = await listCanvasEntities(db, grant.boardId, actorId);
@@ -132,6 +145,7 @@ async function executePrivateMcp(
     annotations: { readOnlyHint: true },
     inputSchema: z.object({ board_id: boardId, entity_id: canvasId }).strict(),
   }, async ({ board_id, entity_id }) => {
+    if (!admitted("board:read")) return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
     if (board_id !== grant.boardId) return errorText("BOARD_ACCESS_DENIED");
     try {
       return output(await getCanvasEntity(db, board_id, actorId, entity_id));
@@ -145,6 +159,7 @@ async function executePrivateMcp(
       board_id: boardId, kind: z.enum(["node", "link"]), payload: canvasEntity,
     }).strict(),
   }, async ({ board_id, kind, payload }) => {
+    if (!admitted("board:write")) return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
     if (board_id !== grant.boardId) return errorText("BOARD_ACCESS_DENIED");
     try {
       const entity = await createCanvasEntity(db, { boardId: board_id, actorId, kind, payload });
@@ -160,6 +175,7 @@ async function executePrivateMcp(
       expected_version: z.number().int().positive(), payload: canvasEntity,
     }).strict(),
   }, async ({ board_id, entity_id, expected_version, payload }) => {
+    if (!admitted("board:write")) return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
     if (board_id !== grant.boardId) return errorText("BOARD_ACCESS_DENIED");
     try {
       const entity = await updateCanvasEntity(db, {
@@ -178,6 +194,7 @@ async function executePrivateMcp(
       expected_version: z.number().int().positive(),
     }).strict(),
   }, async ({ board_id, entity_id, expected_version }) => {
+    if (!admitted("board:write")) return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
     if (board_id !== grant.boardId) return errorText("BOARD_ACCESS_DENIED");
     try {
       return output(await deleteCanvasEntity(db, {
@@ -193,6 +210,7 @@ async function executePrivateMcp(
     annotations: { readOnlyHint: true },
     inputSchema: z.object({ board_id: boardId, note_id: canvasId }).strict(),
   }, async ({ board_id, note_id }) => {
+    if (!admitted("board:read")) return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
     if (board_id !== grant.boardId) return errorText("BOARD_ACCESS_DENIED");
     try { return output(await getSharedAppletState(db, board_id, actorId, note_id)); }
     catch (error) { return canvasFailure(error); }
@@ -207,6 +225,7 @@ async function executePrivateMcp(
       value: z.record(z.string(), z.unknown()),
     }).strict(),
   }, async ({ board_id, note_id, expected_version, value }) => {
+    if (!admitted("board:write")) return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
     if (board_id !== grant.boardId) return errorText("BOARD_ACCESS_DENIED");
     try {
       return output(await saveSharedAppletState(db, {
@@ -321,7 +340,7 @@ export function handlePrivateMcp(
     }
     // Only a verified subject becomes the Jazz actor; never a caller-supplied id.
     const actorId = await jazzAccountFor(subject);
-    await executePrivateMcp(req, res, db, actorId, row.name, grantedScopes, grant);
+    await executePrivateMcp(req, res, db, actorId, row.name, grantedScopes, grant, admission);
   })().catch(() => {
     if (!res.headersSent) res.writeHead(503, { "cache-control": "no-store" });
     if (!res.writableEnded) res.end();

@@ -103,6 +103,49 @@ export function admitVerifiedMcpGrant(
   });
 }
 /**
+ * Check EVERY protected MCP callback before it begins work, not merely once
+ * before an HTTP transport handles a possibly batched request. The receipt
+ * must be server-minted, bound to the verified subject/client/board/version,
+ * present in private SQLite, and younger than its fixed 60-second TTL.
+ *
+ * Do not check the live revoke bit here: a call already admitted before a
+ * durable revoke may finish, subject to current Jazz membership at mutation.
+ * It cannot start another protected callback after its admission expires.
+ * No receipt is accepted from an MCP argument, bearer token or browser body.
+ */
+export function authorizeProtectedMcpInvocation(
+  db: DatabaseSync,
+  admission: GrantAdmission,
+  verified: VerifiedGrantReference,
+  scope: "board:read" | "board:write",
+  nowEpochMs = Date.now(),
+): boolean {
+  if (!Number.isFinite(nowEpochMs) || nowEpochMs < admission.admittedAtMs ||
+      nowEpochMs >= admission.expiresAtMs ||
+      admission.expiresAtMs - admission.admittedAtMs !== 60_000 ||
+      !admission.admittedScopes.includes(scope) ||
+      admission.grantId !== verified.id ||
+      admission.subjectId !== verified.userId ||
+      admission.clientId !== verified.clientId ||
+      admission.boardId !== verified.boardId) return false;
+  const row = db.prepare(`SELECT grant_id,user_id,client_id,board_id,
+    grant_version,admitted_scope,admitted_at_ms,expires_at_ms
+    FROM patchboard_mcp_admission WHERE id=?`).get(admission.id) as {
+      grant_id:string;user_id:string;client_id:string;board_id:string;
+      grant_version:number;admitted_scope:string;admitted_at_ms:number;
+      expires_at_ms:number;
+    } | undefined;
+  return Boolean(row && row.grant_id === admission.grantId &&
+    row.user_id === admission.subjectId &&
+    row.client_id === admission.clientId &&
+    row.board_id === admission.boardId &&
+    row.grant_version === admission.grantVersion &&
+    row.admitted_at_ms === admission.admittedAtMs &&
+    row.expires_at_ms === admission.expiresAtMs &&
+    row.admitted_scope.split(" ").includes(scope));
+}
+
+/**
  * Existing revokeBoardGrant delegates here. The SQL revoke version,
  * sanitized event and request receipt commit atomically. Replayed
  * requests preserve the original ordering, never restore authority.
