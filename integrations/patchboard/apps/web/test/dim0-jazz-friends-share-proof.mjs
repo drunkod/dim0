@@ -153,7 +153,7 @@ try {
   assert.equal(destination.search, "");
   assert.equal(new URLSearchParams(destination.hash.slice(1)).get("invite"),
     oldUrl.searchParams.get("invite"), "Redirect must preserve the invitation code");
-  await createBrowserFriend("single-use editor", oldUrl.href, "member", singleId);
+  const singleUser = await createBrowserFriend("single-use editor", oldUrl.href, "member", singleId);
   const secondContext = await browser.newContext();
   actors.push(secondContext);
   const secondPage = await secondContext.newPage();
@@ -164,10 +164,31 @@ try {
     board_id: singleId, token: oldUrl.searchParams.get("invite"),
   });
   assert.equal(singleReplay.status, 404);
-  console.log("SINGLE_USE_DIM0_REDIRECT_JOIN_AND_REPLAY_PASS");
 
   const shareLink = await createLink(ownerPage);
   const A = await createBrowserFriend("A", shareLink, "member", boardId);
+
+  // The anonymous preview 404 is not enough: challenge the consumed grant
+  // with a second, authenticated, independent Jazz/Better Auth account.
+  // A belongs to the reusable board, not the separate single-use board.
+  const consumedToken = oldUrl.searchParams.get("invite");
+  assert.ok(consumedToken, "Expected the server-issued single-use invitation code");
+  const secondJoin = await api(A.page, "join", {
+    board_id: singleId,
+    token: consumedToken,
+  });
+  assert.equal(secondJoin.status, 404,
+    "An already consumed Jazz grant must reject a different signed-in account");
+  const inaccessibleBoard = await readCanvas(A.page, singleId);
+  assert.equal(inaccessibleBoard.status, 403,
+    "Second account must not acquire access to the single-use board");
+  const originalBoard = await readCanvas(A.page, boardId);
+  assert.equal(originalBoard.status, 200,
+    "Second account must remain signed in and retain its valid board membership");
+  assert.equal((await readCanvas(singleUser.page, singleId)).status, 200,
+    "The first recipient must retain the membership granted by the consumed link");
+  console.log("SINGLE_USE_DIM0_REDIRECT_JOIN_AND_REPLAY_PASS");
+
   const B = await createBrowserFriend("B", shareLink, "member", boardId);
   assert.notEqual((await A.page.evaluate(async()=> (await(await fetch("/patchboard-private/api/me")).json()).accountId)),
     (await B.page.evaluate(async()=> (await(await fetch("/patchboard-private/api/me")).json()).accountId)));

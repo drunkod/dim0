@@ -21,6 +21,43 @@ Branch: fix/dim0-native-jazz-access; stacked on PR #3, reviewed in PR #4.
 - The QA release verifier matched the entry asset name and SHA-256 bytes and confirmed the dummy-token 302 redirect. QA asset: /assets/index-0lKh3ZEY.js, SHA-256 72ea48d2c3448759a87f15ec08c01b0c485ef3aa2d703814f568b15e0f8620bb.
 - Only disposable QA boards were written.
 
+## Authenticated single-use replay regression — follow-up, 22 November 2026
+
+The browser fixture now goes beyond an anonymous second preview. After the
+first disposable friend redeems the exact server-issued single-use URL, a
+different authenticated friend joins only the independent reusable-link QA
+board. That signed-in friend makes an actual /api/join attempt using the
+consumed one-use grant. The assertions require:
+
+- 404 on authenticated second redemption
+- 403 when that second friend reads the first recipient's board
+- 200 when the second friend reads their legitimate reusable-link board
+- 200 when the original recipient reads the one-use board afterward
+
+The existing SINGLE_USE_DIM0_REDIRECT_JOIN_AND_REPLAY_PASS marker is emitted
+after all four assertions, not after the anonymous preview alone. This
+checks real membership isolation and rules out a signed-out browser as the
+reason the replay was rejected.
+
+The complete Chromium/Playwright rehearsal against the already-initialized,
+disposable MacBook QA store passed with
+SINGLE_USE_DIM0_REDIRECT_JOIN_AND_REPLAY_PASS,
+FRIENDS_SHARE_UI_ACCEPTANCE_PASS,
+OWNER_SIGNOUT_SIGNIN_BOOKMARK_PASS, and
+FULL_DIM0_NATIVE_JAZZ_ACCEPTANCE_PASS. The focused invitation/member tests
+passed 12/12. An initial fresh-root run was missing Better Auth's passkey
+table until the standard pnpm auth:migrate:private step ran. On the current
+MacBook, Helium then stalled in WebAuthn account registration before any
+invitation test executed; the independent Chromium run registered its
+accounts and completed the entire sharing test. Do not misreport those
+Helium setup failures as Jazz invitation failures or as a successful Helium
+rerun.
+
+This follow-up only modifies the test and this evidence document. The live
+presentation frontend/server source behavior is unchanged; no additional
+public release or public test writes are needed for the test-only change.
+A distinct human friend's own ChatGPT consent and edit are still pending.
+
 ## Public deployment gate (read-only check)
 
 The public temporary HTTPS origin was verified separately. Its entry asset was still /assets/index-ndhgs_O8.js rather than /assets/index-0lKh3ZEY.js, so the candidate was **not** publicly deployed at the time of this audit. A 200 from the old /signin page is not evidence of this release. A GET to the old single-use entry on the public origin still forwarded the original board and invite query to the old sign-in route.
