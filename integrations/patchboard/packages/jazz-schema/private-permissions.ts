@@ -30,6 +30,7 @@ export const privatePermissions = definePermissions({
     delete: false,
   },
   boardInvites: { read: false, insert: false, update: false, delete: false },
+  boardMemberRoleReceipts: { read: false, insert: false, update: false, delete: false },
   shapes: {
     read: (shape) => mayRead(shape.boardId),
     insert: false,

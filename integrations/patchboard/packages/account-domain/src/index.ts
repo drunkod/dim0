@@ -4,3 +4,4 @@ export * from "./policy.ts";
 export * from "./ports.ts";
 export * from "./ids.ts";
 export * from "./profile.ts";
+export * from "./native-board-member.ts";

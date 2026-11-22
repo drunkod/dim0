@@ -1,0 +1,212 @@
+{
+  "$schema": "https://jazz.tools/schemas/jazz.permissions.v1.json",
+  "$generated": {
+    "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
+    "sha256": "d1dbadbf036f750579776e4e27f64b9a0a0200f5d4a21d03ed143c1780608f87"
+  },
+  "tables": {
+    "agentRuns": {
+      "read": {
+        "anyOf": [
+          "exists boards(id = this.boardId, ownerId = session.user)",
+          "exists boardMembers(boardId = this.boardId, userId = session.user)"
+        ]
+      },
+      "insert": {
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "anyOf": [
+                  "exists boards(id = this.boardId, ownerId = session.user)",
+                  "exists boardMembers(boardId = this.boardId, userId = session.user, role in ['editor', 'admin'])"
+                ]
+              },
+              "exists boardMembers(boardId = this.boardId, userId = session.user, role = 'agent')"
+            ]
+          },
+          "agentId = session.user"
+        ]
+      },
+      "update": {
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "anyOf": [
+                  "exists boards(id = this.boardId, ownerId = session.user)",
+                  "exists boardMembers(boardId = this.boardId, userId = session.user, role in ['editor', 'admin'])"
+                ]
+              },
+              "exists boardMembers(boardId = this.boardId, userId = session.user, role = 'agent')"
+            ]
+          },
+          "agentId = session.user"
+        ]
+      },
+      "delete": "false"
+    },
+    "appletStates": {
+      "read": {
+        "anyOf": [
+          "exists boards(id = this.boardId, ownerId = session.user)",
+          "exists boardMembers(boardId = this.boardId, userId = session.user)"
+        ]
+      },
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "boardInvites": {
+      "read": "exists boards(id = this.boardId, ownerId = session.user)",
+      "insert": "exists boards(id = this.boardId, ownerId = session.user)",
+      "update": "false",
+      "delete": "exists boards(id = this.boardId, ownerId = session.user)"
+    },
+    "boardMembers": {
+      "read": {
+        "anyOf": [
+          "exists boards(id = this.boardId, ownerId = session.user)",
+          "exists boardMembers(boardId = this.boardId, userId = session.user)"
+        ]
+      },
+      "insert": "exists boards(id = this.boardId, ownerId = session.user)",
+      "update": "exists boards(id = this.boardId, ownerId = session.user)",
+      "delete": "exists boards(id = this.boardId, ownerId = session.user)"
+    },
+    "boards": {
+      "read": "true",
+      "insert": "ownerId = session.user",
+      "update": "ownerId = session.user",
+      "delete": "ownerId = session.user"
+    },
+    "canvasEntities": {
+      "read": {
+        "anyOf": [
+          "exists boards(id = this.boardId, ownerId = session.user)",
+          "exists boardMembers(boardId = this.boardId, userId = session.user)"
+        ]
+      },
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "checkpoints": {
+      "read": {
+        "anyOf": [
+          "exists boards(id = this.boardId, ownerId = session.user)",
+          "exists boardMembers(boardId = this.boardId, userId = session.user)"
+        ]
+      },
+      "insert": "exists boards(id = this.boardId, ownerId = session.user)",
+      "update": "false",
+      "delete": "false"
+    },
+    "comments": {
+      "read": "allowedTo.read(task)",
+      "insert": { "allOf": ["allowedTo.read(task)", "authorId = session.user"] },
+      "update": "false",
+      "delete": "allowedTo.update(task)"
+    },
+    "cursors": {
+      "read": {
+        "anyOf": [
+          "exists boards(id = this.boardId, ownerId = session.user)",
+          "exists boardMembers(boardId = this.boardId, userId = session.user)"
+        ]
+      },
+      "insert": {
+        "allOf": [
+          {
+            "anyOf": [
+              "exists boards(id = this.boardId, ownerId = session.user)",
+              "exists boardMembers(boardId = this.boardId, userId = session.user)"
+            ]
+          },
+          "userId = session.user"
+        ]
+      },
+      "update": {
+        "allOf": [
+          {
+            "anyOf": [
+              "exists boards(id = this.boardId, ownerId = session.user)",
+              "exists boardMembers(boardId = this.boardId, userId = session.user)"
+            ]
+          },
+          "userId = session.user"
+        ]
+      },
+      "delete": {
+        "allOf": [
+          {
+            "anyOf": [
+              "exists boards(id = this.boardId, ownerId = session.user)",
+              "exists boardMembers(boardId = this.boardId, userId = session.user)"
+            ]
+          },
+          "userId = session.user"
+        ]
+      }
+    },
+    "mcpRequests": { "read": "false", "insert": "false", "update": "false", "delete": "false" },
+    "proposals": {
+      "read": {
+        "anyOf": [
+          "exists boards(id = this.boardId, ownerId = session.user)",
+          "exists boardMembers(boardId = this.boardId, userId = session.user)"
+        ]
+      },
+      "insert": {
+        "allOf": [
+          {
+            "anyOf": [
+              {
+                "anyOf": [
+                  "exists boards(id = this.boardId, ownerId = session.user)",
+                  "exists boardMembers(boardId = this.boardId, userId = session.user, role in ['editor', 'admin'])"
+                ]
+              },
+              "exists boardMembers(boardId = this.boardId, userId = session.user, role = 'agent')"
+            ]
+          },
+          "proposerId = session.user"
+        ]
+      },
+      "update": {
+        "anyOf": [
+          "exists boards(id = this.boardId, ownerId = session.user)",
+          "exists boardMembers(boardId = this.boardId, userId = session.user, role in ['editor', 'admin'])"
+        ]
+      },
+      "delete": "exists boards(id = this.boardId, ownerId = session.user)"
+    },
+    "shapes": { "read": "true", "insert": "true", "update": "true", "delete": "true" },
+    "tasks": {
+      "read": {
+        "anyOf": [
+          "exists boards(id = this.boardId, ownerId = session.user)",
+          "exists boardMembers(boardId = this.boardId, userId = session.user)"
+        ]
+      },
+      "insert": {
+        "anyOf": [
+          "exists boards(id = this.boardId, ownerId = session.user)",
+          "exists boardMembers(boardId = this.boardId, userId = session.user, role in ['editor', 'admin'])"
+        ]
+      },
+      "update": {
+        "anyOf": [
+          "exists boards(id = this.boardId, ownerId = session.user)",
+          "exists boardMembers(boardId = this.boardId, userId = session.user, role in ['editor', 'admin'])"
+        ]
+      },
+      "delete": {
+        "anyOf": [
+          "exists boards(id = this.boardId, ownerId = session.user)",
+          "exists boardMembers(boardId = this.boardId, userId = session.user, role in ['editor', 'admin'])"
+        ]
+      }
+    }
+  }
+}

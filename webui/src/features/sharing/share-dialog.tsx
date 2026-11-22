@@ -1,4 +1,4 @@
-import { disableJazzLinks, jazzLinks, jazzMembers, mintJazzLink, removeJazzMember, revokeJazzLink } from "./jazz-api"
+import { disableJazzLinks, jazzLinks, jazzMembers, mintJazzLink, removeJazzMember, revokeJazzLink, updateJazzMemberRole } from "./jazz-api"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
@@ -95,6 +95,21 @@ export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenCha
       toast.success(`Removed from board.${kickedNote}`)
     },
     onError: () => toast.error("Couldn't remove member. Try again."),
+  })
+
+  const roleMutation = useMutation({
+    mutationFn: async ({member,role}: {member:BoardMember;role:"member"|"viewer"}) => {
+      if (!jazz || !member.role_version) throw new Error("Not a native Jazz role");
+      return updateJazzMemberRole(boardId,member.user_uid,role,member.role_version)
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({queryKey:membersKey})
+      toast.success("Member role updated. Current board permissions now apply.")
+    },
+    onError: () => {
+      void queryClient.invalidateQueries({queryKey:membersKey})
+      toast.error("Role update denied or stale. Reload members before retrying.")
+    },
   })
 
   const revoke = useMutation({
@@ -243,6 +258,14 @@ export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenCha
                     }
                   }}
                   removeBusy={removeMutation.isPending && removeMutation.variables === m.user_uid}
+                  onChangeRole={jazz && m.role_version && (m.role === "member" || m.role === "viewer")
+                    ? (role) => {
+                      if (m.role === "member" && role === "viewer" &&
+                          !window.confirm("Downgrade this member to Viewer? Existing writes, including MCP requests, will be denied.")) return
+                      roleMutation.mutate({member:m,role})
+                    }
+                    : undefined}
+                  roleBusy={roleMutation.isPending && roleMutation.variables?.member.user_uid === m.user_uid}
                 />
               ))}
             </ul>
@@ -308,7 +331,10 @@ function MemberRow({
   member,
   onRemove,
   removeBusy,
-}: { member: BoardMember; onRemove: () => void; removeBusy: boolean }) {
+  onChangeRole,
+  roleBusy = false,
+}: { member: BoardMember; onRemove: () => void; removeBusy: boolean;
+  onChangeRole?: (role:"member"|"viewer") => void; roleBusy?: boolean }) {
   const isOwner = member.role === "owner"
   return (
     <li className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60">
@@ -317,7 +343,18 @@ function MemberRow({
         <span className="truncate">{member.email}</span>
       </div>
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <span className="capitalize">{member.role}</span>
+        {onChangeRole ? (
+          <select
+            aria-label={"Role of " + member.email}
+            className="rounded-md border bg-background px-2 py-1 text-xs"
+            value={member.role}
+            disabled={roleBusy || removeBusy}
+            onChange={(event) => onChangeRole(event.target.value as "member"|"viewer")}
+          >
+            <option value="member">Editor</option>
+            <option value="viewer">Viewer</option>
+          </select>
+        ) : <span className="capitalize">{member.role}</span>}
         {!isOwner && (
           <Button
             size="sm"

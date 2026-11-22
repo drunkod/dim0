@@ -1,7 +1,7 @@
 import type { BoardMember, ShareRole } from "./api"
 
 type InviteInfo = { id: string; role: "editor" | "viewer"; reusable: boolean; expires_at: number | null }
-type MemberInfo = { id: string; role: string; name?: string | null }
+type MemberInfo = { id: string; role: string; name?: string | null; role_version?: number | null }
 const root = "/patchboard-private/api/"
 
 async function api<T>(endpoint: string, data?: object): Promise<T> {
@@ -25,7 +25,12 @@ export async function jazzMembers(boardId: string): Promise<BoardMember[]> {
     email: member.name?.trim()
       ? member.name.trim() + " · " + member.id.slice(0, 8)
       : "Member · " + member.id.slice(0, 8),
-    role: member.role === "owner" ? "owner" : member.role === "editor" ? "member" : "viewer",
+    role: member.role === "owner" ? "owner" :
+      member.role === "editor" ? "member" :
+      member.role === "agent" ? "agent" :
+      member.role === "admin" ? "admin" : "viewer",
+    role_version: member.role === "editor" || member.role === "viewer"
+      ? member.role_version ?? null : null,
     joined_at: null,
   }))
 }
@@ -52,4 +57,21 @@ export function revokeJazzLink(boardId: string, id: string) {
 
 export function removeJazzMember(boardId: string, id: string) {
   return api("members/remove", { board_id: boardId, user_id: id })
+}
+
+
+/**
+ * Real native board Editor/Viewer role mutation under current Jazz owner;
+ * a Space inherited role, Teable Creator/Commenter, admin or agent is NOT
+ * reinterpreted here. The server checks expected member version atomically.
+ */
+export async function updateJazzMemberRole(
+  boardId: string, memberId: string,
+  assigned: "member" | "viewer", expectedVersion: number
+): Promise<{ assigned_role: "editor" | "viewer"; role_version: number; changed: boolean }> {
+  return api("members/role", {
+    board_id: boardId, user_id: memberId,
+    role: assigned === "member" ? "editor" : "viewer",
+    expected_version: expectedVersion, request_id: crypto.randomUUID(),
+  })
 }

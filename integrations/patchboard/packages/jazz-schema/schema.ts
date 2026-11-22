@@ -20,9 +20,29 @@ export const schema = s.defineSchema({
     },
   ),
   boardMembers: s.table(
-    { boardId: s.uuid(), userId: s.uuid(), role: s.enum("viewer", "editor", "admin", "agent") },
+    {
+      boardId: s.uuid(), userId: s.uuid(),
+      role: s.enum("viewer", "editor", "admin", "agent"),
+      // Native member-role CAS: existing rows migrate to version 1.
+      roleVersion: s.int().default(1),
+    },
     { board: s.rel("boards", "boardId") },
   ).indexOnly(["boardId", "userId"]),
+  /**
+   * Immutable server-only role mutation receipts + sanitized audit.
+   * Single Jazz transaction must check current owner, role/expectedVersion,
+   * update boardMembers and write this receipt. No email/mailbox PII.
+   */
+  boardMemberRoleReceipts: s.table(
+    {
+      boardId: s.uuid(), memberId: s.uuid(), actorId: s.uuid(),
+      requestId: s.string(), fingerprint: s.string(),
+      previousRole: s.enum("viewer", "editor"),
+      assignedRole: s.enum("viewer", "editor"),
+      membershipVersion: s.int(), changed: s.boolean(),
+    },
+    { board: s.rel("boards", "boardId") },
+  ).indexOnly(["boardId", "actorId", "requestId"]),
   boardInvites: s.table(
     {
       boardId: s.uuid(),
@@ -159,6 +179,9 @@ export const permissions = definePermissions({
     insert: (row) => owned(row.boardId),
     update: false,
     delete: (row) => owned(row.boardId),
+  },
+  boardMemberRoleReceipts: {
+    read: false, insert: false, update: false, delete: false,
   },
   shapes: {
     read: true,

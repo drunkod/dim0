@@ -14,8 +14,10 @@ export type ShareLink = {
 export type BoardMember = {
   user_uid: string
   email: string
-  role: "owner" | "member" | "viewer"
+  role: "owner" | "member" | "viewer" | "admin" | "agent"
   joined_at: string | null
+  /** Only native Jazz direct Editor/Viewer rows have an updatable CAS version. */
+  role_version?: number | null
 }
 
 
