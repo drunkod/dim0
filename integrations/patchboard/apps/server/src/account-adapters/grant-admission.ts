@@ -18,6 +18,38 @@ export type GrantAdmission = Readonly<{
 export type GrantRevocation = Readonly<{
   id:string;committedVersion:number;revokedAtMs:number;
 }>;
+export type AccountGrantSummary = Readonly<{
+  id:string; clientId:string; boardId:string;
+  grantVersion:number; createdAtMs:number; revokedAtMs:number|null;
+}>;
+export type VerifiedGrantRevokeIntent = Readonly<{
+  subjectId:string; clientId:string; expectedVersion:number;
+}>;
+export class GrantOwnerError extends Error {
+  constructor(readonly code:"FORBIDDEN"|"STALE_STATE"|"REQUEST_ID_CONFLICT") {
+    super(code);
+    this.name="GrantOwnerError";
+  }
+}
+/** User-scoped, read-only consent metadata; never a bearer access token. */
+export function listCurrentSubjectGrants(
+  db:DatabaseSync,verifiedSubjectId:string
+):{grants:readonly AccountGrantSummary[];hasMore:boolean} {
+  if (!verifiedSubjectId) throw new GrantOwnerError("FORBIDDEN");
+  const rows=db.prepare(`SELECT id,client_id,board_id,grant_version,
+    created_at_ms,revoked_at_ms FROM patchboard_oauth_grant
+    WHERE user_id=? ORDER BY created_at_ms DESC LIMIT 101`)
+    .all(verifiedSubjectId) as {
+      id:string;client_id:string;board_id:string;grant_version:number;
+      created_at_ms:number;revoked_at_ms:number|null
+    }[];
+  return {hasMore:rows.length>100,grants:rows.slice(0,100).map(row=>({
+    id:row.id,clientId:row.client_id,boardId:row.board_id,
+    grantVersion:row.grant_version,createdAtMs:row.created_at_ms,
+    revokedAtMs:row.revoked_at_ms
+  }))};
+}
+
 type Row = {id:string;user_id:string;client_id:string;board_id:string;
   revoked_at_ms:number|null;grant_version:number};
 type ReceiptRow = {fingerprint:string;committed_version:number;revoked_at_ms:number};
@@ -163,25 +195,39 @@ export function authorizeProtectedMcpInvocation(
  */
 export function revokeGrantWithReceipt(
   db:DatabaseSync,id:string,requestId:string="revoke:"+id,
-  nowEpochMs=Date.now()
+  nowEpochMs=Date.now(),verifiedOwner?:VerifiedGrantRevokeIntent
 ):GrantRevocation|null {
   if (!id || !requestId || id.length>200 || requestId.length>200)
     throw new Error("INVALID_REVOKE_REQUEST");
   return serialized(db,()=>{
     const row=grantRow(db,id);
-    if (!row) return null;
+    if (!row) {
+      if (verifiedOwner) throw new GrantOwnerError("FORBIDDEN");
+      return null;
+    }
+    if (verifiedOwner && (row.user_id!==verifiedOwner.subjectId ||
+        row.client_id!==verifiedOwner.clientId))
+      throw new GrantOwnerError("FORBIDDEN");
     const fingerprint=createHash("sha256")
       .update(JSON.stringify({
-        grantId:id,userId:row.user_id,clientId:row.client_id
+        grantId:id,userId:row.user_id,clientId:row.client_id,
+        ...(verifiedOwner ? {expectedVersion:verifiedOwner.expectedVersion} : {})
       })).digest("hex");
     const prior=db.prepare(`SELECT fingerprint,committed_version,revoked_at_ms
       FROM patchboard_grant_revoke_receipt
       WHERE grant_id=? AND request_id=?`).get(id,requestId) as
       ReceiptRow|undefined;
     if (prior) {
-      if (prior.fingerprint!==fingerprint) throw new Error("REQUEST_ID_CONFLICT");
+      if (prior.fingerprint!==fingerprint) {
+        if (verifiedOwner) throw new GrantOwnerError("REQUEST_ID_CONFLICT");
+        throw new Error("REQUEST_ID_CONFLICT");
+      }
       return {id,committedVersion:prior.committed_version,revokedAtMs:prior.revoked_at_ms};
     }
+    // Replay was handled above. Brand-new requests with a stale version fail,
+    // including attempts to re-revoke a grant without refreshing the listing.
+    if (verifiedOwner && row.grant_version!==verifiedOwner.expectedVersion)
+      throw new GrantOwnerError("STALE_STATE");
     const committedVersion=row.revoked_at_ms===null ?
       row.grant_version+1 : row.grant_version;
     const revokedAtMs=row.revoked_at_ms??nowEpochMs;
@@ -205,4 +251,27 @@ export function revokeGrantWithReceipt(
     );
     return {id,committedVersion,revokedAtMs};
   });
+}
+
+
+/**
+ * Current session can revoke ONE selected Board grant with exact expected
+ * version. No raw OAuth token, no browser logout, no unrelated client.
+ * Same SQL serialized authority as MCP admitIfLive and refresh checks.
+ */
+export function revokeVerifiedSubjectGrant(
+  db:DatabaseSync,subjectId:string,input:{
+    grantId:string;clientId:string;expectedVersion:number;requestId:string
+  },nowEpochMs=Date.now()
+):GrantRevocation {
+  if (!subjectId || !input.clientId ||
+      !Number.isSafeInteger(input.expectedVersion) || input.expectedVersion<1 ||
+      !/^[A-Za-z0-9_-]{1,128}$/.test(input.requestId))
+    throw new GrantOwnerError("FORBIDDEN");
+  const result=revokeGrantWithReceipt(db,input.grantId,
+    "self:"+subjectId+":"+input.requestId,nowEpochMs,{
+      subjectId,clientId:input.clientId,expectedVersion:input.expectedVersion
+    });
+  if (!result) throw new GrantOwnerError("FORBIDDEN");
+  return result;
 }

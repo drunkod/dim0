@@ -4,9 +4,10 @@ import { DatabaseSync } from "node:sqlite";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
 import {
   installGrantAdmissionLedger, admitVerifiedMcpGrant, revokeGrantWithReceipt,
+  listCurrentSubjectGrants, revokeVerifiedSubjectGrant, GrantOwnerError,
 } from "../src/account-adapters/grant-admission.ts";
 
 const root = mkdtempSync(join(tmpdir(),"patchboard-acc-grant-fence-"));
@@ -102,6 +103,54 @@ test("invalid/unrecognized grant IDs deny and no principal data or email stored"
   const columns=db.prepare("PRAGMA table_info(patchboard_mcp_admission)").all().map(x=>x.name);
   assert.ok(!columns.includes("email"));
   assert.ok(!columns.includes("access_token"));
+});
+test("account owner can list and revoke exactly ONE client with versioned SQL receipt",()=>{
+  const third={id:randomUUID(),userId:subj,clientId:"client-C",boardId:board};
+  const foreign={id:randomUUID(),userId:randomUUID(),clientId:"client-X",boardId:board2};
+  for(const grant of [third,foreign]) db.prepare(
+    "INSERT INTO patchboard_oauth_grant(id,user_id,client_id,board_id,created_at_ms) VALUES(?,?,?,?,?)"
+  ).run(grant.id,grant.userId,grant.clientId,grant.boardId,2000);
+  const own=listCurrentSubjectGrants(db,subj);
+  assert.ok(own.grants.some(grant=>grant.id===third.id));
+  assert.ok(own.grants.every(grant=>grant.id!==foreign.id));
+  assert.ok(listCurrentSubjectGrants(db,foreign.userId).grants.every(grant=>grant.id!==third.id));
+  assert.throws(()=>revokeVerifiedSubjectGrant(db,foreign.userId,{
+    grantId:third.id,clientId:third.clientId,expectedVersion:1,requestId:"other-user"
+  }),error=>error instanceof GrantOwnerError && error.code==="FORBIDDEN");
+  assert.throws(()=>revokeVerifiedSubjectGrant(db,subj,{
+    grantId:third.id,clientId:"client-wrong",expectedVersion:1,requestId:"wrong-client"
+  }),error=>error instanceof GrantOwnerError && error.code==="FORBIDDEN");
+  assert.throws(()=>revokeVerifiedSubjectGrant(db,subj,{
+    grantId:third.id,clientId:third.clientId,expectedVersion:5,requestId:"stale"
+  }),error=>error instanceof GrantOwnerError && error.code==="STALE_STATE");
+  const revoked=revokeVerifiedSubjectGrant(db,subj,{
+    grantId:third.id,clientId:third.clientId,expectedVersion:1,requestId:"disconnect-C"
+  },8500);
+  assert.equal(revoked.committedVersion,2);
+  assert.equal(revoked.revokedAtMs,8500);
+  assert.equal(admitVerifiedMcpGrant(other,third,scopes,8501),null);
+  assert.ok(admitVerifiedMcpGrant(other,foreign,read,8501));
+  assert.deepEqual(revokeVerifiedSubjectGrant(other,subj,{
+    grantId:third.id,clientId:third.clientId,expectedVersion:1,requestId:"disconnect-C"
+  },9000),revoked,"identical request replay must return durable receipt");
+  assert.throws(()=>revokeVerifiedSubjectGrant(db,subj,{
+    grantId:third.id,clientId:third.clientId,expectedVersion:2,requestId:"disconnect-C"
+  }),error=>error instanceof GrantOwnerError && error.code==="REQUEST_ID_CONFLICT");
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM patchboard_grant_security_event WHERE grant_id=?").get(third.id).n,1);
+});
+test("historical provider revoke fingerprint remains replayable after Settings support",()=>{
+  const historical={id:randomUUID(),userId:subj,clientId:"historical-provider",boardId:board};
+  db.prepare("INSERT INTO patchboard_oauth_grant(id,user_id,client_id,board_id,created_at_ms,revoked_at_ms,grant_version) VALUES(?,?,?,?,?,?,?)")
+    .run(historical.id,historical.userId,historical.clientId,historical.boardId,1000,4500,2);
+  const fingerprint=createHash("sha256").update(JSON.stringify({
+    grantId:historical.id,userId:historical.userId,clientId:historical.clientId
+  })).digest("hex");
+  const requestId="revoke:"+historical.id;
+  db.prepare("INSERT INTO patchboard_grant_revoke_receipt(grant_id,request_id,fingerprint,committed_version,revoked_at_ms) VALUES(?,?,?,?,?)")
+    .run(historical.id,requestId,fingerprint,2,4500);
+  assert.deepEqual(revokeGrantWithReceipt(db,historical.id,requestId,9000),{
+    id:historical.id,committedVersion:2,revokedAtMs:4500
+  });
 });
 test.after(()=>{
   db.close();other.close();
