@@ -1,0 +1,75 @@
+{
+  "candidateSha": "66789d1a59f14ea35b6c1629fd4880ea3ce5159b",
+  "hosted": [
+    {
+      "run": "45890944712",
+      "url": "https://github.com/drunkod/dim0/actions/runs/45890944712",
+      "passed": 5,
+      "total": 5,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "run": "45890944346",
+      "url": "https://github.com/drunkod/dim0/actions/runs/45890944346",
+      "passed": 1,
+      "total": 1,
+      "status": "completed",
+      "conclusion": "success"
+    },
+    {
+      "run": "45890934836",
+      "url": "https://github.com/drunkod/dim0/actions/runs/45890934836",
+      "passed": 1,
+      "total": 1,
+      "status": "completed",
+      "conclusion": "success"
+    }
+  ],
+  "nativeBuild": {
+    "candidateSha": "66789d1a59f14ea35b6c1629fd4880ea3ce5159b",
+    "buildFlags": {
+      "VITE_DIM0_JAZZ_CANVAS": "1",
+      "VITE_DIM0_QA_NATIVE_CATALOG_READONLY": "1",
+      "VITE_DIM0_QA_NATIVE_SAVED_VIEW": "0"
+    },
+    "entryAsset": "/assets/index-DlH0LwUW.js",
+    "entrySha256": "626a5b2b7e940174cd111e4b0b0187120c5bac70fc877c675cdaea8107313f48",
+    "indexSha256": "ee628f05f3a3eafd151df577e7885e2569858a54f41e6e89abe9f9468b207469",
+    "fileCount": 596,
+    "totalBytes": 21472871,
+    "publicAssetVerified": false,
+    "storeRootCreated": false
+  },
+  "nodeProbe": {
+    "probe": "fresh separate userspace daemon, no enrollment or route",
+    "primaryDaemonUntouched": true,
+    "enrollmentAttempted": false,
+    "publicRouteStarted": false,
+    "appStoreCreated": false,
+    "separateSocketReady": true,
+    "backendState": "NeedsLogin",
+    "hasEnrolledDNSName": false,
+    "statusExitCode": 0,
+    "funnelStatusExitCode": 0,
+    "funnelConfigEmpty": true,
+    "probeDaemonStopped": true,
+    "probeSocketRemoved": true,
+    "probeStateRemoved": true,
+    "primaryFunnelUnchanged": true
+  },
+  "qaAccountVerified": false,
+  "localSuiteRerun": false,
+  "installedClientAcceptance": "NOT_RUN",
+  "blocker": "Dedicated Tailscale daemon requires attended login; authorized ChatGPT QA account and ZIP upload permission not verified.",
+  "publicOrigin": null,
+  "publicArchiveSha256": null,
+  "installedPluginName": null,
+  "installedGrantedScopes": null,
+  "installedDiscoveredTools": null,
+  "installedCreationResult": null,
+  "installedReplayResult": null,
+  "installedNativeIds": null,
+  "installedPostDisconnectCounts": null,
+  "publicRouteRetirement": null
+}
