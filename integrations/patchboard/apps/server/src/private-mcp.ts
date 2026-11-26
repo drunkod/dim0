@@ -23,6 +23,12 @@ import {
 } from "./canvas-entity-service.ts";
 import { getSharedAppletState, saveSharedAppletState } from "./applet-state-service.ts";
 import { patchCanvasLabelMarkdown, canvasPatchOperationIdentity, CanvasPatchRequestConflict, CanvasPatchCommitUnknown } from "./canvas-versioned-patch.ts";
+import {typedRecordQaEnabled} from "./typed-record-qa-gate.ts";
+import {
+  patchTypedRecord,typedRecordOperationIdentity,TypedRecordPermissionDenied,TypedRecordGuardDenied,
+  TypedRecordFieldInvalid,TypedRecordSchemaConflict,TypedRecordVersionConflict,
+  TypedRecordRequestConflict,TypedRecordCommitUnknown
+} from "./typed-record-patch.ts";
 import { privateAuthConfig } from "./private-auth/config.ts";
 import { privateAuthDatabase } from "./private-auth/db.ts";
 import { requireConsentBoundBoardGrant, type VerifiedBoardGrant } from "./private-auth/grants.ts";
@@ -269,6 +275,55 @@ async function executePrivateMcp(
       requestId:request_id,patch:field_patch,
     })} : {}),
   }));
+
+  // This first TYPED dataset mutation is not a new production entitlement
+  // for an old board:write grant. Local/disposable QA only until explicit
+  // versioned consent and full relational policy are separately approved.
+  if(typedRecordQaEnabled() && canWrite())mcpServer.registerTool(
+    "patch_typed_record",{
+      description:"QA only: CAS patch one writable typed text field; computed cells derive server-side. Operation receipt is independent of canvas.",
+      annotations:{readOnlyHint:false,destructiveHint:false},
+      inputSchema:z.object({
+        board_id:boardId,dataset_id:boardId,record_id:boardId,
+        schema_version:z.number().int().positive(),
+        expected_version:z.number().int().positive(),
+        request_id:z.string().trim().min(1).max(128),
+        set:z.record(boardId,z.union([
+          z.string().max(2000),z.number().finite(),z.boolean(),z.null()
+        ]))
+      }).strict()
+    },async({
+      board_id,dataset_id,record_id,schema_version,expected_version,request_id,set
+    })=>{
+      const command={boardId:board_id,datasetId:dataset_id,recordId:record_id,
+        schemaVersion:schema_version,expectedVersion:expected_version,
+        requestId:request_id,set,actorId};
+      let identity:ReturnType<typeof typedRecordOperationIdentity>|undefined;
+      if(board_id===grant.boardId){
+        try{identity=typedRecordOperationIdentity(command);}
+        catch(error){if(!(error instanceof TypedRecordFieldInvalid))throw error;}
+      }
+      return withWriteLease(async()=>{
+        if(!admitted("board:write"))return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
+        if(board_id!==grant.boardId)return errorText("BOARD_ACCESS_DENIED");
+        try{
+          return output(await patchTypedRecord(db,command,{beforeWriteSubmit}));
+        }catch(error){
+          return errorText(error instanceof CanvasPatchAdmissionRevoked
+            ? "GRANT_ADMISSION_EXPIRED_OR_INVALID"
+            : error instanceof TypedRecordPermissionDenied ? "BOARD_ACCESS_DENIED"
+            : error instanceof TypedRecordGuardDenied ? "SERVICE_GUARD_DENIED"
+            : error instanceof TypedRecordFieldInvalid ? "INVALID_FIELD"
+            : error instanceof TypedRecordSchemaConflict ? "SCHEMA_VERSION_CONFLICT"
+            : error instanceof TypedRecordVersionConflict ? "VERSION_CONFLICT"
+            : error instanceof TypedRecordRequestConflict ? "REQUEST_ID_CONFLICT"
+            : error instanceof PersistedWriteRejectedError ? "WRITE_REJECTED"
+            : error instanceof TypedRecordCommitUnknown
+              ? "COMMIT_OUTCOME_UNKNOWN: retry same request_id"
+              : "TYPED_RECORD_OPERATION_FAILED");
+        }
+      },request_id,{tool:"patch_typed_record",...(identity?{identity}:{})});
+    });
 
   if (canWrite()) mcpServer.registerTool("delete_canvas_entity", {
     description: "Delete a node/link by UUID with a current version check. Destructive action.",
