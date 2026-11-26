@@ -48,6 +48,21 @@ test("existing board membership migrates to roleVersion=1 without changing grant
       assert.deepEqual(await server.db.all(app.boardMemberRoleReceipts.where({boardId})),[]);
       console.log("ACC_ROLE_LEGACY_MIGRATION_PASS",{boardId,legacyMember});
     } finally {await server.close();}
+    // Reopen the same migrated disposable store, not a newly generated store.
+    const reopened=await createJazz({
+      app,permissions:currentPermissions,store:sqlite({path}),
+      authenticate:()=>null
+    }).ready();
+    try {
+      const board=await reopened.db.one(app.boards.where({id:boardId}));
+      const member=await reopened.db.one(app.boardMembers.where({id:legacyMember}));
+      assert.equal(board?.ownerId,owner);
+      assert.equal(member?.userId,memberId);
+      assert.equal(member?.role,"editor");
+      assert.equal(member?.roleVersion,1);
+      assert.deepEqual(await reopened.db.all(app.boardMemberRoleReceipts.where({boardId})),[]);
+      console.log("ACC_ROLE_LEGACY_MIGRATION_RESTART_PASS");
+    } finally {await reopened.close();}
   } finally {
     await rm(path,{recursive:true,force:true,maxRetries:5,retryDelay:250});
   }
