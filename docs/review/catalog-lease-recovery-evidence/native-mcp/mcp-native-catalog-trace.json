@@ -1,0 +1,216 @@
+{
+  "initial": {
+    "typedDatasets": 0,
+    "typedFields": 0,
+    "typedViews": 0,
+    "typedRecords": 0,
+    "typedCatalogReceipts": 0,
+    "typedCatalogEvents": 0,
+    "typedPatchReceipts": 0,
+    "typedPatchEvents": 0
+  },
+  "created": {
+    "operation": "dataset.create.v1",
+    "boardId": "01a21975-1ae4-7c31-8e44-bf4711df22a3",
+    "datasetId": "8f490c83-fd46-59af-9064-e0fb5f927222",
+    "fieldId": "31262dae-16c3-5b2d-9c52-6fc546c80ff4",
+    "defaultViewId": "87680627-26c3-5b0c-a295-2e98384df84a",
+    "schemaVersion": 1,
+    "receiptId": "84154373-69b2-52bb-947f-542106ee66db",
+    "eventId": "c3624724-659f-5e3e-91fa-8c9e19ec5735",
+    "replayed": false
+  },
+  "replay": {
+    "operation": "dataset.create.v1",
+    "boardId": "01a21975-1ae4-7c31-8e44-bf4711df22a3",
+    "datasetId": "8f490c83-fd46-59af-9064-e0fb5f927222",
+    "fieldId": "31262dae-16c3-5b2d-9c52-6fc546c80ff4",
+    "defaultViewId": "87680627-26c3-5b0c-a295-2e98384df84a",
+    "schemaVersion": 1,
+    "receiptId": "84154373-69b2-52bb-947f-542106ee66db",
+    "eventId": "c3624724-659f-5e3e-91fa-8c9e19ec5735",
+    "replayed": true
+  },
+  "native": {
+    "datasetId": "8f490c83-fd46-59af-9064-e0fb5f927222",
+    "defaultViewId": "87680627-26c3-5b0c-a295-2e98384df84a",
+    "fieldId": "31262dae-16c3-5b2d-9c52-6fc546c80ff4"
+  },
+  "nativeAfterRestart": {
+    "datasetId": "8f490c83-fd46-59af-9064-e0fb5f927222",
+    "defaultViewId": "87680627-26c3-5b0c-a295-2e98384df84a",
+    "fieldId": "31262dae-16c3-5b2d-9c52-6fc546c80ff4"
+  },
+  "postRestart": {
+    "typedDatasets": 1,
+    "typedFields": 1,
+    "typedViews": 1,
+    "typedRecords": 0,
+    "typedCatalogReceipts": 1,
+    "typedCatalogEvents": 1,
+    "typedPatchReceipts": 0,
+    "typedPatchEvents": 0
+  },
+  "oldBoardWriteDenied": true,
+  "missingBoardWriteDenied": true,
+  "viewerDenied": true,
+  "siblingDenied": true,
+  "allZeroBeforeOwner": true,
+  "conflictMcpCode": "CATALOG_REQUEST_ID_CONFLICT",
+  "leasesSettled": true,
+  "leased": {
+    "phase": "leased",
+    "board": "01a21975-1aef-7822-8862-91ee14fccdd9",
+    "statuses": [
+      503,
+      200
+    ],
+    "events": [
+      {
+        "step": 1,
+        "event": "callback-paused",
+        "phase": "leased",
+        "leases": 1
+      },
+      {
+        "step": 2,
+        "event": "settings-post",
+        "attempt": 1
+      },
+      {
+        "step": 3,
+        "event": "pending-fence",
+        "views": 0,
+        "leases": 1,
+        "freshHttp": 401
+      },
+      {
+        "step": 4,
+        "event": "pending-response",
+        "http": 503,
+        "leases": 1
+      },
+      {
+        "step": 5,
+        "event": "settings-post",
+        "attempt": 2
+      },
+      {
+        "step": 6,
+        "event": "resume-reserved-write"
+      },
+      {
+        "step": 7,
+        "event": "server-confirmed-before-ui",
+        "http": 200,
+        "views": 1,
+        "leases": 0
+      },
+      {
+        "step": 8,
+        "event": "ui-confirmed",
+        "receiptId": "82610ff4-21d6-52d8-a9f4-713e45216a43",
+        "eventId": "b5f62398-721b-5d55-abc4-0cda86055dc0",
+        "freshHttp": 401
+      }
+    ],
+    "identity": {
+      "tool": "call-api-write",
+      "action": "dataset.create.v1",
+      "boardId": "01a21975-1aef-7822-8862-91ee14fccdd9",
+      "actorId": "06f389eb-2adb-49f3-9a3a-d97dbe4f010b",
+      "requestId": "qa_inflight_leased_1fc98f1271194cc1a13bca0a7ac770f2",
+      "datasetId": "3e5de331-2bfc-53ac-b577-ee62bd444b8a",
+      "fieldId": "c4cc3dd7-3138-58e6-a991-96d2e9db1744",
+      "viewId": "79056999-c9c8-5199-b41e-6208d44e9d9c",
+      "receiptId": "82610ff4-21d6-52d8-a9f4-713e45216a43",
+      "eventId": "b5f62398-721b-5d55-abc4-0cda86055dc0",
+      "fingerprint": "8275a73465561802e2260629b87a43aaf383591cf616300272a08bdd8110feb2"
+    },
+    "result": {
+      "operation": "dataset.create.v1",
+      "boardId": "01a21975-1aef-7822-8862-91ee14fccdd9",
+      "datasetId": "3e5de331-2bfc-53ac-b577-ee62bd444b8a",
+      "fieldId": "c4cc3dd7-3138-58e6-a991-96d2e9db1744",
+      "defaultViewId": "79056999-c9c8-5199-b41e-6208d44e9d9c",
+      "schemaVersion": 1,
+      "receiptId": "82610ff4-21d6-52d8-a9f4-713e45216a43",
+      "eventId": "b5f62398-721b-5d55-abc4-0cda86055dc0",
+      "replayed": false
+    },
+    "originalIntentReused": true
+  },
+  "disconnected": {
+    "phase": "admitted",
+    "board": "01a21975-1af7-74c0-81bc-93985c4179a8",
+    "statuses": [
+      200
+    ],
+    "events": [
+      {
+        "step": 1,
+        "event": "callback-paused",
+        "phase": "admitted",
+        "leases": 0
+      },
+      {
+        "step": 2,
+        "event": "settings-post",
+        "attempt": 1
+      },
+      {
+        "step": 3,
+        "event": "server-confirmed-before-ui",
+        "http": 200,
+        "views": 0,
+        "leases": 0
+      },
+      {
+        "step": 4,
+        "event": "ui-confirmed-before-resume"
+      },
+      {
+        "step": 5,
+        "event": "resumed-callback-denied",
+        "views": 0,
+        "mcpError": "GRANT_ADMISSION_EXPIRED_OR_INVALID",
+        "freshHttp": 401
+      }
+    ]
+  },
+  "leaseFirstCounts": {
+    "typedDatasets": 1,
+    "typedFields": 1,
+    "typedViews": 1,
+    "typedRecords": 0,
+    "typedCatalogReceipts": 1,
+    "typedCatalogEvents": 1,
+    "typedPatchReceipts": 0,
+    "typedPatchEvents": 0
+  },
+  "disconnectFirstCounts": {
+    "typedDatasets": 0,
+    "typedFields": 0,
+    "typedViews": 0,
+    "typedRecords": 0,
+    "typedCatalogReceipts": 0,
+    "typedCatalogEvents": 0,
+    "typedPatchReceipts": 0,
+    "typedPatchEvents": 0
+  },
+  "leaseReceiptIdentityMatched": true,
+  "independentClientUsable": true,
+  "featureOffCachedDenied": true,
+  "featureOffOutcome": "MCP isError",
+  "featureOffDiscoveryAbsent": true,
+  "featureOffCounts": {
+    "typedDatasets": 1,
+    "typedFields": 1,
+    "typedViews": 1,
+    "typedRecords": 0,
+    "typedCatalogReceipts": 1,
+    "typedCatalogEvents": 1,
+    "typedPatchReceipts": 0,
+    "typedPatchEvents": 0
+  }
+}

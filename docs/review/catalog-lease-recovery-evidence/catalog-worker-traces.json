@@ -1,0 +1,183 @@
+{
+  "testedSha": "483373aaa173fc3272ae4ab73e8474b4d57cf8f4",
+  "processProof": {
+    "beforeCommit": {
+      "boardId": "5e15490d-2467-4d81-9739-bd4c0a583229",
+      "writerExit": {
+        "pid": 2558,
+        "signal": "SIGKILL",
+        "leaseId": "ecb9546f-087c-43c9-a9ea-21c8f2a536b7"
+      },
+      "before": {
+        "datasets": 0,
+        "fields": 0,
+        "views": 0,
+        "receipts": 0,
+        "events": 0,
+        "records": 0,
+        "leases": 1
+      },
+      "after": {
+        "datasets": 0,
+        "fields": 0,
+        "views": 0,
+        "receipts": 0,
+        "events": 0,
+        "records": 0,
+        "leases": 1
+      },
+      "recovery": "NO_RECEIPT",
+      "disconnect": [
+        503,
+        503
+      ],
+      "pendingIntent": {
+        "requestId": "disconnect-before",
+        "expectedVersion": 1
+      }
+    },
+    "afterCommit": {
+      "boardId": "14b58a13-1a9a-41e3-8d6d-6098772debe1",
+      "writerExit": {
+        "pid": 2588,
+        "signal": "SIGKILL",
+        "leaseId": "6eaf64e7-360d-49f6-8155-d1ce58d3bc6b"
+      },
+      "before": {
+        "datasets": 1,
+        "fields": 1,
+        "views": 1,
+        "receipts": 1,
+        "events": 1,
+        "records": 0,
+        "leases": 1
+      },
+      "after": {
+        "datasets": 1,
+        "fields": 1,
+        "views": 1,
+        "receipts": 1,
+        "events": 1,
+        "records": 0,
+        "leases": 0
+      },
+      "unfencedWhileAlive": "WORKER_MAY_STILL_COMMIT",
+      "recovery": "PROVED_COMMITTED",
+      "repeated": "ALREADY_SETTLED",
+      "admissionPruned": true,
+      "disconnect": [
+        503,
+        200
+      ],
+      "disconnectReplay": true,
+      "revokedAdmissionDenied": true,
+      "independentClientUsable": true,
+      "ownerReadback": {
+        "pid": 2904,
+        "datasetId": "7b52c116-6a58-5c2b-9a7f-f54ea3d0951e",
+        "fieldId": "9bc1fa64-7a9a-513d-9bb8-93e98a3f9e97",
+        "defaultViewId": "f41ac962-c5c1-5990-94aa-302c5f012d96",
+        "viewVersion": 1,
+        "rows": 0
+      },
+      "receiptId": "fbac1bc4-6fc0-5a93-b7df-a595cc24a311",
+      "eventId": "0ed14c2d-b5c9-51a0-85a8-03771b4b5871",
+      "rejected": [
+        "actorId",
+        "boardId",
+        "requestId",
+        "fingerprint",
+        "eventId",
+        "datasetId",
+        "fieldId",
+        "viewId",
+        "receiptId",
+        "malformed/unsupported",
+        "malformed/unsupported",
+        "malformed/unsupported",
+        "malformed/unsupported",
+        "malformed/unsupported",
+        "malformed/unsupported",
+        "malformed/unsupported",
+        "patchboard_mcp_write_lease.verified_subject_id",
+        "patchboard_mcp_write_lease.verified_board_id",
+        "patchboard_mcp_write_lease.grant_id",
+        "patchboard_oauth_grant.board_id",
+        "patchboard_mcp_admission.client_id",
+        "patchboard_mcp_admission.board_id",
+        "patchboard_mcp_admission.admitted_scope",
+        "patchboard_jazz_identity.jazz_account_id"
+      ],
+      "lastRecoveryPid": 2894
+    },
+    "revisedView": {
+      "writerExit": {
+        "pid": 2913,
+        "signal": "SIGKILL",
+        "leaseId": "bdd00e8c-310d-4bd0-a9e9-58144d2a3a4e"
+      },
+      "before": {
+        "datasets": 1,
+        "fields": 1,
+        "views": 1,
+        "receipts": 1,
+        "events": 1,
+        "records": 0,
+        "leases": 1
+      },
+      "after": {
+        "datasets": 1,
+        "fields": 1,
+        "views": 1,
+        "receipts": 1,
+        "events": 1,
+        "records": 0,
+        "leases": 1
+      },
+      "recovery": "RECEIPT_MISMATCH",
+      "disconnect": [
+        503,
+        503
+      ],
+      "ownerEditPreserved": true,
+      "view": {
+        "id": "ed7af76f-a835-520c-827d-503c6433d011",
+        "boardId": "bb6b2fee-0618-4cf1-8c28-7280ff6e4021",
+        "datasetId": "ad2022af-075d-5d0a-9980-ed8901de7884",
+        "name": "Owner revised view",
+        "kind": "grid",
+        "definitionVersion": 2,
+        "allowedFieldIds": [
+          "a9f556bc-f938-567a-9a6f-80a35c6e5fbf"
+        ],
+        "filter": {
+          "op": "text_prefix",
+          "fieldId": "a9f556bc-f938-567a-9a6f-80a35c6e5fbf",
+          "value": "Demo"
+        },
+        "sort": {
+          "fieldId": "a9f556bc-f938-567a-9a6f-80a35c6e5fbf",
+          "direction": "desc"
+        }
+      }
+    },
+    "missingEvent": {
+      "receiptId": "6ce3f0b5-e8f5-54e3-8b78-a4c512b7f191",
+      "missingEventId": "91543561-e62d-55ad-bb45-fb573192f9d2",
+      "recovery": "RECEIPT_MISMATCH",
+      "counts": {
+        "datasets": 1,
+        "fields": 1,
+        "views": 1,
+        "receipts": 1,
+        "events": 0,
+        "records": 0,
+        "leases": 1
+      },
+      "disconnect": [
+        503,
+        503
+      ]
+    }
+  }
+}
