@@ -23,6 +23,9 @@ import {
 } from "./canvas-entity-service.ts";
 import { getSharedAppletState, saveSharedAppletState } from "./applet-state-service.ts";
 import { patchCanvasLabelMarkdown, canvasPatchOperationIdentity, CanvasPatchRequestConflict, CanvasPatchCommitUnknown } from "./canvas-versioned-patch.ts";
+import {createTextTable,textTableOperationIdentity,
+  TypedCatalogInvalid,TypedCatalogConflict,TypedCatalogCommitUnknown
+} from "./typed-catalog.ts";
 import {typedRecordQaEnabled} from "./typed-record-qa-gate.ts";
 import {
   querySavedTypedView,TypedViewAccessDenied,TypedViewUnsupported,
@@ -35,10 +38,10 @@ import {
 } from "./typed-record-patch.ts";
 import { privateAuthConfig } from "./private-auth/config.ts";
 import { privateAuthDatabase } from "./private-auth/db.ts";
-import { requireConsentBoundBoardGrant, type VerifiedBoardGrant } from "./private-auth/grants.ts";
+import { requireConsentBoundBoardGrant, hasExplicitTableCreateConsent, type VerifiedBoardGrant } from "./private-auth/grants.ts";
 import {
   admitVerifiedMcpGrant, authorizeProtectedMcpInvocation,
-  type GrantAdmission,
+  type GrantAdmission, type AdmittedScope,
 } from "./account-adapters/grant-admission.ts";
 import {
   beginProtectedMcpWriteLease, runReservedMcpWrite,
@@ -72,12 +75,18 @@ async function executePrivateMcp(
   // request. Guard EACH callback with the immutable server-minted SQL receipt.
   // It is never accepted from caller parameters or exposed in tool results.
   const writeContext=new AsyncLocalStorage<ProtectedMcpWriteLease>();
-  const admitted = (scope: "board:read" | "board:write") =>
+  const admitted = (scope: AdmittedScope) =>
     authorizeProtectedMcpInvocation(privateAuthDatabase(),admission,grant,scope,
-      Date.now(),scope==="board:write" ? writeContext.getStore()?.id : undefined);
+      Date.now(),scope!=="board:read" ? writeContext.getStore()?.id : undefined);
   /** Check again at Jazz write submission, not just transport/callback dispatch. */
   const beforeWriteSubmit = () => {
     if (!admitted("board:write")) throw new CanvasPatchAdmissionRevoked();
+  };
+  const tableCreateConsented=()=>typedRecordQaEnabled()&&grantedScopes.has("board:write")&&
+    grantedScopes.has("table:create")&&hasExplicitTableCreateConsent(grant);
+  const beforeTableCreateSubmit=()=>{
+    if(!tableCreateConsented()||!admitted("board:write")||!admitted("table:create"))
+      throw new CanvasPatchAdmissionRevoked();
   };
   /** Server-only deterministic pause; only disposable localhost CI can enable. */
   const qaPause=async(phase:"admitted"|"leased",requestId?:string)=>{
@@ -187,6 +196,46 @@ async function executePrivateMcp(
           : error instanceof TypedViewUnsupported
           ? error.code:"VIEW_QUERY_FAILED");
       }
+    });
+
+  // Discovery is scoped to the verified live grant AND current native Owner.
+  // Cached calls are registered anew per HTTP request, and the shared command
+  // rechecks Owner inside its serializable transaction before replay/mutation.
+  if(tableCreateConsented()&&admitted("board:write")&&admitted("table:create")&&
+    (await db.one(app.boards.where({id:grant.boardId})))?.ownerId===actorId)
+    mcpServer.registerTool("call-api-write",{
+      description:"QA only: allowlisted dataset.create.v1. Create one primary-text table and default grid. Requires explicit table:create and board:write consent and current Owner. Stable request_id replays original IDs.",
+      annotations:{readOnlyHint:false,destructiveHint:false},
+      inputSchema:z.object({
+        operation:z.literal("dataset.create.v1"),
+        input:z.object({
+          board_id:boardId,request_id:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
+          name:z.string().min(1).max(80),primary_field_name:z.string().min(1).max(80),
+          default_view_name:z.string().min(1).max(80)
+        }).strict()
+      }).strict()
+    },async({input})=>{
+      if(!tableCreateConsented()||!admitted("table:create")||!admitted("board:write"))
+        return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
+      if(input.board_id!==grant.boardId)return errorText("BOARD_ACCESS_DENIED");
+      const command={boardId:grant.boardId,actorId,requestId:input.request_id,
+        name:input.name,primaryFieldName:input.primary_field_name,defaultViewName:input.default_view_name};
+      let identity:ReturnType<typeof textTableOperationIdentity>;
+      try{identity=textTableOperationIdentity(command);}
+      catch(error){return errorText(error instanceof TypedCatalogInvalid?"CATALOG_INVALID_DEFINITION":"CATALOG_OUTCOME_UNKNOWN");}
+      return withWriteLease(async()=>{
+        try{
+          const result=await createTextTable(db,command,{beforeWriteSubmit:beforeTableCreateSubmit});
+          return output({operation:"dataset.create.v1",...result});
+        }catch(error){
+          return errorText(error instanceof CanvasPatchAdmissionRevoked?"GRANT_ADMISSION_EXPIRED_OR_INVALID":
+            error instanceof TypedRecordPermissionDenied?"BOARD_ACCESS_DENIED":
+            error instanceof TypedCatalogInvalid?"CATALOG_INVALID_DEFINITION":
+            error instanceof TypedCatalogConflict?"CATALOG_REQUEST_ID_CONFLICT":
+            error instanceof TypedCatalogCommitUnknown?"CATALOG_COMMIT_OUTCOME_UNKNOWN: retry same request_id":
+            "CATALOG_OUTCOME_UNKNOWN: retain lease and reconcile");
+        }
+      },input.request_id,{tool:"call-api-write",identity});
     });
 
   if (canWrite()) mcpServer.registerTool("create_note", {

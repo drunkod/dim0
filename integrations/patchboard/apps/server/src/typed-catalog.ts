@@ -51,7 +51,9 @@ export type CreateTextTableInput=Readonly<{
   boardId:string;actorId:string;requestId:string;
   name:string;primaryFieldName:string;defaultViewName:string;
 }>;
-export async function createTextTable(db:Db,input:CreateTextTableInput){
+/** Exact, immutable operation identity for the SQL grant write lease.
+ * This does not authorize anything, allocate a new ID or create a table. */
+export function textTableOperationIdentity(input:CreateTextTableInput){
   // Validate the entire bounded catalog definition BEFORE writing any row.
   if(!uuid.test(input.boardId)||!uuid.test(input.actorId)||
     !req.test(input.requestId))throw new TypedCatalogInvalid();
@@ -65,8 +67,21 @@ export async function createTextTable(db:Db,input:CreateTextTableInput){
   const eventId=stableId("dim0:catalog:event:v1",receiptId);
   const fp=fingerprint({boardId:input.boardId,name:datasetName,
     primaryFieldName:fieldName,defaultViewName:viewName,kind:"text",primary:true});
+  return {tool:"call-api-write" as const,action:"dataset.create.v1" as const,
+    boardId:input.boardId,actorId:input.actorId,requestId:input.requestId,
+    datasetId,fieldId,viewId,receiptId,eventId,fingerprint:fp};
+}
+export async function createTextTable(db:Db,input:CreateTextTableInput,
+  options:Readonly<{beforeWriteSubmit?:()=>void}>={}){
+  const op=textTableOperationIdentity(input);
+  const {datasetId,fieldId,viewId,receiptId,eventId}=op;
+  const fp=op.fingerprint;
+  const datasetName=input.name,fieldName=input.primaryFieldName,
+    viewName=input.defaultViewName;
+  options.beforeWriteSubmit?.();
   const tx=await db.serializableTransaction(async t=>{
     await owner(t,input.boardId,input.actorId);
+    options.beforeWriteSubmit?.();
     const prior=await t.one(app.typedCatalogReceipts.where({id:receiptId}));
     if(prior){
       if(prior.fingerprint!==fp||prior.datasetId!==datasetId||
@@ -83,9 +98,11 @@ export async function createTextTable(db:Db,input:CreateTextTableInput){
         dataset.boardId!==input.boardId||field.datasetId!==datasetId||
         view.datasetId!==datasetId||event.receiptId!==receiptId)
         throw new TypedCatalogConflict();
+      options.beforeWriteSubmit?.();
       return {boardId:input.boardId,datasetId,fieldId,defaultViewId:viewId,
         schemaVersion:dataset.schemaVersion,receiptId,eventId,replayed:true};
     }
+    options.beforeWriteSubmit?.();
     t.insert(app.typedDatasets,{
       boardId:input.boardId,name:datasetName,schemaVersion:1,state:"active"
     },{id:datasetId});

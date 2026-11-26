@@ -10,9 +10,10 @@ import type { DatabaseSync } from "node:sqlite";
 export type VerifiedGrantReference = Readonly<{
   id: string; userId: string; clientId: string; boardId: string;
 }>;
+export type AdmittedScope="board:read"|"board:write"|"table:create";
 export type GrantAdmission = Readonly<{
   id:string; grantId:string; subjectId:string; clientId:string; boardId:string;
-  grantVersion:number; admittedScopes:readonly ("board:read"|"board:write")[];
+  grantVersion:number; admittedScopes:readonly AdmittedScope[];
   admittedAtMs:number; expiresAtMs:number;
 }>;
 export type GrantRevocation = Readonly<{
@@ -157,7 +158,7 @@ export function admitVerifiedMcpGrant(
 ):GrantAdmission|null {
   if (!verified.id || !verified.userId || !verified.clientId || !verified.boardId)
     return null;
-  const scopes=(["board:read","board:write"] as const)
+  const scopes=(["board:read","board:write","table:create"] as const)
     .filter(scope=>verifiedTokenScopes.has(scope));
   if (scopes.length===0) return null;
   return serialized(db,()=>{
@@ -203,7 +204,7 @@ export function authorizeProtectedMcpInvocation(
   db: DatabaseSync,
   admission: GrantAdmission,
   verified: VerifiedGrantReference,
-  scope: "board:read" | "board:write",
+  scope: AdmittedScope,
   nowEpochMs = Date.now(),
   activeWriteLeaseId?: string,
 ): boolean {
@@ -225,9 +226,9 @@ export function authorizeProtectedMcpInvocation(
   // Revocation/version is authoritative at callback entry, not HTTP admission.
   // SQLite's synchronous read observes commits made before this call starts.
   const liveGrant = grantRow(db, admission.grantId);
-  const activeLease=scope==="board:write" && activeWriteLeaseId && Boolean(db.prepare(
-    "SELECT 1 FROM patchboard_mcp_write_lease WHERE id=? AND grant_id=? AND admission_id=?"
-  ).get(activeWriteLeaseId,admission.grantId,admission.id));
+  const activeLease=scope!=="board:read" && activeWriteLeaseId && Boolean(db.prepare(
+    "SELECT 1 FROM patchboard_mcp_write_lease WHERE id=? AND grant_id=? AND admission_id=? AND (? <> 'table:create' OR tool_name='call-api-write')"
+  ).get(activeWriteLeaseId,admission.grantId,admission.id,scope));
   const pending=Boolean(db.prepare("SELECT 1 FROM patchboard_grant_disconnect_pending WHERE grant_id=?").get(admission.grantId));
   return Boolean(row && liveGrant && liveGrant.revoked_at_ms === null &&
     (!pending || activeLease) &&

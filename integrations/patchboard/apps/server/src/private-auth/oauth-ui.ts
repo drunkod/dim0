@@ -24,7 +24,9 @@ export async function oauthConsentPage(
   const nonce = randomBytes(20).toString("base64");
   const clientId = escapeHtml(url.searchParams.get("client_id") ?? "Unknown client");
   const requestedScopes = (url.searchParams.get("scope") ?? "").split(" ").filter(Boolean);
-  const scopeList = requestedScopes.map(scope => "<li>" + escapeHtml(scope) + "</li>").join("");
+  const scopeList = requestedScopes.map(scope => scope==="table:create"
+    ? "<li><strong>table:create</strong> — Create a new primary-text table and default grid on the selected board (owner only, disposable QA). This is separate from board:write.</li>"
+    : "<li>" + escapeHtml(scope) + "</li>").join("");
   const boards = await listPrivateBoards(db, await jazzAccountFor(session.user.id));
   const options = boards.map(board =>
     '<option value="' + escapeHtml(board.board_id) + '">' +

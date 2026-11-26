@@ -9,7 +9,7 @@ import {createJazz,sqlite} from "jazz-tools/backend";
 import {app} from "@patchboard/jazz-schema";
 import privatePermissions from "@patchboard/jazz-schema/private.permissions.json" with {type:"json"};
 import guestPermissions from "@patchboard/jazz-schema/jazz.permissions.json" with {type:"json"};
-import {createTextTable,addTextRow,
+import {createTextTable,addTextRow,textTableOperationIdentity,
   TypedCatalogInvalid,TypedCatalogConflict} from "../src/typed-catalog.ts";
 import {TypedRecordPermissionDenied,TypedRecordRequestConflict,
   TypedRecordVersionConflict,patchTypedRecord} from "../src/typed-record-patch.ts";
@@ -72,6 +72,22 @@ test("single owner catalog transaction, lost reply replay, three rows and restar
       }),TypedRecordPermissionDenied);
       assert.equal((await count()).datasets,0);
       assert.equal((await count()).catalogEvents,0);
+      await assert.rejects(()=>createTextTable(server.db,{
+        ...input,requestId:"blocked-by-oauth-lease"
+      },{beforeWriteSubmit:()=>{throw new Error(
+        "GRANT_ADMISSION_EXPIRED_OR_INVALID"
+      );}}),/GRANT_ADMISSION_EXPIRED_OR_INVALID/);
+      assert.deepEqual(await count(),{
+        datasets:0,fields:0,views:0,catalogReceipts:0,catalogEvents:0,records:0
+      },"denied admission before Jazz submission must leave no catalog objects");
+      let checks=0;
+      await assert.rejects(()=>createTextTable(server.db,{
+        ...input,requestId:"guard-changed-after-entry"
+      },{beforeWriteSubmit:()=>{if(++checks>1)throw new Error("GRANT_ADMISSION_EXPIRED_OR_INVALID");}}),
+        /GRANT_ADMISSION_EXPIRED_OR_INVALID/);
+      assert.equal(checks,2);
+      assert.deepEqual(await count(),{datasets:0,fields:0,views:0,catalogReceipts:0,catalogEvents:0,records:0});
+
     });
     await t.test("owner gets stable catalog IDs, replay after lost reply, conflict",async()=>{
       created=await createTextTable(server.db,input);
@@ -80,6 +96,22 @@ test("single owner catalog transaction, lost reply replay, three rows and restar
       for(const x of [created.datasetId,created.fieldId,created.defaultViewId,
         created.receiptId,created.eventId])
         assert.match(x,/^[a-f\d-]{36}$/);
+      const identity=textTableOperationIdentity(input);
+      assert.equal(identity.tool,"call-api-write");
+      assert.equal(identity.action,"dataset.create.v1");
+      assert.equal(identity.datasetId,created.datasetId);
+      assert.equal(identity.fieldId,created.fieldId);
+      assert.equal(identity.viewId,created.defaultViewId);
+      assert.equal(identity.receiptId,created.receiptId);
+      assert.equal(identity.eventId,created.eventId);
+      assert.equal((await server.db.one(app.typedCatalogReceipts.where({
+        id:created.receiptId
+      }))).fingerprint,identity.fingerprint);
+      let replayChecks=0;
+      await assert.rejects(()=>createTextTable(server.db,input,{
+        beforeWriteSubmit:()=>{if(++replayChecks===3)throw new Error("GRANT_ADMISSION_EXPIRED_OR_INVALID");}
+      }),/GRANT_ADMISSION_EXPIRED_OR_INVALID/);
+      assert.equal(replayChecks,3);
       const replay=await createTextTable(server.db,input);
       assert.deepEqual({...replay,replayed:false},created);
       assert.equal(replay.replayed,true);

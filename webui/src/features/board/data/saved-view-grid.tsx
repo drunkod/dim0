@@ -53,8 +53,8 @@ export function SavedViewGrid({ view }: { view: ViewRef | Recipient }) {
     {ready && <>
       <h2 className="text-lg font-semibold">{ready.page.name}</h2>
       <div className="overflow-auto rounded-md border">
-        <table aria-label="Saved view records" className="w-full border-collapse text-sm">
-          <thead className="bg-muted"><tr>{ready.page.columns.map(c => <th key={c.id} scope="col" className="border-b p-3 text-left">{c.name}</th>)}</tr></thead>
+        <table data-dataset-id={ready.page.datasetId} data-view-id={ready.page.viewId} aria-label="Saved view records" className="w-full border-collapse text-sm">
+          <thead className="bg-muted"><tr>{ready.page.columns.map(c => <th key={c.id} data-field-id={c.id} scope="col" className="border-b p-3 text-left">{c.name}</th>)}</tr></thead>
           <tbody>{ready.page.rows.map(row => <tr key={row.id} data-record-id={row.id}>{ready.page.columns.map(c => {
             const cell = row.cells[c.id]
             return <td key={c.id} className="break-words border-b p-3">{typeof cell === "string" || typeof cell === "number" || typeof cell === "boolean" ? String(cell) : ""}</td>
