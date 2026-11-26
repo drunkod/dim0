@@ -40,11 +40,18 @@ execFileSync("openssl",["req","-x509","-newkey","rsa:2048","-nodes","-days","1",
 setDefaultCACertificates([...getCACertificates("default"),await readFile(cert,"utf8")]);
 const tls=createHttpsServer({key:await readFile(key),cert:await readFile(cert)},(req,res)=>{
   if(req.headers.host!==host){res.writeHead(421);res.end();return;}
-  const upstream=httpRequest({hostname:"127.0.0.1",port:uiPort,path:req.url,method:req.method,headers:req.headers},r=>{
-    res.writeHead(r.statusCode,r.headers);r.pipe(res);
+  // Never destroy a pooled upstream socket after a normally completed
+  // response: it could already be serving another asset or API request.
+  const headers={...req.headers,connection:"close","x-forwarded-proto":"https"};
+  delete headers["proxy-connection"];
+  const upstream=httpRequest({hostname:"127.0.0.1",port:uiPort,path:req.url,method:req.method,headers,agent:false},r=>{
+    const reply={...r.headers};
+    delete reply.connection;delete reply["keep-alive"];
+    res.writeHead(r.statusCode,reply);r.pipe(res);
   });
   upstream.on("error",()=>{if(!res.headersSent)res.writeHead(502);res.end();});
-  res.once("close",()=>upstream.destroy());req.pipe(upstream);
+  res.once("close",()=>{if(!res.writableFinished)upstream.destroy();});
+  req.pipe(upstream);
 });
 await new Promise((yes,no)=>tls.once("error",no).listen(tlsPort,"127.0.0.1",yes));
 const env=Object.fromEntries(Object.entries(process.env).filter(([k])=>!/^(PATCHBOARD_|DIM0_|BETTER_AUTH_|VITE_|JAZZ_|DATABASE_URL$|APP_PORT$|PORT$)/.test(k)));
@@ -117,9 +124,12 @@ async function account(){
   page.on("response",r=>{const u=new URL(r.url());if(u.origin===origin && r.status()>=400)console.log("LOCAL_BROWSER_HTTP",r.status(),u.pathname);});
   const cdp=await context.newCDPSession(page);await cdp.send("WebAuthn.enable");
   await cdp.send("WebAuthn.addVirtualAuthenticator",{options:{protocol:"ctap2",transport:"internal",hasResidentKey:true,hasUserVerification:true,isUserVerified:true,automaticPresenceSimulation:true}});
-  await page.goto(origin+"/signup");
+  await page.goto(origin+"/signup",{waitUntil:"load"});
   try{
-    await page.getByRole("button",{name:"Create account with passkey",exact:true}).click({timeout:15000});
+    // Require stylesheets to be actually available, not merely a fetched
+    // HTML/entry chunk; an unstyled page is not valid native UI evidence.
+    await expect.poll(()=>page.evaluate(()=>Array.from(document.querySelectorAll('link[rel="stylesheet"]')).every(link=>!!link.sheet)),{timeout:30000}).toBe(true);
+    await page.getByRole("button",{name:"Create account with passkey",exact:true}).click({timeout:30000});
   }catch(error){
     await page.screenshot({path:join(evidence,"initial-signup-debug.png")});
     console.error("LOCAL_SIGNUP_DEBUG",JSON.stringify({path:new URL(page.url()).pathname,body:(await page.locator("body").innerText()).slice(0,400)}));
