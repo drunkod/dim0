@@ -26,6 +26,10 @@ import {
   TypedRecordCommitUnknown
 } from "./typed-record-patch.ts";
 import {typedRecordQaEnabled} from "./typed-record-qa-gate.ts";
+import {createTextTable,addTextRow,
+  TypedCatalogInvalid,TypedCatalogConflict,
+  TypedCatalogLimit,TypedCatalogCommitUnknown
+} from "./typed-catalog.ts";
 import {
   createSavedTypedView,changeSavedTypedView,issueTypedViewShare,
   revokeTypedViewShare,querySavedTypedView,
@@ -323,6 +327,40 @@ export async function privateBoardRequest(
         actorId: accountId, expectedVersion: parsed.expected_version, value: parsed.value,
       }));
     }
+    // The SAME QA-gated server catalog API is used by browser controls and
+    // isolated server-domain tests. Neither HTTP DTO permits actor or IDs.
+    if(pathname==="/patchboard-private/api/records/tables/create" &&
+      request.method==="POST"){
+      if(!typedRecordQaEnabled())return json({error:"Not found"},404);
+      const parsed=z.object({
+        board_id:boardIdSchema,
+        request_id:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
+        name:z.string(),primary_field_name:z.string(),
+        default_view_name:z.string()
+      }).strict().parse(await safeJson(request));
+      return json(await createTextTable(db,{
+        boardId:parsed.board_id,actorId:accountId,
+        requestId:parsed.request_id,name:parsed.name,
+        primaryFieldName:parsed.primary_field_name,
+        defaultViewName:parsed.default_view_name
+      }),201);
+    }
+    if(pathname==="/patchboard-private/api/records/rows/create" &&
+      request.method==="POST"){
+      if(!typedRecordQaEnabled())return json({error:"Not found"},404);
+      const parsed=z.object({
+        board_id:boardIdSchema,dataset_id:boardIdSchema,
+        request_id:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
+        schema_version:z.number().int().positive(),field_id:boardIdSchema,
+        value:z.string().max(2000)
+      }).strict().parse(await safeJson(request));
+      return json(await addTextRow(db,{
+        boardId:parsed.board_id,datasetId:parsed.dataset_id,
+        actorId:accountId,requestId:parsed.request_id,
+        schemaVersion:parsed.schema_version,
+        fieldId:parsed.field_id,value:parsed.value
+      }),201);
+    }
     // QA only: owner Data picker and share-management metadata. This GET
     // never exposes token hashes, records, credentials or member lists.
     if(pathname==="/patchboard-private/api/records/views" &&
@@ -560,6 +598,12 @@ export async function privateBoardRequest(
     if (error instanceof CanvasPatchRequestConflict) return json({error:"Request ID conflict"},409);
     if (error instanceof CanvasPatchCommitUnknown) return json({error:"Commit outcome unknown",request_id:error.requestId,retry_same_request_only:true},503);
     if (error instanceof CanvasInvalid) return json({ error: "Invalid canvas payload" }, 400);
+    if(error instanceof TypedCatalogInvalid)return json({error:error.message},400);
+    if(error instanceof TypedCatalogConflict)return json({error:error.message},409);
+    if(error instanceof TypedCatalogLimit)return json({error:error.message},409);
+    if(error instanceof TypedCatalogCommitUnknown)
+      return json({error:error.message,request_id:error.requestId,
+        retry_same_request_only:true},503);
     if(error instanceof TypedViewAccessDenied)return json({error:error.message},403);
     if(error instanceof TypedViewNotFound)return json({error:error.message},404);
     if(error instanceof TypedViewCursorChanged ||

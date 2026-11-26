@@ -422,6 +422,10 @@ export async function listOwnerSavedTypedViews(
     result.push({
       viewId:view.id,boardId:view.boardId,datasetId:view.datasetId,
       viewVersion:view.definitionVersion,name:view.name,
+      datasetName:dataset.name,datasetSchemaVersion:dataset.schemaVersion,
+      singleTextTable:fields.length===1&&fields[0]?.boardId===input.boardId&&fields[0]?.kind==="text"&&
+        fields[0]?.primary===true&&
+        fields[0]?.computeFromFieldId==null&&dataset.state==="active",
       fields:names,
       filter:{op:filter.op,fieldId:filter.fieldId,value:filter.value},
       sort:{fieldId:sort.fieldId,direction:sort.direction},
