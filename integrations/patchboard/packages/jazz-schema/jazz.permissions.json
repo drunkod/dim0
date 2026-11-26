@@ -2,7 +2,7 @@
   "$schema": "https://jazz.tools/schemas/jazz.permissions.v1.json",
   "$generated": {
     "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
-    "sha256": "7dd785580edb8f505bbe20356a3d962f7a5cfed1f4b09e64b13041bce4aeade4"
+    "sha256": "8b324e2111d50233bf98a92bbe3144a47cfdf6b31693d7e407a8b14237d94d1d"
   },
   "tables": {
     "agentRuns": {
@@ -57,6 +57,7 @@
       "update": "false",
       "delete": "false"
     },
+    "baseMemberships": { "read": "false", "insert": "false", "update": "false", "delete": "false" },
     "boardInvites": {
       "read": "exists boards(id = this.boardId, ownerId = session.user)",
       "insert": "exists boards(id = this.boardId, ownerId = session.user)",
@@ -79,6 +80,12 @@
       "insert": "exists boards(id = this.boardId, ownerId = session.user)",
       "update": "exists boards(id = this.boardId, ownerId = session.user)",
       "delete": "exists boards(id = this.boardId, ownerId = session.user)"
+    },
+    "boardWorkspaceBindings": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
     },
     "boards": {
       "read": "true",
@@ -213,6 +220,25 @@
           "exists boardMembers(boardId = this.boardId, userId = session.user, role in ['editor', 'admin'])"
         ]
       }
-    }
+    },
+    "workspaceAccountReceipts": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "workspaceMemberships": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "workspaceOwnerSets": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "workspaces": { "read": "false", "insert": "false", "update": "false", "delete": "false" }
   }
 }

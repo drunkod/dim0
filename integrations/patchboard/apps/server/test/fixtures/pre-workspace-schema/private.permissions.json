@@ -1,0 +1,114 @@
+{
+  "$schema": "https://jazz.tools/schemas/jazz.permissions.v1.json",
+  "tables": {
+    "agentRuns": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "appletStates": {
+      "read": {
+        "anyOf": [
+          "exists boards(id = this.boardId, ownerId = session.user)",
+          "exists boardMembers(boardId = this.boardId, userId = session.user)"
+        ]
+      },
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "boardInvites": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "boardMemberRoleReceipts": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "boardMembers": {
+      "read": {
+        "anyOf": [
+          "exists boards(id = this.boardId, ownerId = session.user)",
+          "exists boardMembers(boardId = this.boardId, userId = session.user)"
+        ]
+      },
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "boards": {
+      "read": {
+        "anyOf": [
+          "exists boards(id = this.id, ownerId = session.user)",
+          "exists boardMembers(boardId = this.id, userId = session.user)"
+        ]
+      },
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "canvasEntities": {
+      "read": {
+        "anyOf": [
+          "exists boards(id = this.boardId, ownerId = session.user)",
+          "exists boardMembers(boardId = this.boardId, userId = session.user)"
+        ]
+      },
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "checkpoints": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "comments": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "cursors": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "mcpRequests": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "proposals": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "shapes": {
+      "read": {
+        "anyOf": [
+          "exists boards(id = this.boardId, ownerId = session.user)",
+          "exists boardMembers(boardId = this.boardId, userId = session.user)"
+        ]
+      },
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "tasks": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    }
+  }
+}

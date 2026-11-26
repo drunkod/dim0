@@ -19,6 +19,66 @@ export const schema = s.defineSchema({
       appletStatesViaBoard: s.reverse("appletStates", "board"),
     },
   ),
+  /**
+   * PR1 additive Teable Space equivalent. These rows only supply shadow
+   * ancestry until a verified live policy rollout; old boards keep their
+   * exact ownerId and native membership authorization.
+   */
+  workspaces: s.table({
+    name: s.string(), createdBy: s.uuid(),
+    state: s.enum("active", "disabled").default("active"),
+  }),
+  /**
+   * Exactly one binding per legacy board, enforced by using boardId as the
+   * binding row's deterministic primary ID in the server-only backfill.
+   */
+  boardWorkspaceBindings: s.table({
+    boardId: s.uuid(), workspaceId: s.uuid(),
+    version: s.int().default(1),
+  }, {
+    board: s.rel("boards", "boardId"),
+    workspace: s.rel("workspaces", "workspaceId"),
+  }).indexOnly(["boardId"]),
+  workspaceMemberships: s.table({
+    workspaceId: s.uuid(), actorId: s.uuid(),
+    role: s.enum("owner", "creator", "editor", "commenter", "viewer"),
+    state: s.enum("active", "disabled").default("active"),
+    version: s.int().default(1),
+    proof: s.enum("legacy_private_owner", "verified_better_auth"),
+  }, {
+    workspace: s.rel("workspaces", "workspaceId"),
+  }).indexOnly(["workspaceId", "actorId"]),
+  /**
+   * No independently assignable Base Owner. Legacy agent/admin roles
+   * remain ONLY in the old boardMembers table pending compatibility proof.
+   */
+  baseMemberships: s.table({
+    workspaceId: s.uuid(), boardId: s.uuid(), actorId: s.uuid(),
+    role: s.enum("creator", "editor", "commenter", "viewer"),
+    state: s.enum("active", "disabled").default("active"),
+    version: s.int().default(1),
+    // Shadow lineage only. Old and independent Base rows lack this value and
+    // MUST NOT be treated as current copies of legacy boardMembers.
+    legacyMemberId: s.uuid().optional(),
+  }, {
+    workspace: s.rel("workspaces", "workspaceId"),
+    board: s.rel("boards", "boardId"),
+  }).indexOnly(["boardId", "actorId"]),
+  /**
+   * One serialized workspace owner-set CAS conflict point, not independent
+   * owner membership writes. No external transfer API is enabled in PR1.
+   */
+  workspaceOwnerSets: s.table({
+    workspaceId: s.uuid(), version: s.int(),
+    ownerActorIds: s.json(),
+  }, { workspace: s.rel("workspaces", "workspaceId") }).indexOnly(["workspaceId"]),
+  workspaceAccountReceipts: s.table({
+    workspaceId: s.uuid(), actorId: s.uuid(),
+    operation: s.enum("legacy_backfill", "owner_transfer"),
+    requestId: s.string(), fingerprint: s.string(),
+    committedVersion: s.int(), result: s.json(),
+  }, { workspace: s.rel("workspaces", "workspaceId") })
+    .indexOnly(["workspaceId", "actorId", "requestId"]),
   boardMembers: s.table(
     {
       boardId: s.uuid(), userId: s.uuid(),
@@ -162,6 +222,13 @@ const agentOrEditor = (boardId: s.Uuid) => anyOf(
 );
 
 export const permissions = definePermissions({
+  // Guest/demo clients NEVER see or write private account or Space ancestry.
+  workspaces: { read: false, insert: false, update: false, delete: false },
+  boardWorkspaceBindings: { read: false, insert: false, update: false, delete: false },
+  workspaceMemberships: { read: false, insert: false, update: false, delete: false },
+  baseMemberships: { read: false, insert: false, update: false, delete: false },
+  workspaceOwnerSets: { read: false, insert: false, update: false, delete: false },
+  workspaceAccountReceipts: { read: false, insert: false, update: false, delete: false },
   boards: {
     read: true,
     insert: { ownerId: session.user },
