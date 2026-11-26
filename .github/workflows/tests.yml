@@ -6,6 +6,7 @@ on:
       - main
       - "epic/**"
       # Stacked Jazz access PRs must run the same checks before main.
+      - "review/**"
       - "feat/jazz-mcp-tailscale-migration"
       - "fix/jazz-route-shell-20261122"
   push:
