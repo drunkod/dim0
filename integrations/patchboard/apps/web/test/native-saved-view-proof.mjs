@@ -104,6 +104,7 @@ async function cleared(page,message){
   await expect(grid(page)).toHaveCount(0);
   await expect(page.getByText(/matching records/)).toHaveCount(0);
   await expect(page.getByRole("button",{name:"Next page"})).toBeDisabled();
+  await expect(page.getByRole("button",{name:"First page"})).toBeDisabled();
 }
 let stage="startup";
 try{
@@ -137,7 +138,7 @@ try{
   await op.getByRole("button",{name:"Open saved view Demo items"}).click();
   await see(op,"Demo alpha");
   assert.equal(await grid(op).locator("tbody tr").getAttribute("data-record-id"),records[0]);
-  await op.screenshot({path:join(evidence,"owner-data.png")});
+  await op.screenshot({animations:"disabled",path:join(evidence,"owner-data.png")});
   await op.keyboard.press("Escape");
   stage="copy actual link";
   await op.getByRole("button",{name:"Share this board"}).click();
@@ -165,7 +166,7 @@ try{
   await rp.getByRole("button",{name:"Next page"}).click();
   await see(rp,"Demo beta");
   assert.equal(await grid(rp).locator("tbody tr").getAttribute("data-record-id"),records[2]);
-  await rp.screenshot({path:join(evidence,"recipient-page-two.png")});
+  await rp.screenshot({animations:"disabled",path:join(evidence,"recipient-page-two.png")});
   console.log("NATIVE_COPIED_LINK_NONMEMBER_PASS",JSON.stringify({board,dataset,view,records:[records[0],records[2]],field:title,total:2,boardDenied:403,datasetDenied:403,grants:0}));
   stage="definition revision";
   assert.equal((await api(op,"records/views/revise",{...ref,expected_version:1,definition:definition("Demo alpha")})).status,200);
@@ -184,7 +185,7 @@ try{
   const denial=rp.waitForResponse(r=>r.url().endsWith("/records/views/query")&&r.status()===403);
   await rp.getByRole("button",{name:"Refresh view"}).click();await denial;
   await cleared(rp,/revoked or is unavailable/);
-  await rp.screenshot({path:join(evidence,"recipient-revoked.png")});
+  await rp.screenshot({animations:"disabled",path:join(evidence,"recipient-revoked.png")});
   await rp.reload();await cleared(rp,/revoked or is unavailable/);
   await stop(backend);await startBackend();await rp.reload();await cleared(rp,/revoked or is unavailable/);
   console.log("NATIVE_VIEW_REVOCATION_RELOAD_RESTART_PASS",JSON.stringify({http:403,gridCleared:true}));
@@ -219,22 +220,36 @@ try{
     membershipCount:0,oauthGrants:0,filteredTotal:2,definitionReset:true,at500:2,at501:"VIEW_DATASET_LIMIT_500",
     revokedPageFetch:403,clearedRowsAndCount:true,disabledPagination:true,reloadDenied:true,restartDenied:true,ownerRowsPreserved:3});
   stage="feature off";
-  await stop(backend);await startBackend("0");await stop(frontend);await startFrontend("0");
+  stage="feature off backend";await stop(backend);await startBackend("0");
+  stage="feature off build";await stop(frontend);await startFrontend("0");
+  stage="feature off board";
   await op.goto(origin+"/boards/"+board);await expect(op.getByRole("button",{name:"Share this board"})).toBeVisible(options);
   await expect(op.getByRole("button",{name:"Open board Data"})).toHaveCount(0);
+  stage="feature off Share";
   await op.getByRole("button",{name:"Share this board"}).click();
   await expect(op.getByRole("dialog").getByRole("button",{name:"Create link",exact:true})).toBeVisible(options);
   await expect(op.getByRole("region",{name:"Saved view links"})).toHaveCount(0);
+  stage="feature off ordinary invite";
+  const ordinary=op.waitForResponse(r=>r.url().endsWith("/api/invite")&&r.request().method()==="POST");
   await op.getByRole("dialog").getByRole("button",{name:"Create link",exact:true}).click();
+  assert.equal((await ordinary).status(),201);
   await expect(op.getByRole("dialog").getByLabel("Invitation link")).not.toHaveValue("",options);
-  await rp.goto(activeCopied);await expect(rp.getByText("Saved view unavailable",{exact:true})).toBeVisible(options);
-  await expect(grid(rp)).toHaveCount(0);
+  stage="feature off direct view";
+  // A fresh document proves the off build, rather than a same-fragment
+  // navigation that can retain the previous enabled JavaScript.
+  const offPage=await recipient.context.newPage();
+  await offPage.goto(activeCopied,{waitUntil:"domcontentloaded"});
+  await expect(offPage.getByRole("heading",{name:"Saved view unavailable",exact:true})).toBeVisible(options);
+  await expect(grid(offPage)).toHaveCount(0);
   assert.equal((await api(op,"records/views?board_id="+board)).status,404);
+  const activeToken=new URLSearchParams(new URL(activeCopied).hash.slice(1)).get("share");
+  assert.equal((await api(offPage,"records/views/query",{...ref,share_token:activeToken,page_size:1})).status,404);
+  await offPage.close();
   console.log("NATIVE_VIEW_FEATURE_OFF_PASS");
   console.log("NATIVE_SAVED_VIEW_ACCEPTANCE_PASS");
 }catch(error){
   // Never print an assertion URL, share token, cursor or cookie.
-  console.error("NATIVE_SAVED_VIEW_FAILURE",stage,error?.name??"Error");
+  console.error("NATIVE_SAVED_VIEW_FAILURE",stage,error?.name??"Error",String(error?.message??"").split("\n")[0].replace(/https?:\/\/[^\s]+/g,"[URL]").replace(/[A-Za-z0-9_-]{43,}/g,"[REDACTED]"));
   process.exitCode=1;
 }finally{
   await browser?.close().catch(()=>{});
