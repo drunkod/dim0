@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { execFileSync, spawn } from "node:child_process";
-import { openSync, closeSync, readFileSync } from "node:fs";
+import { openSync, closeSync, readFileSync, realpathSync } from "node:fs";
+import { DatabaseSync } from "node:sqlite";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -458,6 +459,95 @@ try {
     assert.equal(appletWrongBoard.isError, true);
     assert.match(appletWrongBoard.content[0].text, /BOARD_ACCESS_DENIED/);
     console.log("DIM0_JAZZ_OAUTH_MCP_APPLET_STATE_PASS", canvasId);
+
+    // Fault injection is confined to the private-ci harness's fresh loopback
+    // database. A server-minted receipt disappears AFTER transport admission
+    // but BEFORE tool dispatch. Every callback must independently deny.
+    if (process.env.PATCHBOARD_OAUTH_CI_RESTART === "1") {
+      const root = process.env.PATCHBOARD_PRIVATE_ROOT;
+      const port = Number(process.env.PATCHBOARD_PRIVATE_PORT);
+      assert.equal(process.env.PATCHBOARD_PRIVATE_DEV, "1");
+      assert.equal(origin, "http://localhost:" + port);
+      assert.ok(Number.isInteger(port) && port > 1024 && ![8791, 8792, 8793, 8794].includes(port));
+      assert.ok(root?.startsWith(join(tmpdir(), "patchboard-private-ci-")));
+      const fixtureRoot = realpathSync(root);
+      assert.ok(fixtureRoot.startsWith(join(realpathSync(tmpdir()), "patchboard-private-ci-")));
+      const dbPath = join(fixtureRoot, "auth", "better-auth.sqlite");
+      assert.equal(realpathSync(dbPath), dbPath);
+      const fixture = new DatabaseSync(dbPath);
+      const trigger = "qa_prune_callback_admission";
+      const snapshot = async () => {
+        const paths = [
+          "board?board_id=" + boardId,
+          "canvas?board_id=" + boardId,
+          "applet-state?board_id=" + boardId + "&note_id=" + canvasId,
+        ];
+        return Promise.all(paths.map(async path => {
+          const response = await context.request.get(origin + "/patchboard-private/api/" + path);
+          assert.equal(response.status(), 200);
+          return response.json();
+        }));
+      };
+      const before = await snapshot();
+      const deniedCalls = [
+        ["list_boards", {}],
+        ["read_board", { board_id: boardId }],
+        ["list_canvas_entities", { board_id: boardId }],
+        ["get_canvas_entity", { board_id: boardId, entity_id: canvasId }],
+        ["get_applet_state", { board_id: boardId, note_id: canvasId }],
+        ["create_note", { board_id: boardId, text: "Denied callback fixture", request_id: randomUUID() }],
+        ["create_canvas_entity", { board_id: boardId, kind: "node", payload: { ...baseEntity, id: randomUUID() } }],
+        ["update_canvas_entity", { board_id: boardId, entity_id: canvasId, expected_version: 2,
+          payload: { ...baseEntity, label: { markdown: "Denied callback update" } } }],
+        ["delete_canvas_entity", { board_id: boardId, entity_id: canvasId, expected_version: 2 }],
+        ["update_applet_state", { board_id: boardId, note_id: canvasId, expected_version: 1,
+          value: { count: 999 } }],
+      ];
+      assert.deepEqual(deniedCalls.map(([name]) => name).sort(),
+        (await writer.listTools()).tools.map(tool => tool.name).sort());
+      let installed = false;
+      try {
+        fixture.exec("PRAGMA busy_timeout=5000");
+        const grants = fixture.prepare("SELECT id FROM patchboard_oauth_grant WHERE client_id=? AND board_id=? AND revoked_at_ms IS NULL")
+          .all(issuedTokens.get(writeToken).clientId, boardId);
+        assert.equal(grants.length, 1);
+        const grantId = grants[0].id;
+        assert.match(grantId, /^[a-f0-9-]{36}$/i);
+        // Only this newly created synthetic OAuth client's admission rows.
+        fixture.exec("CREATE TRIGGER " + trigger + " AFTER INSERT ON patchboard_mcp_admission " +
+          "WHEN NEW.grant_id='" + grantId + "' BEGIN " +
+          "DELETE FROM patchboard_mcp_admission WHERE id=NEW.id; END;");
+        installed = true;
+        for (const [name, args] of deniedCalls) {
+          const result = await writer.callTool({ name, arguments: args });
+          assert.equal(result.isError, true, name + " must deny a pruned receipt");
+          assert.equal(result.content[0].text, "GRANT_ADMISSION_EXPIRED_OR_INVALID", name);
+        }
+        assert.deepEqual(await snapshot(), before, "Denied callbacks must leave durable data unchanged");
+        const { client: independent, connect: connectIndependent } = clientWithToken(readToken);
+        try {
+          await connectIndependent();
+          const allowed = await independent.callTool({ name: "read_board", arguments: { board_id: boardId } });
+          assert.equal(allowed.isError, undefined, "Independent read grant must remain usable");
+          const refused = await independent.callTool({ name: "create_note", arguments: {
+            board_id: boardId, text: "Denied read-only fixture", request_id: randomUUID(),
+          } }).catch(error => ({ rejected: String(error) }));
+          assert.ok(refused.rejected || refused.isError);
+          assert.deepEqual(await snapshot(), before, "Read-only denial must not write a note");
+        } finally { await independent.close(); }
+      } finally {
+        try { if (installed) fixture.exec("DROP TRIGGER " + trigger); }
+        finally { fixture.close(); }
+      }
+      const restored = await writer.callTool({ name: "get_canvas_entity", arguments: {
+        board_id: boardId, entity_id: canvasId,
+      } });
+      assert.equal(restored.isError, undefined);
+      assert.deepEqual(await snapshot(), before);
+      console.log("PRIVATE_MCP_ALL_CALLBACK_ADMISSION_FENCES_PASS",
+        JSON.stringify({ denied: deniedCalls.map(([name]) => name), unchanged: true,
+          independentGrantUsable: true, freshAdmissionUsable: true }));
+    }
 
     const canvasDelete = await writer.callTool({
       name: "delete_canvas_entity",
