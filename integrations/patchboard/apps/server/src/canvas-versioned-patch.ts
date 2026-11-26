@@ -58,6 +58,22 @@ const fingerprint=(input:CanvasVersionedPatchInput)=>createHash("sha256")
     expectedVersion:input.expectedVersion,patch:input.patch
   })).digest("hex");
 
+/**
+ * Server-only opaque durable correlation for a recovered MCP grant lease.
+ * This contains IDs, versions and SHA-256; never stores a note label in SQL.
+ * It is the SAME identity function used by the Jazz mutation itself.
+ */
+export function canvasPatchOperationIdentity(input:CanvasVersionedPatchInput){
+  validateInput(input);
+  return {
+    tool:"patch_canvas_entity" as const,
+    boardId:input.boardId,actorId:input.actorId,
+    entityId:jazzCanvasStorageId(input.id),requestId:input.requestId,
+    expectedVersion:input.expectedVersion,
+    ...ids(input),fingerprint:fingerprint(input),
+  };
+}
+
 function validateInput(input:CanvasVersionedPatchInput):void {
   if(!input.actorId || !Number.isSafeInteger(input.expectedVersion) ||
     input.expectedVersion<1 || !/^[a-zA-Z0-9_-]{1,128}$/.test(input.requestId) ||
@@ -97,10 +113,7 @@ export async function patchCanvasLabelMarkdown(
     beforeWriteSubmit?:()=>void;
   }>={}
 ):Promise<CanvasPatchResult> {
-  validateInput(input);
-  const storageId=jazzCanvasStorageId(input.id);
-  const {receiptId,eventId}=ids(input);
-  const inputHash=fingerprint(input);
+  const {entityId:storageId,receiptId,eventId,fingerprint:inputHash}=canvasPatchOperationIdentity(input);
   await options.beforeTransaction?.();
   options.beforeWriteSubmit?.();
   const result=await db.serializableTransaction(async tx=>{

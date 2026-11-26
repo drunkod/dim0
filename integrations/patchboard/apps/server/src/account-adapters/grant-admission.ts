@@ -112,6 +112,23 @@ export function installGrantAdmissionLedger(db:DatabaseSync):void {
     event_type TEXT NOT NULL, occurred_at_ms INTEGER NOT NULL,
     safe_context TEXT NOT NULL
   );`);
+  // Rehearsed additive upgrade: the earlier sprint's leases have no durable
+  // operation identity and MUST remain unresolved, never inferred from version.
+  db.exec("BEGIN IMMEDIATE");
+  try{
+    const writeLeaseCols=new Set((db.prepare(
+      "PRAGMA table_info(patchboard_mcp_write_lease)").all() as {name:string}[])
+      .map(x=>x.name));
+    if(!writeLeaseCols.has("tool_name")) db.exec(
+      "ALTER TABLE patchboard_mcp_write_lease ADD COLUMN tool_name TEXT NOT NULL DEFAULT 'unattributed'");
+    if(!writeLeaseCols.has("operation_identity")) db.exec(
+      "ALTER TABLE patchboard_mcp_write_lease ADD COLUMN operation_identity TEXT");
+    if(!writeLeaseCols.has("verified_subject_id")) db.exec(
+      "ALTER TABLE patchboard_mcp_write_lease ADD COLUMN verified_subject_id TEXT");
+    if(!writeLeaseCols.has("verified_board_id")) db.exec(
+      "ALTER TABLE patchboard_mcp_write_lease ADD COLUMN verified_board_id TEXT");
+    db.exec("COMMIT");
+  }catch(error){db.exec("ROLLBACK");throw error;}
 }
 function grantRow(db:DatabaseSync,id:string):Row|undefined {
   return db.prepare(`SELECT id,user_id,client_id,board_id,

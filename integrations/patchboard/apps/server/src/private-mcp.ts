@@ -22,7 +22,7 @@ import {
   CanvasPermissionDenied, CanvasConflict, CanvasInvalid, type CanvasPayload,
 } from "./canvas-entity-service.ts";
 import { getSharedAppletState, saveSharedAppletState } from "./applet-state-service.ts";
-import { patchCanvasLabelMarkdown, CanvasPatchRequestConflict, CanvasPatchCommitUnknown } from "./canvas-versioned-patch.ts";
+import { patchCanvasLabelMarkdown, canvasPatchOperationIdentity, CanvasPatchRequestConflict, CanvasPatchCommitUnknown } from "./canvas-versioned-patch.ts";
 import { privateAuthConfig } from "./private-auth/config.ts";
 import { privateAuthDatabase } from "./private-auth/db.ts";
 import { requireConsentBoundBoardGrant, type VerifiedBoardGrant } from "./private-auth/grants.ts";
@@ -32,7 +32,7 @@ import {
 } from "./account-adapters/grant-admission.ts";
 import {
   beginProtectedMcpWriteLease, runReservedMcpWrite,
-  type ProtectedMcpWriteLease,
+  type ProtectedMcpWriteLease, type McpLeaseOperation,
 } from "./account-adapters/grant-write-drain.ts";
 
 const boardId = z.string().uuid();
@@ -90,9 +90,10 @@ async function executePrivateMcp(
     throw new Error("ACC051_QA_PAUSE_EXPIRED");
   };
   /** Every write tool reserves a durable SQL drain lease before Jazz work. */
-  const withWriteLease=async<T>(action:()=>Promise<T>,requestId?:string):Promise<T|ReturnType<typeof errorText>>=>{
+  const withWriteLease=async<T>(action:()=>Promise<T>,requestId?:string,
+    operation?:McpLeaseOperation):Promise<T|ReturnType<typeof errorText>>=>{
     await qaPause("admitted",requestId);
-    const lease=beginProtectedMcpWriteLease(privateAuthDatabase(),admission,grant);
+    const lease=beginProtectedMcpWriteLease(privateAuthDatabase(),admission,grant,operation);
     if(!lease)return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
     return writeContext.run(lease,()=>runReservedMcpWrite(privateAuthDatabase(),lease,async()=>{
       await qaPause("leased",requestId);
@@ -163,7 +164,7 @@ async function executePrivateMcp(
         : error instanceof PersistedWriteRejectedError ? "WRITE_REJECTED"
         : "WRITE_FAILED: Check read_board before retrying");
     }
-  },request_id));
+  },request_id,{tool:"create_note"}));
 
   // Dim0 JSON entities remain in Jazz; every tool is scoped to this OAuth grant.
   const canvasFailure = (error: unknown) => errorText(
@@ -218,7 +219,7 @@ async function executePrivateMcp(
       const entity = await createCanvasEntity(db, { boardId: board_id, actorId, kind, payload });
       return output({ id: entity.id, board_id, version: entity.version });
     } catch (error) { return canvasFailure(error); }
-  }));
+  },undefined,{tool:"create_canvas_entity"}));
 
   if (canWrite()) mcpServer.registerTool("update_canvas_entity", {
     description: "Replace a Dim0 node/link payload with a version check; always read the current entity first.",
@@ -237,7 +238,7 @@ async function executePrivateMcp(
       });
       return output({ id: entity.id, board_id, version: entity.version });
     } catch (error) { return canvasFailure(error); }
-  }));
+  },undefined,{tool:"update_canvas_entity"}));
 
   if (canWrite()) mcpServer.registerTool("patch_canvas_entity", {
     description:"Patch one canvas note label.markdown with version CAS and a stable request_id; authoritative Jazz transaction writes entity, receipt and audit event once.",
@@ -259,7 +260,15 @@ async function executePrivateMcp(
       },{beforeWriteSubmit});
       return output(updated);
     } catch(error){return canvasFailure(error);}
-  },request_id));
+  },request_id,{
+    tool:"patch_canvas_entity",
+    // An out-of-grant board is rejected by the callback with the existing
+    // BOARD_ACCESS_DENIED contract. It cannot mint another board's SQL identity.
+    ...(board_id===grant.boardId && Number.isSafeInteger(expected_version) && /^[A-Za-z0-9_-]{1,128}$/.test(request_id) ? {identity:canvasPatchOperationIdentity({
+      boardId:board_id,actorId,id:entity_id,expectedVersion:expected_version,
+      requestId:request_id,patch:field_patch,
+    })} : {}),
+  }));
 
   if (canWrite()) mcpServer.registerTool("delete_canvas_entity", {
     description: "Delete a node/link by UUID with a current version check. Destructive action.",
@@ -276,7 +285,7 @@ async function executePrivateMcp(
         boardId: board_id, actorId, id: entity_id, expectedVersion: expected_version,
       }));
     } catch (error) { return canvasFailure(error); }
-  }));
+  },undefined,{tool:"delete_canvas_entity"}));
 
   // Applet runtime data uses a separate Jazz state revision so a counter
   // click never mutates its canvas geometry/source version.
@@ -308,7 +317,7 @@ async function executePrivateMcp(
         actorId, expectedVersion: expected_version, value,
       }));
     } catch (error) { return canvasFailure(error); }
-  }));
+  },undefined,{tool:"update_applet_state"}));
 
   response.once("close", () => { void mcpServer.close().catch(() => {}); });
   try {
