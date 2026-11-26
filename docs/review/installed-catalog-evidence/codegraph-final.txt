@@ -1,0 +1,165 @@
+
+CodeGraph Status
+
+Project: /Users/test/work/patchwork/dim0-pr-qa-installed-catalog
+
+Index Statistics:
+  Files:     1,563
+  Nodes:     23,980
+  Edges:     59,340
+  DB Size:   78.49 MB
+  Backend:   node:sqlite — built-in (full WAL)
+  Journal:   wal
+
+Nodes by Kind:
+  import          6,963
+  function        4,924
+  property        4,515
+  constant        2,142
+  file            1,544
+  type_alias      1,314
+  method          1,137
+  variable        522
+  class           463
+  interface       242
+  route           189
+  component       22
+  struct          3
+
+Files by Language:
+  typescript      829
+  python          341
+  tsx             295
+  javascript      73
+  yaml            19
+  rust            6
+
+✓ Index is up to date
+
+
+Callers of "qaHttpsCatalogProfile" (16):
+
+function qaHttpsCatalogProfile (typescript) — integrations/patchboard/apps/server/src/qa-https-catalog-profile.ts:28
+constant    profile
+  integrations/patchboard/apps/server/test/audit-https-catalog.mjs:9
+
+constant    server
+  integrations/patchboard/apps/server/src/private-demo.ts:22
+
+constant    httpsCatalog
+  integrations/patchboard/apps/server/src/private-demo.ts:15
+
+constant    httpsCatalog
+  integrations/patchboard/apps/server/src/private-auth/auth.ts:15
+
+function    privateBoardRequest
+  integrations/patchboard/apps/server/src/private-board-routes.ts:66
+
+function    oauthConsentPage
+  integrations/patchboard/apps/server/src/private-auth/oauth-ui.ts:11
+
+function    qaHttpsCatalogBoardAllowed
+  integrations/patchboard/apps/server/src/qa-https-catalog-profile.ts:98
+
+function    handlePrivateMcp
+  integrations/patchboard/apps/server/src/private-mcp.ts:484
+
+function    handlePrivateAuth
+  integrations/patchboard/apps/server/src/private-auth/http.ts:38
+
+file        auth.ts [imports]
+  integrations/patchboard/apps/server/src/private-auth/auth.ts:1
+
+file        http.ts [imports]
+  integrations/patchboard/apps/server/src/private-auth/http.ts:1
+
+file        oauth-ui.ts [imports]
+  integrations/patchboard/apps/server/src/private-auth/oauth-ui.ts:1
+
+file        private-board-routes.ts [imports]
+  integrations/patchboard/apps/server/src/private-board-routes.ts:1
+
+file        private-demo.ts [imports]
+  integrations/patchboard/apps/server/src/private-demo.ts:1
+
+file        private-mcp.ts [imports]
+  integrations/patchboard/apps/server/src/private-mcp.ts:1
+
+file        audit-https-catalog.mjs [imports]
+  integrations/patchboard/apps/server/test/audit-https-catalog.mjs:1
+
+
+Callers of "qaHttpsCatalogBoardAllowed" (4):
+
+function qaHttpsCatalogBoardAllowed (typescript) — integrations/patchboard/apps/server/src/qa-https-catalog-profile.ts:98
+function    tableCreateConsented
+  integrations/patchboard/apps/server/src/private-mcp.ts:86
+
+function    privateBoardRequest
+  integrations/patchboard/apps/server/src/private-board-routes.ts:66
+
+file        private-board-routes.ts [imports]
+  integrations/patchboard/apps/server/src/private-board-routes.ts:1
+
+file        private-mcp.ts [imports]
+  integrations/patchboard/apps/server/src/private-mcp.ts:1
+
+
+Callers of "createTextTable" (8):
+
+function createTextTable (typescript) — integrations/patchboard/apps/server/src/typed-catalog.ts:74
+constant    result
+  integrations/patchboard/apps/server/test/grant-drain-worker.mjs:71
+
+file        typed-catalog-migration.test.mjs
+  integrations/patchboard/apps/server/test/typed-catalog-migration.test.mjs:1
+
+file        typed-catalog.test.mjs
+  integrations/patchboard/apps/server/test/typed-catalog.test.mjs:1
+
+function    executePrivateMcp
+  integrations/patchboard/apps/server/src/private-mcp.ts:65
+
+function    privateBoardRequest
+  integrations/patchboard/apps/server/src/private-board-routes.ts:66
+
+file        private-board-routes.ts [imports]
+  integrations/patchboard/apps/server/src/private-board-routes.ts:1
+
+file        private-mcp.ts [imports]
+  integrations/patchboard/apps/server/src/private-mcp.ts:1
+
+file        grant-drain-worker.mjs [imports]
+  integrations/patchboard/apps/server/test/grant-drain-worker.mjs:1
+
+
+Callers of "listOwnerSavedTypedViews" — 2 distinct definitions (narrow with --file):
+
+function listOwnerSavedTypedViews (typescript) — integrations/patchboard/apps/server/src/typed-shared-view.ts:401 (4):
+
+file        typed-shared-view.test.mjs
+  integrations/patchboard/apps/server/test/typed-shared-view.test.mjs:1
+
+function    privateBoardRequest
+  integrations/patchboard/apps/server/src/private-board-routes.ts:66
+
+file        private-board-routes.ts [imports]
+  integrations/patchboard/apps/server/src/private-board-routes.ts:1
+
+file        grant-drain-worker.mjs [imports]
+  integrations/patchboard/apps/server/test/grant-drain-worker.mjs:1
+
+
+function listOwnerSavedTypedViews (typescript) — integrations/patchboard/apps/server/test/fixtures/pre-native-catalog-schema/typed-shared-view.ts:401 (0):
+
+  (no callers)
+
+Callers of "reconcileTerminatedCatalogWriteLease" (2):
+
+function reconcileTerminatedCatalogWriteLease (typescript) — integrations/patchboard/apps/server/src/account-adapters/catalog-lease-recovery.ts:52
+constant    unfenced
+  integrations/patchboard/apps/server/test/grant-drain-worker.mjs:77
+
+file        grant-drain-worker.mjs [imports]
+  integrations/patchboard/apps/server/test/grant-drain-worker.mjs:1
+

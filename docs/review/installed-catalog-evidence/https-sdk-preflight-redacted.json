@@ -1,0 +1,125 @@
+{
+  "origin": "https://dim0-catalog.localhost:57439",
+  "board": "01a21986-661d-7ef1-94ca-519f0f3ff86c",
+  "asset": "/assets/index-DlH0LwUW.js",
+  "assetSha256": "626a5b2b7e940174cd111e4b0b0187120c5bac70fc877c675cdaea8107313f48",
+  "archiveSha256": "b2abd28937ca8ea3e7e414d4d9b1fc49b3fac105899f11952da3eb11c4497ff7",
+  "archiveKind": "LOCAL_FIXTURE_ONLY",
+  "browserCreateStatus": 404,
+  "legacyRedirect": 302,
+  "wrongHost": 421,
+  "initial": {
+    "typedDatasets": 0,
+    "typedFields": 0,
+    "typedViews": 0,
+    "typedRecords": 0,
+    "typedCatalogReceipts": 0,
+    "typedCatalogEvents": 0,
+    "typedPatchReceipts": 0,
+    "typedPatchEvents": 0
+  },
+  "forgedConsentStatus": 403,
+  "oldScopeDenied": true,
+  "otherTypedBrowserWritesDenied": true,
+  "stoppedStoreAudit": {
+    "boardId": "01a21986-661d-7ef1-94ca-519f0f3ff86c",
+    "counts": {
+      "datasets": 1,
+      "fields": 1,
+      "views": 1,
+      "receipts": 1,
+      "events": 1,
+      "records": 0
+    },
+    "ids": {
+      "datasets": [
+        "20a9cdea-301f-5e13-a886-00335e23e5ad"
+      ],
+      "fields": [
+        "56632f4f-d4a6-5b62-8b8b-3ac4e5a41b02"
+      ],
+      "views": [
+        "76fc2f10-b3f1-51b9-9b67-ee9d7959d272"
+      ],
+      "receipts": [
+        "1ecd4fc2-0bb6-5256-891b-f276af49f614"
+      ],
+      "events": [
+        "720e054c-6893-562c-b293-6d4671ffd88b"
+      ],
+      "records": []
+    },
+    "grants": [
+      {
+        "id": "c40ab8b5-b0c2-46c7-9156-63a7a13087ca",
+        "version": 1,
+        "revoked": false,
+        "scopes": [
+          "board:read",
+          "board:write"
+        ]
+      },
+      {
+        "id": "0a6d02ae-877b-442a-88e9-fc894e3e0c18",
+        "version": 2,
+        "revoked": true,
+        "scopes": [
+          "board:read",
+          "board:write",
+          "table:create"
+        ]
+      }
+    ]
+  },
+  "consentedScopes": [
+    "board:read",
+    "board:write",
+    "table:create"
+  ],
+  "first": {
+    "operation": "dataset.create.v1",
+    "boardId": "01a21986-661d-7ef1-94ca-519f0f3ff86c",
+    "datasetId": "20a9cdea-301f-5e13-a886-00335e23e5ad",
+    "fieldId": "56632f4f-d4a6-5b62-8b8b-3ac4e5a41b02",
+    "defaultViewId": "76fc2f10-b3f1-51b9-9b67-ee9d7959d272",
+    "schemaVersion": 1,
+    "receiptId": "1ecd4fc2-0bb6-5256-891b-f276af49f614",
+    "eventId": "720e054c-6893-562c-b293-6d4671ffd88b",
+    "replayed": false
+  },
+  "replay": {
+    "operation": "dataset.create.v1",
+    "boardId": "01a21986-661d-7ef1-94ca-519f0f3ff86c",
+    "datasetId": "20a9cdea-301f-5e13-a886-00335e23e5ad",
+    "fieldId": "56632f4f-d4a6-5b62-8b8b-3ac4e5a41b02",
+    "defaultViewId": "76fc2f10-b3f1-51b9-9b67-ee9d7959d272",
+    "schemaVersion": 1,
+    "receiptId": "1ecd4fc2-0bb6-5256-891b-f276af49f614",
+    "eventId": "720e054c-6893-562c-b293-6d4671ffd88b",
+    "replayed": true
+  },
+  "native": {
+    "datasetId": "20a9cdea-301f-5e13-a886-00335e23e5ad",
+    "defaultViewId": "76fc2f10-b3f1-51b9-9b67-ee9d7959d272",
+    "fieldId": "56632f4f-d4a6-5b62-8b8b-3ac4e5a41b02"
+  },
+  "afterRestart": {
+    "datasetId": "20a9cdea-301f-5e13-a886-00335e23e5ad",
+    "defaultViewId": "76fc2f10-b3f1-51b9-9b67-ee9d7959d272",
+    "fieldId": "56632f4f-d4a6-5b62-8b8b-3ac4e5a41b02"
+  },
+  "postDisconnectHttp": 401,
+  "postDisconnectCounts": {
+    "typedDatasets": 1,
+    "typedFields": 1,
+    "typedViews": 1,
+    "typedRecords": 0,
+    "typedCatalogReceipts": 1,
+    "typedCatalogEvents": 1,
+    "typedPatchReceipts": 0,
+    "typedPatchEvents": 0
+  },
+  "installedChatGPTPluginTested": false,
+  "publicFunnelStarted": false,
+  "expiredSealStatus": 503
+}
