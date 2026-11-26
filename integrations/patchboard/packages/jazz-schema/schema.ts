@@ -147,6 +147,26 @@ export const schema = s.defineSchema({
     },
     { board: s.rel("boards", "boardId") },
   ).indexOnly(["boardId", "kind"]),
+  /**
+   * ACC-051 canvas field-patch receipts/events are backend-only. The receipt
+   * stores the committed vN snapshot for safe lost-response replay; the event
+   * carries one sanitized attribution for each actual mutation. Both insert
+   * in the SAME serializable Jazz transaction as the canvas entity update.
+   */
+  canvasPatchReceipts: s.table({
+    boardId: s.uuid(), entityId: s.uuid(), actorId: s.uuid(),
+    requestId: s.string(), fingerprint: s.string(),
+    previousVersion: s.int(), committedVersion: s.int(),
+    committedPayload: s.json(), eventId: s.uuid(),
+  }, { board: s.rel("boards", "boardId") })
+    .indexOnly(["boardId", "actorId", "requestId"]),
+  canvasPatchEvents: s.table({
+    boardId: s.uuid(), entityId: s.uuid(), actorId: s.uuid(),
+    requestId: s.string(), receiptId: s.uuid(),
+    previousVersion: s.int(), committedVersion: s.int(),
+    field: s.enum("label.markdown"),
+  }, { board: s.rel("boards", "boardId") })
+    .indexOnly(["boardId", "entityId"]),
   /** Per-applet shared runtime state, separate from versioned Canvas geometry.
    * Serializability and optimistic CAS prevent lost counter updates. */
   appletStates: s.table(
@@ -262,6 +282,8 @@ export const permissions = definePermissions({
     update: false,
     delete: false,
   },
+  canvasPatchReceipts: { read: false, insert: false, update: false, delete: false },
+  canvasPatchEvents: { read: false, insert: false, update: false, delete: false },
   appletStates: {
     read: (row) => member(row.boardId),
     insert: false,

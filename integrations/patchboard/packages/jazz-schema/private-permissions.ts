@@ -50,6 +50,8 @@ export const privatePermissions = definePermissions({
     update: false,
     delete: false,
   },
+  canvasPatchReceipts: { read: false, insert: false, update: false, delete: false },
+  canvasPatchEvents: { read: false, insert: false, update: false, delete: false },
   appletStates: {
     read: (row) => mayRead(row.boardId),
     insert: false,

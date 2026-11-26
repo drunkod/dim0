@@ -203,7 +203,7 @@ async function oauthGrant(grantScopes, targetPage = page, selectedBoardId) {
  * staging process. Never restart a user's running 8791/8792 demos.
  */
 let ciReplacementGroup;
-async function restartPrivateCiFixture() {
+async function restartPrivateCiFixture(audit) {
   const root = process.env.PATCHBOARD_PRIVATE_ROOT;
   const port = Number(process.env.PATCHBOARD_PRIVATE_PORT);
   assert.ok(root?.startsWith(join(tmpdir(), "patchboard-private-ci-")),
@@ -225,6 +225,17 @@ async function restartPrivateCiFixture() {
     await new Promise(done => setTimeout(done, 100));
   }
   assert.ok(stopped, "Disposable server did not stop");
+  // The HTTP listener closing is not sufficient evidence that Jazz has
+  // closed its store. Wait for this identified disposable server process.
+  let exited = false;
+  for (let i = 0; i < 100; i++) {
+    try { process.kill(pid, 0); }
+    catch (error) { if (error.code !== "ESRCH") throw error; exited = true; break; }
+    await new Promise(done => setTimeout(done, 100));
+  }
+  assert.ok(exited, "Disposable Jazz process must exit before offline audit");
+  if (audit) await audit();
+
   const outputFile = openSync(join(root, "private-restart.log"), "a", 0o600);
   const child = spawn("pnpm", ["--filter", "@patchboard/server", "exec", "tsx",
     "src/private-demo.ts"], {
@@ -248,9 +259,9 @@ async function restartPrivateCiFixture() {
   assert.ok(recovered, "Disposable server did not recover");
   return true;
 }
-async function restartPublicStaging() {
+async function restartPublicStaging(audit) {
   if (process.env.PATCHBOARD_OAUTH_CI_RESTART === "1") {
-    return restartPrivateCiFixture();
+    return restartPrivateCiFixture(audit);
   }
   const root = "/Users/test/work/patchwork/demo/patchboard-private-oauth-public-staging";
   if (process.env.PATCHBOARD_OAUTH_STAGING_RESTART !== "1") return false;
@@ -389,7 +400,7 @@ try {
   try {
     await connectWriter();
     assert.deepEqual((await writer.listTools()).tools.map(t => t.name).sort(),
-      ["create_canvas_entity", "create_note", "delete_canvas_entity", "get_applet_state", "get_canvas_entity", "list_boards", "list_canvas_entities", "read_board", "update_applet_state", "update_canvas_entity"]);
+      ["create_canvas_entity", "create_note", "delete_canvas_entity", "get_applet_state", "get_canvas_entity", "list_boards", "list_canvas_entities", "patch_canvas_entity", "read_board", "update_applet_state", "update_canvas_entity"]);
     // New Dim0 entity API: an actual OAuth MCP client can mutate full
     // applet/note JSON through Jazz, with CAS and board scope enforced.
     const canvasId = randomUUID();
@@ -500,6 +511,8 @@ try {
         ["create_canvas_entity", { board_id: boardId, kind: "node", payload: { ...baseEntity, id: randomUUID() } }],
         ["update_canvas_entity", { board_id: boardId, entity_id: canvasId, expected_version: 2,
           payload: { ...baseEntity, label: { markdown: "Denied callback update" } } }],
+        ["patch_canvas_entity", { board_id: boardId, entity_id: canvasId, expected_version: 2,
+          request_id: randomUUID(), field_patch: { label_markdown: "Denied patch callback" } }],
         ["delete_canvas_entity", { board_id: boardId, entity_id: canvasId, expected_version: 2 }],
         ["update_applet_state", { board_id: boardId, note_id: canvasId, expected_version: 1,
           value: { count: 999 } }],
@@ -813,6 +826,15 @@ try {
           const { client: editorMcp, connect: connectEditor } = clientWithToken(editorToken);
           try {
             await connectEditor();
+            let canvasQaReport = null;
+            if (process.env.PATCHBOARD_OAUTH_CI_RESTART === "1") {
+              const { proveAcc051LiveCanvasPatch } = await import("./acc051-live-versioned-patch.mjs");
+              canvasQaReport = await proveAcc051LiveCanvasPatch({
+                boardId, siblingBoardId: secondBoardId, ownerPage: page, editorPage, viewerPage,
+                editorMcp, viewerMcp, readOnlyToken: readToken, makeMcp: clientWithToken,
+                editorActorId: editorMe.accountId,
+              });
+            }
             const request_id = "same-operation-" + randomUUID();
             const ownerText = "Owner wrote " + randomUUID().slice(0, 8);
             const editorText = "Editor wrote " + randomUUID().slice(0, 8);
@@ -910,6 +932,49 @@ try {
               boardId, noteId: beforeMove.id, editedBy: editorMe.accountId,
               retainedAuthor: ownerMe.accountId, viewerStatus: viewerDenied,
             }));
+        if (canvasQaReport) {
+          // Real owner role mutation; the editor token remains live. Check
+          // both transports before restoring the editor for #12's later proof.
+          const setRole = async (role, version) => page.evaluate(async input => {
+            const response = await fetch("/patchboard-private/api/members/role", {
+              method: "POST", credentials: "same-origin",
+              headers: { "content-type": "application/json" }, body: JSON.stringify(input),
+            });
+            return {status: response.status, body: await response.json()};
+          }, {board_id: boardId, user_id: editorMe.accountId, role,
+              expected_version: version, request_id: randomUUID()});
+          const members = await page.evaluate(async id =>
+            (await (await fetch("/patchboard-private/api/members?board_id=" + id)).json()).members, boardId);
+          const editor = members.find(m => m.id === editorMe.accountId);
+          assert.equal(editor.role, "editor");
+          const downgraded = await setRole("viewer", editor.role_version);
+          assert.equal(downgraded.status, 200);
+          assert.equal(downgraded.body.role_version, editor.role_version + 1);
+          const read = await editorMcp.callTool({name:"get_canvas_entity",arguments:{
+            board_id:boardId,entity_id:canvasQaReport.entityIds.primary,
+          }});
+          assert.equal(read.isError, undefined, "Editor grant remains live as viewer");
+          const replay = {board_id:boardId,entity_id:canvasQaReport.entityIds.primary,
+            expected_version:7,request_id:canvasQaReport.stableRequestId,
+            field_patch:canvasQaReport.fieldPatch};
+          const denied = await editorMcp.callTool({name:"patch_canvas_entity",arguments:replay});
+          assert.equal(denied.isError,true);
+          assert.equal(denied.content[0].text,"BOARD_ACCESS_DENIED");
+          const browserDenied=await editorPage.evaluate(async body=>{
+            const response=await fetch("/patchboard-private/api/canvas/patch",{
+              method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},
+              body:JSON.stringify(body),
+            });
+            return response.status;
+          },replay);
+          assert.equal(browserDenied,403);
+          const restored=await setRole("editor",downgraded.body.role_version);
+          assert.equal(restored.status,200);
+          assert.equal(restored.body.role_version,downgraded.body.role_version+1);
+          console.log("ACC051_REPLAY_AFTER_ROLE_DOWNGRADE_DENIED_PASS",JSON.stringify({
+            mcpError:denied.content[0].text,browserStatus:browserDenied,grantStillReadable:true,roleRestoredForSeparateProof:true,
+          }));
+        }
         const evidenceDir = process.env.PATCHBOARD_OAUTH_EVIDENCE_DIR;
         if (evidenceDir) {
           assert.ok(isAbsolute(evidenceDir), "Evidence path must be absolute");
@@ -926,7 +991,11 @@ try {
             authorEvidence, browserErrors,
           }, null, 2), { mode: 0o600 });
         }
-        if (await restartPublicStaging()) {
+        let canvasAudit;
+        if (await restartPublicStaging(canvasQaReport ? async () => {
+          const {auditAcc051CanvasPatch}=await import("./acc051-write-audit.mjs");
+          canvasAudit=await auditAcc051CanvasPatch(canvasQaReport);
+        } : undefined)) {
           await Promise.all([page.reload(), viewerPage.reload(), editorPage.reload()]);
           await Promise.all([page, viewerPage, editorPage].map(async current => {
             await expect(current.getByRole("heading", { name: boardTitle }))
@@ -993,6 +1062,32 @@ try {
                 recoveredExactId: true, oauthTokenRemainedValid: true,
                 browserErrors,
               }, null, 2), { mode: 0o600 });
+            }
+            if (canvasQaReport) {
+              assert.equal(canvasAudit.persistedReceiptCount,2);
+              assert.equal(canvasAudit.persistedEventCount,2);
+              const ownerAfter=await page.evaluate(async({boardId,entityId})=>{
+                const response=await fetch("/patchboard-private/api/canvas/entity?"+
+                  new URLSearchParams({board_id:boardId,entity_id:entityId}),{cache:"no-store"});
+                return {status:response.status,body:await response.json()};
+              },{boardId,entityId:canvasQaReport.entityIds.primary});
+              assert.equal(ownerAfter.status,200);
+              assert.equal(ownerAfter.body.id,canvasQaReport.entityIds.primary);
+              assert.equal(ownerAfter.body.version,8);
+              assert.equal(ownerAfter.body.updatedBy,editorMe.accountId);
+              assert.equal(ownerAfter.body.payload.label.markdown,canvasQaReport.fieldPatch.label_markdown);
+              assert.equal(ownerAfter.body.payload.content.markdown,"preserved-content");
+              const ownerSdk=await afterRestart.callTool({name:"get_canvas_entity",arguments:{
+                board_id:boardId,entity_id:canvasQaReport.entityIds.primary,
+              }});
+              assert.equal(ownerSdk.isError,undefined);
+              assert.deepEqual(JSON.parse(ownerSdk.content[0].text),ownerAfter.body);
+              const summary={entityId:ownerAfter.body.id,version:8,updatedBy:ownerAfter.body.updatedBy,
+                label:ownerAfter.body.payload.label.markdown,contentPreserved:true,
+                writerMatchesEditor:true,ownerHttpAndMcpMatch:true,receipts:canvasAudit.persistedReceiptCount,
+                events:canvasAudit.persistedEventCount,raceWinner:canvasQaReport.raceWinner};
+              console.log("ACC051_INDEPENDENT_OWNER_RELOAD_RESTART_PASS",JSON.stringify(summary));
+              if(evidenceDir)await writeFile(join(evidenceDir,"canvas-owner-restart.json"),JSON.stringify(summary,null,2)+"\n",{mode:0o600});
             }
             // Reuse the editor's real OAuth grant only AFTER all its normal
             // acceptance and restart assertions. No extra DCR or rate-limit change.

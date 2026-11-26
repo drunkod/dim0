@@ -17,6 +17,7 @@ import {
   CanvasPermissionDenied, CanvasConflict, CanvasInvalid, type CanvasPayload,
 } from "./canvas-entity-service.ts";
 import { getSharedAppletState, saveSharedAppletState } from "./applet-state-service.ts";
+import { patchCanvasLabelMarkdown, CanvasPatchRequestConflict, CanvasPatchCommitUnknown } from "./canvas-versioned-patch.ts";
 import {
   changePrivateNote, createMcpNote, DemoBoardMissing, PrivatePermissionDenied,
   readBoard, RequestIdConflict, requirePrivateBoardAccess,
@@ -328,6 +329,18 @@ export async function privateBoardRequest(
         boardId: parsed.board_id, actorId: accountId, kind: parsed.kind, payload: parsed.payload,
       }), 201);
     }
+    if (pathname === "/patchboard-private/api/canvas/patch" && request.method === "POST") {
+      const parsed=z.object({
+        board_id:boardIdSchema,entity_id:entityIdSchema,
+        expected_version:z.number().int().positive(),request_id:requestSchema,
+        field_patch:z.object({label_markdown:z.string().max(2000)}).strict()
+      }).strict().parse(await safeJson(request, 20_480));
+      return json(await patchCanvasLabelMarkdown(db,{
+        boardId:parsed.board_id,actorId:accountId,id:parsed.entity_id,
+        expectedVersion:parsed.expected_version,requestId:parsed.request_id,
+        patch:parsed.field_patch
+      }));
+    }
     if (pathname === "/patchboard-private/api/canvas/update" && request.method === "POST") {
       const parsed = z.object({
         board_id: boardIdSchema, entity_id: entityIdSchema,
@@ -357,6 +370,8 @@ export async function privateBoardRequest(
     if (error instanceof RequestIdConflict) return json({ error: "Request ID conflict" }, 409);
     if (error instanceof CanvasPermissionDenied) return json({ error: "Canvas access denied" }, 403);
     if (error instanceof CanvasConflict) return json({ error: "Canvas version conflict" }, 409);
+    if (error instanceof CanvasPatchRequestConflict) return json({error:"Request ID conflict"},409);
+    if (error instanceof CanvasPatchCommitUnknown) return json({error:"Commit outcome unknown",request_id:error.requestId,retry_same_request_only:true},503);
     if (error instanceof CanvasInvalid) return json({ error: "Invalid canvas payload" }, 400);
     // Intentionally do not expose internal Jazz or Better Auth errors over HTTP.
     return json({ error: "Private operation failed" }, 503);

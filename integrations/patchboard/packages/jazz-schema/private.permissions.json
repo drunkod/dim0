@@ -75,6 +75,18 @@
       "update": "false",
       "delete": "false"
     },
+    "canvasPatchEvents": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "canvasPatchReceipts": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
     "checkpoints": {
       "read": "false",
       "insert": "false",
