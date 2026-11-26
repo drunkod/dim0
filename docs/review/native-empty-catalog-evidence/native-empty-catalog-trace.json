@@ -1,0 +1,158 @@
+{
+  "initialCounts": {
+    "typedDatasets": 0,
+    "typedFields": 0,
+    "typedViews": 0,
+    "typedRecords": 0,
+    "typedCatalogReceipts": 0,
+    "typedCatalogEvents": 0,
+    "typedPatchReceipts": 0,
+    "typedPatchEvents": 0
+  },
+  "tableCreate": {
+    "boardId": "01a218d0-3c83-73f1-98a6-ed958259d251",
+    "datasetId": "f33ccc7a-f09e-5a52-b072-af9a9e7a3b7b",
+    "fieldId": "1aff4c72-9af3-5877-b203-ee9392312d0b",
+    "defaultViewId": "81c86871-7c00-5af1-ae7a-91ece4509653",
+    "schemaVersion": 1,
+    "receiptId": "144aa49a-8f09-5f99-8573-c8354265f4ae",
+    "eventId": "5db95b9c-fb2e-5da8-b479-e7c77947c810",
+    "replayed": false
+  },
+  "tableRetry": {
+    "boardId": "01a218d0-3c83-73f1-98a6-ed958259d251",
+    "datasetId": "f33ccc7a-f09e-5a52-b072-af9a9e7a3b7b",
+    "fieldId": "1aff4c72-9af3-5877-b203-ee9392312d0b",
+    "defaultViewId": "81c86871-7c00-5af1-ae7a-91ece4509653",
+    "schemaVersion": 1,
+    "receiptId": "144aa49a-8f09-5f99-8573-c8354265f4ae",
+    "eventId": "5db95b9c-fb2e-5da8-b479-e7c77947c810",
+    "replayed": true
+  },
+  "identicalTableRequest": true,
+  "tableRequestConflict": 409,
+  "afterTableReload": {
+    "typedDatasets": 1,
+    "typedFields": 1,
+    "typedViews": 1,
+    "typedRecords": 0,
+    "typedCatalogReceipts": 1,
+    "typedCatalogEvents": 1,
+    "typedPatchReceipts": 0,
+    "typedPatchEvents": 0
+  },
+  "rowCreate": [
+    {
+      "recordId": "0dd892c8-8fcb-59f4-9031-67233a8a43d4",
+      "datasetId": "f33ccc7a-f09e-5a52-b072-af9a9e7a3b7b",
+      "fieldId": "1aff4c72-9af3-5877-b203-ee9392312d0b",
+      "version": 1,
+      "schemaVersion": 1,
+      "updatedBy": "77d7fa9e-b8bb-472d-90e9-444424fa7358",
+      "receiptId": "9e925a3a-f3f1-5616-a1e1-14008c94ef01",
+      "eventId": "0985a709-9056-5c16-bbbc-3fc61cba53f7",
+      "replayed": false
+    },
+    {
+      "recordId": "6ea69b63-5816-5a38-add4-bbfe31138715",
+      "datasetId": "f33ccc7a-f09e-5a52-b072-af9a9e7a3b7b",
+      "fieldId": "1aff4c72-9af3-5877-b203-ee9392312d0b",
+      "version": 1,
+      "schemaVersion": 1,
+      "updatedBy": "77d7fa9e-b8bb-472d-90e9-444424fa7358",
+      "receiptId": "6b92670c-4aeb-5dac-936c-096cc93b80af",
+      "eventId": "a4a472af-4205-5e96-9e70-8ad511c6a963",
+      "replayed": false
+    },
+    {
+      "recordId": "38d5f40d-3331-5c10-9380-78a5c6c94d19",
+      "datasetId": "f33ccc7a-f09e-5a52-b072-af9a9e7a3b7b",
+      "fieldId": "1aff4c72-9af3-5877-b203-ee9392312d0b",
+      "version": 1,
+      "schemaVersion": 1,
+      "updatedBy": "77d7fa9e-b8bb-472d-90e9-444424fa7358",
+      "receiptId": "9c262350-e6aa-5929-9e30-8943f3991870",
+      "eventId": "7c639b0f-ed22-58ed-b8ea-6104ca30db76",
+      "replayed": false
+    }
+  ],
+  "rowRetry": {
+    "recordId": "0dd892c8-8fcb-59f4-9031-67233a8a43d4",
+    "datasetId": "f33ccc7a-f09e-5a52-b072-af9a9e7a3b7b",
+    "fieldId": "1aff4c72-9af3-5877-b203-ee9392312d0b",
+    "version": 1,
+    "schemaVersion": 1,
+    "receiptId": "9e925a3a-f3f1-5616-a1e1-14008c94ef01",
+    "eventId": "0985a709-9056-5c16-bbbc-3fc61cba53f7",
+    "updatedBy": "77d7fa9e-b8bb-472d-90e9-444424fa7358",
+    "replayed": true
+  },
+  "identicalRowRequest": true,
+  "rowRequestConflict": 409,
+  "filteredViewId": "798f014f-3657-4831-8bf7-4bf5d188e78f",
+  "canonicalTitles": [
+    "Demo alpha",
+    "Internal planning",
+    "Demo beta"
+  ],
+  "filteredTitles": [
+    "Demo alpha",
+    "Demo beta"
+  ],
+  "actualClipboard": true,
+  "nonmemberPasskey": true,
+  "denied": {
+    "board": 403,
+    "dataset": 403,
+    "table": 403,
+    "row": 403,
+    "view": 403
+  },
+  "recipientMemberships": 0,
+  "oauthGrants": 0,
+  "beforeRestart": {
+    "typedDatasets": 1,
+    "typedFields": 1,
+    "typedViews": 2,
+    "typedRecords": 3,
+    "typedCatalogReceipts": 1,
+    "typedCatalogEvents": 1,
+    "typedPatchReceipts": 3,
+    "typedPatchEvents": 3
+  },
+  "postRestart": {
+    "typedDatasets": 1,
+    "typedFields": 1,
+    "typedViews": 2,
+    "typedRecords": 3,
+    "typedCatalogReceipts": 1,
+    "typedCatalogEvents": 1,
+    "typedPatchReceipts": 3,
+    "typedPatchEvents": 3
+  },
+  "stableCatalogRetryAfterRestart": true,
+  "stableRowRetryAfterRestart": true,
+  "writerPreserved": true,
+  "revokedNextFetch": 403,
+  "clearedGridAndCount": true,
+  "disabledPagination": true,
+  "reloadAndRestartDenied": true,
+  "ownerRetained": 3,
+  "featureOff": {
+    "list": 404,
+    "table": 404,
+    "row": 404,
+    "view": 404
+  },
+  "ordinaryInviteStatus": 201,
+  "afterFeatureOff": {
+    "typedDatasets": 1,
+    "typedFields": 1,
+    "typedViews": 2,
+    "typedRecords": 3,
+    "typedCatalogReceipts": 1,
+    "typedCatalogEvents": 1,
+    "typedPatchReceipts": 3,
+    "typedPatchEvents": 3
+  }
+}
