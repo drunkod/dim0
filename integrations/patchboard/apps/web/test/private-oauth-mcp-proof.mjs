@@ -827,6 +827,7 @@ try {
           try {
             await connectEditor();
             let canvasQaReport = null;
+            let canvasDeniedReplay;
             if (process.env.PATCHBOARD_OAUTH_CI_RESTART === "1") {
               const { proveAcc051LiveCanvasPatch } = await import("./acc051-live-versioned-patch.mjs");
               canvasQaReport = await proveAcc051LiveCanvasPatch({
@@ -971,9 +972,10 @@ try {
           const restored=await setRole("editor",downgraded.body.role_version);
           assert.equal(restored.status,200);
           assert.equal(restored.body.role_version,downgraded.body.role_version+1);
-          console.log("ACC051_REPLAY_AFTER_ROLE_DOWNGRADE_DENIED_PASS",JSON.stringify({
+          canvasDeniedReplay={
             mcpError:denied.content[0].text,browserStatus:browserDenied,grantStillReadable:true,roleRestoredForSeparateProof:true,
-          }));
+          };
+          console.log("ACC051_REPLAY_AFTER_ROLE_DOWNGRADE_DENIED_PASS",JSON.stringify(canvasDeniedReplay));
         }
         const evidenceDir = process.env.PATCHBOARD_OAUTH_EVIDENCE_DIR;
         if (evidenceDir) {
@@ -1087,7 +1089,15 @@ try {
                 writerMatchesEditor:true,ownerHttpAndMcpMatch:true,receipts:canvasAudit.persistedReceiptCount,
                 events:canvasAudit.persistedEventCount,raceWinner:canvasQaReport.raceWinner};
               console.log("ACC051_INDEPENDENT_OWNER_RELOAD_RESTART_PASS",JSON.stringify(summary));
-              if(evidenceDir)await writeFile(join(evidenceDir,"canvas-owner-restart.json"),JSON.stringify(summary,null,2)+"\n",{mode:0o600});
+              if(evidenceDir){
+                await writeFile(join(evidenceDir,"canvas-owner-restart.json"),JSON.stringify(summary,null,2)+"\n",{mode:0o600});
+                // Persist structured synthetic test evidence before CI's bounded
+                // log formatter truncates long receipt and event IDs.
+                await writeFile(join(evidenceDir,"canvas-verification.json"),JSON.stringify({
+                  live:canvasQaReport.verification,deniedReplay:canvasDeniedReplay,
+                  audit:canvasAudit,ownerAfterRestart:summary,
+                },null,2)+"\n",{mode:0o600});
+              }
             }
             // Reuse the editor's real OAuth grant only AFTER all its normal
             // acceptance and restart assertions. No extra DCR or rate-limit change.

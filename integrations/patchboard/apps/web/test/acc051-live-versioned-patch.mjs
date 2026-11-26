@@ -202,12 +202,14 @@ export async function proveAcc051LiveCanvasPatch({
     eventId:original.eventId,raceBrowserId:raceBrowser.request_id,
     raceMcpId:raceMcp.request_id,raceWinner:httpWin?"browser":"mcp",
     versions:{before:7,after:8},expectedReceipts:2,expectedEvents:2};
-  console.log("ACC051_PASSKEY_BROWSER_MCP_V7_V8_PASS",JSON.stringify({
+  const verification={
     boardId,entityIds,editorActorId,receiptId:report.receiptId,
     eventId:report.eventId,raceWinner:report.raceWinner,
     lostHttpResponse:true,replayedByMcp:true,
     httpViewerDenied:true,mcpViewerDenied:true,readOnlyGrantDenied:true,
     siblingDenied:true,ownerReloadObservedV8:true,receiptReplayed:true,conflictingReplayDenied:true,oneRaceWinner:true
-  }));
+  };
+  console.log("ACC051_PASSKEY_BROWSER_MCP_V7_V8_PASS",JSON.stringify(verification));
+  report.verification=verification;
   return report;
 }
