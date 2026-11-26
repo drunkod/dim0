@@ -76,8 +76,11 @@ test("canonical build preserves names, portable OAuth and Teable-style assets/sk
   assert.equal(mcp.mcpServers.dim0.url, fixtureUrl);
   assert.deepEqual(mcp.mcpServers.dim0.extensions["com.openai"].auth,
     { type: "oauth", client: { mode: "dcr" } });
-  assert.match(unzipText(canonicalZip, "skills/dim0-board/SKILL.md"),
-    /^---\nname: dim0-board\ndescription: /);
+  const skill = unzipText(canonicalZip, "skills/dim0-board/SKILL.md");
+  assert.match(skill, /^---\nname: dim0-board\ndescription: /);
+  assert.match(skill, /dataset\.create\.v1/);
+  assert.match(skill, /explicitly approved table:create and board:write/);
+  assert.match(skill, /never fall back to creating a canvas card/);
   for (const name of ["assets/icon.png", "assets/logo.png"]) {
     const content = execFileSync("unzip", ["-p", canonicalZip, name]);
     assert.deepEqual(content.subarray(0, 8), Buffer.from([137,80,78,71,13,10,26,10]));

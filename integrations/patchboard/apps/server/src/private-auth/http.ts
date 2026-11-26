@@ -4,6 +4,8 @@ import { auth } from "./auth.ts";
 import { privateAuthDatabase } from "./db.ts";
 import { tryRememberJazzMemberIdentity } from "./member-directory.ts";
 import { privateAuthConfig } from "./config.ts";
+import {qaHttpsCatalogProfile} from "../qa-https-catalog-profile.ts";
+import {app} from "@patchboard/jazz-schema";
 import { EnrollmentLimitReached, newRegistrationIntent } from "./enrollment.ts";
 import { oauthConsentPage } from "./oauth-ui.ts";
 import { createPendingGrant, discardGrant, grantBoardForConsent, withConsentGrant } from "./grants.ts";
@@ -101,6 +103,15 @@ export function handlePrivateAuth(
           try {
             const jazzAccountId = await jazzAccountFor(session.user.id);
             await grantBoardForConsent(db, boardId as string, jazzAccountId);
+            // The HTTPS QA issuer has exactly ONE board, always a native
+            // Owner. Validate even for an old board:write-only consent and
+            // even when client JSON forges a board absent from the picker.
+            const profile=qaHttpsCatalogProfile();
+            if(profile){
+              const board=await db.one(app.boards.where({id:boardId as string}));
+              if(profile.boardId!==boardId||board?.ownerId!==jazzAccountId)
+                throw new Error("QA_TABLE_CREATE_BOARD_NOT_APPROVED");
+            }
             allowed = true;
             // This optional display-name reference cannot turn an authorized
             // ChatGPT board consent into an authorization denial.

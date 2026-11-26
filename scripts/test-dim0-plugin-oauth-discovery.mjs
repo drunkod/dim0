@@ -52,6 +52,15 @@ for (const key of [
   assert.equal(uri.origin, endpoint.origin);
   assert.ok(uri.pathname.startsWith(issuer.pathname + "/"));
 }
+if (process.env.DIM0_QA_CATALOG_DISCOVERY === "1") {
+  // A challenge advertises the explicit consent option, never an implicit
+  // grant. The installed client still has to request and obtain both scopes.
+  const requested = authenticate.match(/(?:^|[, ])scope="([^"]+)"/i)?.[1]?.split(/\s+/) ?? [];
+  for (const scope of ["board:write", "table:create"]) {
+    assert.ok(requested.includes(scope), "QA bearer challenge missing " + scope);
+    assert.ok(provider.scopes_supported?.includes(scope), "QA issuer missing " + scope);
+  }
+}
 console.log("DIM0_PLUGIN_OAUTH_DISCOVERY_PASS", JSON.stringify({
   resource: endpoint.href,
   issuer: provider.issuer,

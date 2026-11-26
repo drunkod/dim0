@@ -29,7 +29,8 @@
     "test:private:ci": "node apps/server/test/private-ci.mjs",
     "test:native:saved-view": "pnpm --filter @patchboard/web exec node test/native-saved-view-proof.mjs",
     "test:native:empty-catalog": "pnpm --filter @patchboard/web exec node test/native-empty-catalog-proof.mjs",
-    "test:native:mcp-table-create": "pnpm --filter @patchboard/web exec node test/native-mcp-table-create-proof.mjs"
+    "test:native:mcp-table-create": "pnpm --filter @patchboard/web exec node test/native-mcp-table-create-proof.mjs",
+    "test:qa:https-catalog": "pnpm --filter @patchboard/web exec node test/qa-https-native-catalog-preflight.mjs"
   },
   "packageManager": "pnpm@12.11.2"
 }

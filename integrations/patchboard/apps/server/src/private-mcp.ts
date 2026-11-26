@@ -26,6 +26,7 @@ import { patchCanvasLabelMarkdown, canvasPatchOperationIdentity, CanvasPatchRequ
 import {createTextTable,textTableOperationIdentity,
   TypedCatalogInvalid,TypedCatalogConflict,TypedCatalogCommitUnknown
 } from "./typed-catalog.ts";
+import {qaHttpsCatalogProfile,qaHttpsCatalogBoardAllowed} from "./qa-https-catalog-profile.ts";
 import {typedRecordQaEnabled} from "./typed-record-qa-gate.ts";
 import {
   querySavedTypedView,TypedViewAccessDenied,TypedViewUnsupported,
@@ -82,7 +83,7 @@ async function executePrivateMcp(
   const beforeWriteSubmit = () => {
     if (!admitted("board:write")) throw new CanvasPatchAdmissionRevoked();
   };
-  const tableCreateConsented=()=>typedRecordQaEnabled()&&grantedScopes.has("board:write")&&
+  const tableCreateConsented=()=>(typedRecordQaEnabled()||qaHttpsCatalogBoardAllowed(grant.boardId))&&grantedScopes.has("board:write")&&
     grantedScopes.has("table:create")&&hasExplicitTableCreateConsent(grant);
   const beforeTableCreateSubmit=()=>{
     if(!tableCreateConsented()||!admitted("board:write")||!admitted("table:create"))
@@ -533,7 +534,7 @@ export function handlePrivateMcp(
       grant = verified;
       grantedScopes = new Set(typeof claims.scope === "string" ? claims.scope.split(/\s+/).filter(Boolean) : []);
       return new Response(null, { status: 204 });
-    }, { resource: resource(), challengeScopes: scopes })(verificationRequest);
+    }, { resource: resource(), challengeScopes: qaHttpsCatalogProfile() ? [...scopes,"table:create"] : scopes })(verificationRequest);
 
     if (verification.status !== 204 || !subject || !grant) {
       if (debugAuth) console.warn("PRIVATE_MCP_AUTH_REJECT", JSON.stringify({
@@ -574,6 +575,13 @@ export function handlePrivateMcp(
     }
     // Only a verified subject becomes the Jazz actor; never a caller-supplied id.
     const actorId = await jazzAccountFor(subject);
+    // The sealed external issuer cannot use a pre-seal grant to reach
+    // another board, or a grant whose subject is no longer current Owner.
+    const profile=qaHttpsCatalogProfile();
+    if(profile && ((grant as VerifiedBoardGrant).boardId!==profile.boardId ||
+      (await db.one(app.boards.where({id:profile.boardId})))?.ownerId!==actorId)){
+      res.writeHead(401,{"cache-control":"no-store"});res.end();return;
+    }
     await executePrivateMcp(req, res, db, actorId, row.name, grantedScopes, grant, admission);
   })().catch(() => {
     if (!res.headersSent) res.writeHead(503, { "cache-control": "no-store" });
