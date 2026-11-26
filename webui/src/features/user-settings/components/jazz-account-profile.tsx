@@ -21,8 +21,13 @@ type AccountEvent = { type: string; at: number; detail: unknown }
 const path = "/patchboard-private/api/account/"
 /** Preserve the status and retry guidance independently of display copy. */
 class AccountRequestError extends Error {
-  constructor(message: string, readonly status: number, readonly retrySameRequest: boolean) {
+  readonly status: number
+  readonly retrySameRequest: boolean
+
+  constructor(message: string, status: number, retrySameRequest: boolean) {
     super(message)
+    this.status = status
+    this.retrySameRequest = retrySameRequest
   }
 }
 async function accountFetch<T>(resource: string, body?: object, method: "PATCH" | "POST" = "PATCH"): Promise<T> {
