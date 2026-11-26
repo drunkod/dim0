@@ -2,7 +2,7 @@
   "$schema": "https://jazz.tools/schemas/jazz.permissions.v1.json",
   "$generated": {
     "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
-    "sha256": "47212c8429dab6c385aaf8a149d54501abcc7e168fbb27db56822cf965d307c9"
+    "sha256": "46b249deaaa5cccd1c57b9c41a774a846edc11f7a15a5c69e401922e0fcf821d"
   },
   "tables": {
     "agentRuns": {
@@ -243,6 +243,7 @@
       "delete": "false"
     },
     "typedRecords": { "read": "false", "insert": "false", "update": "false", "delete": "false" },
+    "typedViews": { "read": "false", "insert": "false", "update": "false", "delete": "false" },
     "workspaceAccountReceipts": {
       "read": "false",
       "insert": "false",

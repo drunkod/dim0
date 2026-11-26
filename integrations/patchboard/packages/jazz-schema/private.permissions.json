@@ -164,6 +164,12 @@
       "update": "false",
       "delete": "false"
     },
+    "typedViews": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
     "workspaceAccountReceipts": {
       "read": "false",
       "insert": "false",

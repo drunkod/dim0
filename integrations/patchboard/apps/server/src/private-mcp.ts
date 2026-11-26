@@ -25,6 +25,10 @@ import { getSharedAppletState, saveSharedAppletState } from "./applet-state-serv
 import { patchCanvasLabelMarkdown, canvasPatchOperationIdentity, CanvasPatchRequestConflict, CanvasPatchCommitUnknown } from "./canvas-versioned-patch.ts";
 import {typedRecordQaEnabled} from "./typed-record-qa-gate.ts";
 import {
+  querySavedTypedView,TypedViewAccessDenied,TypedViewUnsupported,
+  TypedViewCursorChanged,TypedViewNotFound
+} from "./typed-shared-view.ts";
+import {
   patchTypedRecord,typedRecordOperationIdentity,TypedRecordPermissionDenied,TypedRecordGuardDenied,
   TypedRecordFieldInvalid,TypedRecordSchemaConflict,TypedRecordVersionConflict,
   TypedRecordRequestConflict,TypedRecordCommitUnknown
@@ -142,6 +146,48 @@ async function executePrivateMcp(
         : error instanceof DemoBoardMissing ? "BOARD_UNAVAILABLE" : "READ_FAILED");
     }
   });
+
+  // A view bearer token only restricts the existing, separately verified
+  // board:read OAuth scope. It never creates an OAuth or board membership.
+  if(typedRecordQaEnabled() && canRead())mcpServer.registerTool(
+    "read_typed_view",{
+      description:"QA only: server-filtered saved typed view. Requires live board:read OAuth grant AND separate revocable view share.",
+      annotations:{readOnlyHint:true},
+      inputSchema:z.object({
+        board_id:boardId,dataset_id:boardId,view_id:boardId,
+        share_token:z.string().min(1).max(80),
+        page_size:z.number().int().min(1).max(20),
+        cursor:z.string().max(20000).optional(),
+        record_id:boardId.optional(),
+        requested_field_ids:z.array(boardId).min(1).max(20).optional(),
+        requested_sort_field_id:boardId.optional(),
+        requested_filter_field_id:boardId.optional(),
+      }).strict()
+    },async args=>{
+      if(!admitted("board:read"))return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
+      if(args.board_id!==grant.boardId)return errorText("BOARD_ACCESS_DENIED");
+      try{
+        const result=await querySavedTypedView(db,privateAuthDatabase(),{
+          boardId:args.board_id,datasetId:args.dataset_id,viewId:args.view_id,
+          shareToken:args.share_token,verifiedSubjectId:grant.userId,
+          channel:"mcp",pageSize:args.page_size,cursor:args.cursor,
+          recordId:args.record_id,requestedFieldIds:args.requested_field_ids,
+          requestedSortFieldId:args.requested_sort_field_id,
+          requestedFilterFieldId:args.requested_filter_field_id
+        });
+        if(!admitted("board:read"))return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
+        return output(result);
+      }catch(error){
+        return errorText(error instanceof TypedViewAccessDenied
+          ? "VIEW_ACCESS_DENIED"
+          : error instanceof TypedViewCursorChanged
+          ? "VIEW_CURSOR_REQUIRES_FRESH_QUERY"
+          : error instanceof TypedViewNotFound
+          ? "RECORD_NOT_IN_VIEW"
+          : error instanceof TypedViewUnsupported
+          ? error.code:"VIEW_QUERY_FAILED");
+      }
+    });
 
   if (canWrite()) mcpServer.registerTool("create_note", {
     description: "Create a note in a private board. Requires board:write and current editor/owner permission; a stable request_id makes retries idempotent.",

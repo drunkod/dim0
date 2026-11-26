@@ -27,6 +27,12 @@ import {
 } from "./typed-record-patch.ts";
 import {typedRecordQaEnabled} from "./typed-record-qa-gate.ts";
 import {
+  createSavedTypedView,changeSavedTypedView,issueTypedViewShare,
+  revokeTypedViewShare,querySavedTypedView,
+  TypedViewAccessDenied,TypedViewUnsupported,TypedViewCursorChanged,
+  TypedViewNotFound,TypedViewVersionConflict
+} from "./typed-shared-view.ts";
+import {
   changePrivateNote, createMcpNote, DemoBoardMissing, PrivatePermissionDenied,
   readBoard, RequestIdConflict, requirePrivateBoardAccess,
 } from "./board-service.ts";
@@ -331,6 +337,109 @@ export async function privateBoardRequest(
     // First typed relational-record vertical slice: disabled except for a
     // disposable loopback CI issuer with explicit opt-in. No old OAuth scope
     // gains a new live capability from this browser route.
+    // One persisted typed read view; its credential never joins the board
+    // membership table. All routes are disposable-QA opt-in only.
+    if(pathname.startsWith("/patchboard-private/api/records/views/") &&
+      request.method==="POST"){
+      if(!typedRecordQaEnabled())return json({error:"Not found"},404);
+      const definition=z.object({
+        name:z.string().trim().min(1).max(80),
+        allowed_field_ids:z.array(boardIdSchema).min(1).max(20),
+        filter:z.object({
+          op:z.literal("text_prefix"),field_id:boardIdSchema,
+          value:z.string().max(80)
+        }).strict(),
+        sort:z.object({
+          field_id:boardIdSchema,direction:z.enum(["asc","desc"])
+        }).strict(),
+      }).strict();
+      const viewRef={
+        board_id:boardIdSchema,dataset_id:boardIdSchema,view_id:boardIdSchema
+      };
+      const toDefinition=(value:z.infer<typeof definition>)=>({
+        name:value.name,allowedFieldIds:value.allowed_field_ids,
+        filter:{op:value.filter.op,fieldId:value.filter.field_id,
+          value:value.filter.value},
+        sort:{fieldId:value.sort.field_id,
+          direction:value.sort.direction}
+      });
+      if(pathname.endsWith("/create")){
+        const input=z.object({
+          board_id:boardIdSchema,dataset_id:boardIdSchema,
+          definition
+        }).strict().parse(await safeJson(request));
+        return json(await createSavedTypedView(db,{
+          boardId:input.board_id,datasetId:input.dataset_id,
+          actorId:accountId,definition:toDefinition(input.definition)
+        }),201);
+      }
+      if(pathname.endsWith("/revise")){
+        const input=z.object({...viewRef,
+          expected_version:z.number().int().positive(),definition
+        }).strict().parse(await safeJson(request));
+        return json(await changeSavedTypedView(db,{
+          boardId:input.board_id,datasetId:input.dataset_id,
+          viewId:input.view_id,expectedVersion:input.expected_version,
+          actorId:accountId,definition:toDefinition(input.definition)
+        }));
+      }
+      if(pathname.endsWith("/share")){
+        const input=z.object(viewRef).strict().parse(await safeJson(request));
+        return json(await issueTypedViewShare(db,privateAuthDatabase(),{
+          boardId:input.board_id,datasetId:input.dataset_id,
+          viewId:input.view_id,actorId:accountId,
+          verifiedSubjectId:session.user.id
+        }),201);
+      }
+      if(pathname.endsWith("/revoke")){
+        const input=z.object({...viewRef,
+          share_id:boardIdSchema,
+          expected_version:z.number().int().positive()
+        }).strict().parse(await safeJson(request));
+        return json(await revokeTypedViewShare(db,privateAuthDatabase(),{
+          boardId:input.board_id,datasetId:input.dataset_id,
+          viewId:input.view_id,actorId:accountId,
+          shareId:input.share_id,expectedVersion:input.expected_version
+        }));
+      }
+      if(pathname.endsWith("/query")){
+        const input=z.object({...viewRef,
+          share_token:z.string().min(1).max(80),
+          page_size:z.number().int().min(1).max(20),
+          cursor:z.string().max(20000).optional(),
+          record_id:boardIdSchema.optional(),
+          requested_field_ids:z.array(boardIdSchema).min(1).max(20).optional(),
+          requested_sort_field_id:boardIdSchema.optional(),
+          requested_filter_field_id:boardIdSchema.optional(),
+        }).strict().parse(await safeJson(request,32_000));
+        return json(await querySavedTypedView(db,privateAuthDatabase(),{
+          boardId:input.board_id,datasetId:input.dataset_id,
+          viewId:input.view_id,shareToken:input.share_token,
+          verifiedSubjectId:session.user.id,channel:"browser",
+          pageSize:input.page_size,cursor:input.cursor,recordId:input.record_id,
+          requestedFieldIds:input.requested_field_ids,
+          requestedSortFieldId:input.requested_sort_field_id,
+          requestedFilterFieldId:input.requested_filter_field_id
+        }));
+      }
+    }
+    if(pathname==="/patchboard-private/api/records/dataset"&&
+      request.method==="GET"){
+      if(!typedRecordQaEnabled())return json({error:"Not found"},404);
+      const boardId=boardIdSchema.parse(url.searchParams.get("board_id"));
+      const datasetId=boardIdSchema.parse(url.searchParams.get("dataset_id"));
+      const board=await db.one(app.boards.where({id:boardId}));
+      if(!board||board.ownerId!==accountId)
+        throw new TypedViewAccessDenied();
+      const dataset=await db.one(app.typedDatasets.where({id:datasetId}));
+      if(!dataset||dataset.boardId!==boardId)
+        throw new TypedViewAccessDenied();
+      const records=await db.all(app.typedRecords.where({datasetId}).limit(501));
+      if(records.length>500||records.some(r=>r.boardId!==boardId))
+        throw new TypedViewUnsupported("VIEW_DATASET_LIMIT_500");
+      return json({boardId,datasetId,
+        records:records.map(r=>({id:r.id,version:r.version,cells:r.cells}))});
+    }
     if(pathname==="/patchboard-private/api/records/record" &&
       request.method==="GET"){
       if(!typedRecordQaEnabled())return json({error:"Not found"},404);
@@ -414,6 +523,12 @@ export async function privateBoardRequest(
     if (error instanceof CanvasPatchRequestConflict) return json({error:"Request ID conflict"},409);
     if (error instanceof CanvasPatchCommitUnknown) return json({error:"Commit outcome unknown",request_id:error.requestId,retry_same_request_only:true},503);
     if (error instanceof CanvasInvalid) return json({ error: "Invalid canvas payload" }, 400);
+    if(error instanceof TypedViewAccessDenied)return json({error:error.message},403);
+    if(error instanceof TypedViewNotFound)return json({error:error.message},404);
+    if(error instanceof TypedViewCursorChanged ||
+      error instanceof TypedViewVersionConflict)
+      return json({error:error.message},409);
+    if(error instanceof TypedViewUnsupported)return json({error:error.message},400);
     if(error instanceof TypedRecordPermissionDenied)return json({error:"TYPED_RECORD_ACCESS_DENIED"},403);
     if(error instanceof TypedRecordGuardDenied)return json({error:"SERVICE_GUARD_DENIED"},403);
     if(error instanceof TypedRecordFieldInvalid)return json({error:"INVALID_FIELD"},400);
