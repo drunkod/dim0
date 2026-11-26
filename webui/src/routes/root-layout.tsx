@@ -26,7 +26,9 @@ export function RootLayout() {
   const pathname = useRouterState({ select: (state) => state.location.pathname })
   const accountRoute = /^\/(signin|signup|jazz-signin)\/?$/.test(pathname)
   const jazzRoute = accountRoute ||
-    pathname.startsWith("/share/join/") || pathname.startsWith("/jazz-invite/") || pathname === "/boards" || pathname.startsWith("/boards/")
+    pathname.startsWith("/share/join/") || pathname.startsWith("/jazz-invite/") ||
+    pathname === "/boards" || pathname.startsWith("/boards/") ||
+    pathname === "/settings" || pathname === "/settings/"
 
   if (import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" && jazzRoute) {
     return (

@@ -140,7 +140,10 @@ export function JazzBoardsPage() {
         <>
           <div className="flex items-center justify-between gap-3 text-sm">
             <p role="status">Signed in as <strong>{session.name}</strong></p>
-            <JazzLogoutButton />
+            <div className="flex items-center gap-3">
+              <a href="/settings" className="underline underline-offset-2">Account settings</a>
+              <JazzLogoutButton />
+            </div>
           </div>
           {boards.length > 0 && (
             <section className="space-y-2">
