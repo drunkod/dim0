@@ -9,8 +9,9 @@ import { z } from "zod";
 import type { DatabaseSync } from "node:sqlite";
 import { normalizedDisplayName, normalizedAccountLocale } from "@patchboard/account-domain/profile";
 import { ProfileConflict, readAccountPreferences, updateAccountPreferences } from "./profile-preferences.ts";
-import { GrantOwnerError, listCurrentSubjectGrants, revokeVerifiedSubjectGrant }
+import { GrantOwnerError, GrantDrainPending, listCurrentSubjectGrants }
   from "./grant-admission.ts";
+import { disconnectAfterMcpWritesDrain } from "./grant-write-drain.ts";
 
 type VerifiedSessionUser = Readonly<{ id: string; name: string }>;
 type NameUpdater = (name: string, headers: Headers) => Promise<boolean>;
@@ -80,13 +81,15 @@ export async function privateAccountProfileRequest(
         expected_version:z.number().int().positive(),
         request_id:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
       }).strict().parse(await safeJson(request));
-      const receipt=revokeVerifiedSubjectGrant(db,verifiedUser.id,{
+      const receipt=await disconnectAfterMcpWritesDrain(db,verifiedUser.id,{
         grantId:parsed.grant_id,clientId:parsed.client_id,
         expectedVersion:parsed.expected_version,requestId:parsed.request_id
       });
       return json({grant_id:receipt.id,version:receipt.committedVersion,
         revoked_at_ms:receipt.revokedAtMs});
     } catch(error) {
+      if (error instanceof GrantDrainPending)
+        return json({error:"WRITE_DRAIN_PENDING",disconnected:false,retry_same_request:true},503);
       if (error instanceof GrantOwnerError)
         return json({error:error.code},error.code==="FORBIDDEN"?403:409);
       if (error instanceof z.ZodError || error instanceof SyntaxError ||

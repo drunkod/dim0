@@ -152,6 +152,53 @@ test("historical provider revoke fingerprint remains replayable after Settings s
     id:historical.id,committedVersion:2,revokedAtMs:4500
   });
 });
+test("projects a pending disconnect only to its owner and resumes the original command",async()=>{
+  const {beginProtectedMcpWriteLease,settleProtectedMcpWriteLease,
+    disconnectAfterMcpWritesDrain}=await import("../src/account-adapters/grant-write-drain.ts");
+  const pending={id:randomUUID(),userId:subj,clientId:"pending-client",boardId:board};
+  const foreign={id:randomUUID(),userId:randomUUID(),clientId:"foreign-client",boardId:board2};
+  for(const grant of [pending,foreign])db.prepare(
+    "INSERT INTO patchboard_oauth_grant(id,user_id,client_id,board_id,created_at_ms) VALUES(?,?,?,?,?)"
+  ).run(grant.id,grant.userId,grant.clientId,grant.boardId,Date.now());
+  const admission=admitVerifiedMcpGrant(db,pending,scopes);
+  const lease=beginProtectedMcpWriteLease(db,admission,pending);
+  assert.ok(lease);
+  const command={grantId:pending.id,clientId:pending.clientId,
+    expectedVersion:1,requestId:"resume-pending-disconnect"};
+  await assert.rejects(disconnectAfterMcpWritesDrain(db,subj,command,{maxWaitMs:0}),
+    /WRITE_DRAIN_PENDING/);
+  const own=listCurrentSubjectGrants(db,subj).grants.find(grant=>grant.id===pending.id);
+  assert.deepEqual(own.pendingDisconnect,{
+    requestId:command.requestId,expectedVersion:command.expectedVersion
+  });
+  assert.ok(!listCurrentSubjectGrants(db,foreign.userId).grants.some(grant=>grant.id===pending.id));
+  assert.equal(listCurrentSubjectGrants(db,foreign.userId).grants[0].pendingDisconnect,null);
+  await assert.rejects(disconnectAfterMcpWritesDrain(db,foreign.userId,command),
+    error=>error instanceof GrantOwnerError&&error.code==="FORBIDDEN");
+  settleProtectedMcpWriteLease(db,lease);
+  const receipt=await disconnectAfterMcpWritesDrain(db,subj,{
+    grantId:own.id,clientId:own.clientId,...own.pendingDisconnect
+  });
+  assert.equal(receipt.committedVersion,2);
+  assert.equal(listCurrentSubjectGrants(db,subj).grants.find(grant=>grant.id===pending.id)
+    .pendingDisconnect,null);
+  assert.ok(admitVerifiedMcpGrant(db,foreign,scopes));
+});
+
+test("does not project a pending intent whose stored subject or client differs from its grant",()=>{
+  for(const mismatch of ["subject","client"]){
+    const grant={id:randomUUID(),userId:subj,clientId:"owned-"+mismatch,boardId:board};
+    db.prepare("INSERT INTO patchboard_oauth_grant(id,user_id,client_id,board_id,created_at_ms) VALUES(?,?,?,?,?)")
+      .run(grant.id,grant.userId,grant.clientId,grant.boardId,Date.now());
+    db.prepare(`INSERT INTO patchboard_grant_disconnect_pending
+      (grant_id,subject_id,client_id,expected_version,request_id,started_at_ms)
+      VALUES(?,?,?,?,?,?)`).run(grant.id,mismatch==="subject"?randomUUID():subj,
+        mismatch==="client"?"foreign-client":grant.clientId,1,"self:"+subj+":mismatch",Date.now());
+    assert.equal(listCurrentSubjectGrants(db,subj).grants.find(row=>row.id===grant.id)
+      .pendingDisconnect,null);
+  }
+});
+
 test.after(()=>{
   db.close();other.close();
   rmSync(root,{recursive:true,force:true});

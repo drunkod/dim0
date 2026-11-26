@@ -1,11 +1,15 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { access, mkdir, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import type { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { requireMcpAuth } from "@better-auth/mcp";
 import { Effect } from "effect";
 import { z } from "zod";
-import type { Db } from "jazz-tools";
+import { PersistedWriteRejectedError, type Db } from "jazz-tools";
 import { app } from "@patchboard/jazz-schema";
 import {
   createMcpNote, DemoBoardMissing, PrivatePermissionDenied,
@@ -26,6 +30,10 @@ import {
   admitVerifiedMcpGrant, authorizeProtectedMcpInvocation,
   type GrantAdmission,
 } from "./account-adapters/grant-admission.ts";
+import {
+  beginProtectedMcpWriteLease, runReservedMcpWrite,
+  type ProtectedMcpWriteLease,
+} from "./account-adapters/grant-write-drain.ts";
 
 const boardId = z.string().uuid();
 const scopes = ["board:read", "board:write"] as const;
@@ -53,8 +61,44 @@ async function executePrivateMcp(
   // The transport can dispatch multiple/delayed callbacks for one HTTP
   // request. Guard EACH callback with the immutable server-minted SQL receipt.
   // It is never accepted from caller parameters or exposed in tool results.
+  const writeContext=new AsyncLocalStorage<ProtectedMcpWriteLease>();
   const admitted = (scope: "board:read" | "board:write") =>
-    authorizeProtectedMcpInvocation(privateAuthDatabase(), admission, grant, scope);
+    authorizeProtectedMcpInvocation(privateAuthDatabase(),admission,grant,scope,
+      Date.now(),scope==="board:write" ? writeContext.getStore()?.id : undefined);
+  /** Check again at Jazz write submission, not just transport/callback dispatch. */
+  const beforeWriteSubmit = () => {
+    if (!admitted("board:write")) throw new CanvasPatchAdmissionRevoked();
+  };
+  /** Server-only deterministic pause; only disposable localhost CI can enable. */
+  const qaPause=async(phase:"admitted"|"leased",requestId?:string)=>{
+    const config=privateAuthConfig();
+    if(process.env.PATCHBOARD_ACC051_INFLIGHT_QA!=="1" ||
+      process.env.PATCHBOARD_OAUTH_CI_RESTART!=="1" ||
+      process.env.PATCHBOARD_PRIVATE_DEV!=="1" ||
+      !config.root.startsWith(join(tmpdir(),"patchboard-private-ci-")) ||
+      !["localhost","127.0.0.1"].includes(new URL(config.origin).hostname) ||
+      !requestId || !new RegExp("^qa_inflight_"+phase+"_[a-f0-9]{32}$").test(requestId))return;
+    const dir=join(config.root,"acc051-write-pauses");
+    await mkdir(dir,{recursive:true,mode:0o700});
+    const marker=join(dir,phase+"-"+requestId+".ready");
+    const resume=join(dir,phase+"-"+requestId+".resume");
+    await writeFile(marker,"ready",{mode:0o600});
+    for(let n=0;n<2400;n++){
+      try {await access(resume);return;}catch{}
+      await new Promise(resolve=>setTimeout(resolve,25));
+    }
+    throw new Error("ACC051_QA_PAUSE_EXPIRED");
+  };
+  /** Every write tool reserves a durable SQL drain lease before Jazz work. */
+  const withWriteLease=async<T>(action:()=>Promise<T>,requestId?:string):Promise<T|ReturnType<typeof errorText>>=>{
+    await qaPause("admitted",requestId);
+    const lease=beginProtectedMcpWriteLease(privateAuthDatabase(),admission,grant);
+    if(!lease)return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
+    return writeContext.run(lease,()=>runReservedMcpWrite(privateAuthDatabase(),lease,async()=>{
+      await qaPause("leased",requestId);
+      return action();
+    }));
+  };
   const canRead = () => grantedScopes.has("board:read");
   const canWrite = () => grantedScopes.has("board:write");
   const mcpServer = new McpServer({ name: "patchboard-private", version: "0.1.0" });
@@ -100,7 +144,7 @@ async function executePrivateMcp(
       text: z.string().trim().min(1).max(2000),
       request_id: z.string().trim().min(1).max(128),
     }).strict(),
-  }, async ({ board_id, text, request_id }) => {
+  }, async ({ board_id, text, request_id }) => withWriteLease(async()=>{
     if (!admitted("board:write")) return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
     if (!canWrite()) return errorText("INSUFFICIENT_SCOPE: board:write required");
     try {
@@ -108,15 +152,18 @@ async function executePrivateMcp(
       return output(await Effect.runPromise(createMcpNote(db, {
         boardId: grant.boardId, text, requestId: request_id,
         actorId, authorName: actorName,
-      })));
+      }, beforeWriteSubmit)));
     } catch (error) {
-      return errorText(error instanceof PrivatePermissionDenied
+      return errorText(error instanceof CanvasPatchAdmissionRevoked
+        ? "GRANT_ADMISSION_EXPIRED_OR_INVALID"
+        : error instanceof PrivatePermissionDenied
         ? "BOARD_WRITE_DENIED"
         : error instanceof DemoBoardMissing ? "BOARD_UNAVAILABLE"
         : error instanceof RequestIdConflict ? "REQUEST_ID_CONFLICT"
+        : error instanceof PersistedWriteRejectedError ? "WRITE_REJECTED"
         : "WRITE_FAILED: Check read_board before retrying");
     }
-  });
+  },request_id));
 
   // Dim0 JSON entities remain in Jazz; every tool is scoped to this OAuth grant.
   const canvasFailure = (error: unknown) => errorText(
@@ -126,6 +173,7 @@ async function executePrivateMcp(
       : error instanceof CanvasPermissionDenied ? "BOARD_ACCESS_DENIED"
       : error instanceof CanvasConflict ? "VERSION_CONFLICT"
       : error instanceof CanvasInvalid ? "INVALID_ENTITY"
+      : error instanceof PersistedWriteRejectedError ? "WRITE_REJECTED"
       : "CANVAS_OPERATION_FAILED",
   );
   // Values reached this handler as JSON over HTTP; Zod 3 lacks z.json().
@@ -163,14 +211,14 @@ async function executePrivateMcp(
     inputSchema: z.object({
       board_id: boardId, kind: z.enum(["node", "link"]), payload: canvasEntity,
     }).strict(),
-  }, async ({ board_id, kind, payload }) => {
+  }, async ({ board_id, kind, payload }) => withWriteLease(async()=>{
     if (!admitted("board:write")) return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
     if (board_id !== grant.boardId) return errorText("BOARD_ACCESS_DENIED");
     try {
       const entity = await createCanvasEntity(db, { boardId: board_id, actorId, kind, payload });
       return output({ id: entity.id, board_id, version: entity.version });
     } catch (error) { return canvasFailure(error); }
-  });
+  }));
 
   if (canWrite()) mcpServer.registerTool("update_canvas_entity", {
     description: "Replace a Dim0 node/link payload with a version check; always read the current entity first.",
@@ -179,7 +227,7 @@ async function executePrivateMcp(
       board_id: boardId, entity_id: canvasId,
       expected_version: z.number().int().positive(), payload: canvasEntity,
     }).strict(),
-  }, async ({ board_id, entity_id, expected_version, payload }) => {
+  }, async ({ board_id, entity_id, expected_version, payload }) => withWriteLease(async()=>{
     if (!admitted("board:write")) return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
     if (board_id !== grant.boardId) return errorText("BOARD_ACCESS_DENIED");
     try {
@@ -189,7 +237,7 @@ async function executePrivateMcp(
       });
       return output({ id: entity.id, board_id, version: entity.version });
     } catch (error) { return canvasFailure(error); }
-  });
+  }));
 
   if (canWrite()) mcpServer.registerTool("patch_canvas_entity", {
     description:"Patch one canvas note label.markdown with version CAS and a stable request_id; authoritative Jazz transaction writes entity, receipt and audit event once.",
@@ -200,7 +248,7 @@ async function executePrivateMcp(
       request_id:z.string().trim().min(1).max(128),
       field_patch:z.object({label_markdown:z.string().max(2000)}).strict()
     }).strict(),
-  },async ({board_id,entity_id,expected_version,request_id,field_patch})=>{
+  },async ({board_id,entity_id,expected_version,request_id,field_patch})=> withWriteLease(async()=>{
     if(!admitted("board:write"))return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
     if(!canWrite())return errorText("INSUFFICIENT_SCOPE: board:write required");
     if(board_id!==grant.boardId)return errorText("BOARD_ACCESS_DENIED");
@@ -208,12 +256,10 @@ async function executePrivateMcp(
       const updated=await patchCanvasLabelMarkdown(db,{
         boardId:board_id,actorId,id:entity_id,
         expectedVersion:expected_version,requestId:request_id,patch:field_patch,
-      },{beforeWriteSubmit:()=>{
-        if(!admitted("board:write"))throw new CanvasPatchAdmissionRevoked();
-      }});
+      },{beforeWriteSubmit});
       return output(updated);
     } catch(error){return canvasFailure(error);}
-  });
+  },request_id));
 
   if (canWrite()) mcpServer.registerTool("delete_canvas_entity", {
     description: "Delete a node/link by UUID with a current version check. Destructive action.",
@@ -222,7 +268,7 @@ async function executePrivateMcp(
       board_id: boardId, entity_id: canvasId,
       expected_version: z.number().int().positive(),
     }).strict(),
-  }, async ({ board_id, entity_id, expected_version }) => {
+  }, async ({ board_id, entity_id, expected_version }) => withWriteLease(async()=>{
     if (!admitted("board:write")) return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
     if (board_id !== grant.boardId) return errorText("BOARD_ACCESS_DENIED");
     try {
@@ -230,7 +276,7 @@ async function executePrivateMcp(
         boardId: board_id, actorId, id: entity_id, expectedVersion: expected_version,
       }));
     } catch (error) { return canvasFailure(error); }
-  });
+  }));
 
   // Applet runtime data uses a separate Jazz state revision so a counter
   // click never mutates its canvas geometry/source version.
@@ -253,7 +299,7 @@ async function executePrivateMcp(
       expected_version: z.number().int().nonnegative(),
       value: z.record(z.string(), z.unknown()),
     }).strict(),
-  }, async ({ board_id, note_id, expected_version, value }) => {
+  }, async ({ board_id, note_id, expected_version, value }) => withWriteLease(async()=>{
     if (!admitted("board:write")) return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
     if (board_id !== grant.boardId) return errorText("BOARD_ACCESS_DENIED");
     try {
@@ -262,7 +308,7 @@ async function executePrivateMcp(
         actorId, expectedVersion: expected_version, value,
       }));
     } catch (error) { return canvasFailure(error); }
-  });
+  }));
 
   response.once("close", () => { void mcpServer.close().catch(() => {}); });
   try {
