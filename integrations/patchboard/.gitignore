@@ -1,0 +1,18 @@
+node_modules/
+dist/
+.tsc/
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.jazz/
+data/
+coverage/
+playwright-report/
+test-results/
+.DS_Store
+
+references/
+
+# Local CodeGraph index is machine-specific and must not be committed.
+.codegraph/

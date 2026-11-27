@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
+import { toast } from "sonner"
 import { LocalBoardUrl } from "@/routes"
 import { isTauri } from "@/platform"
 import { useQueryClient } from "@tanstack/react-query"
@@ -76,6 +77,7 @@ import { CUSTOM_NODE_TYPES } from "./custom-node-types"
 import { useLocalPresence } from "./use-local-presence"
 import { useWsCollab } from "./use-ws-collab"
 import { useBoardSyncV2 } from "./use-board-sync-v2"
+import { useJazzCanvasSync } from "@/features/board/jazz/use-jazz-canvas-sync"
 import { useHistoryBatchIds } from "./use-history-batch-ids"
 import { browserAgentActiveFor, useSyncEngine } from "./use-sync-engine"
 import { useThumbnailCapture } from "./use-thumbnail-capture"
@@ -123,6 +125,9 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
     storeRef.current = createBoardStore({ nodeTypes: [...boardNodeTypes] })
   }
   const store = storeRef.current
+  // Explicit opt-in until the entire backend and auth cutover is verified.
+  // A Jazz board must not mount the legacy WS or v2 oplog in parallel.
+  const jazzEnabled = !local && import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1"
 
   const tool = useBoardAppStore((s) => s.tool)
   const viewMode = useBoardAppStore((s) => s.viewMode)
@@ -235,7 +240,9 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
   const styleMemory = useStyleMemory(store)
   useStampNewEdges(store, boardId, rootId)
   useStampNewNodes(store, boardId, rootId)
-  useSidebarContentsSync(store, boardId)
+  // The existing sidebar cache reads IndexedDB, not Jazz. Do not make it
+  // claim a Jazz-backed projection until its list provider has migrated.
+  useSidebarContentsSync(store, jazzEnabled ? null : boardId)
   useBlockFolderCopy(store)
   useHarnessApplyMindMap(store, boardId, rootId, ready)
   useHydrateIconNodes(store, boardId, rootId, ready)
@@ -245,7 +252,7 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
   useThumbnailCapture(
     store,
     boardId,
-    ready && (!local || !rootId),
+    ready && !jazzEnabled && (!local || !rootId),
     theme.minimap,
     local ? saveLocalThumbnail : undefined,
   )
@@ -274,20 +281,64 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
     [local, syncEngine],
   )
   useLocalSearchIndex(store, agentLocalIndexes)
-  useLocalDocIndex(boardId ?? "", agentLocalIndexes)
-  useDocNodeCascade(store, boardId ?? "", agentLocalIndexes)
+  useLocalDocIndex(boardId ?? "", agentLocalIndexes && !jazzEnabled)
+  useDocNodeCascade(store, boardId ?? "", agentLocalIndexes && !jazzEnabled)
 
-  useWsCollab(store, boardId, ready && !local && !v2, rootId)
+  useJazzCanvasSync(store, boardId, jazzEnabled, rootId ?? null, {
+    onRole: (role) => {
+      if (role === null) {
+        setReady(false)
+        setIsLoading(true)
+      }
+      setBoardRole(role)
+      setCanEdit(role === "owner" || role === "member")
+    },
+    onReady: () => {
+      setIsLoading(false)
+      setReady(true)
+      setBoardVisibility("private")
+      if (boardId) {
+        void fetch(`/patchboard-private/api/board?board_id=${encodeURIComponent(boardId)}`, {
+          credentials: "include", cache: "no-store",
+        }).then((response) => response.ok ? response.json() : Promise.reject(response.status))
+          .then((data: { title?: string }) => setBoardLabel(data.title ?? "Jazz board"))
+          .catch(() => setBoardLabel("Jazz board"))
+      }
+    },
+    onError: (error) => {
+      console.error("[jazz-canvas]", error)
+      toast.error(error, {
+        id: "jazz-canvas-status",
+        duration: error.includes("Editing suspended") ? Infinity : 6000,
+        action: error.includes("Editing suspended") ? {
+          label: "Copy local draft",
+          onClick: () => {
+            try {
+              // Explicit user action only: copy a recoverable JSON snapshot
+              // without overwriting the newer Jazz revision on the server.
+              const draft = JSON.stringify({ boardId,
+                nodes: store.getAllNodes(), edges: store.getAllEdges() }, null, 2)
+              void navigator.clipboard.writeText(draft)
+                .then(() => toast.success("Local board draft copied. Save it before reloading."))
+                .catch(() => toast.error("Clipboard unavailable. Keep this tab open."))
+            } catch { toast.error("Could not copy the draft. Keep this tab open.") }
+          },
+        } : undefined,
+      })
+      setIsLoading(false)
+    },
+  })
+  useWsCollab(store, boardId, ready && !local && !v2 && !jazzEnabled, rootId)
   // Fail-closed until the coordinator resolves the role from the ticket: unknown
   // role (null) → no edit affordances / no owner-only Share. Keyed on the board
   // (not rootId), so folder navigation within a board never resets a resolved role.
   useEffect(() => {
-    if (v2) {
+    if (v2 && !jazzEnabled) {
       setCanEdit(false)
       setBoardRole(null)
     }
-  }, [boardId, v2, setCanEdit, setBoardRole])
-  useBoardSyncV2(store, boardId, ready && v2, rootId ?? null, (role) => {
+  }, [boardId, v2, jazzEnabled, setCanEdit, setBoardRole])
+  useBoardSyncV2(store, boardId, ready && v2 && !jazzEnabled, rootId ?? null, (role) => {
     // v2 skips the REST hydrate, so this is where the real role lands (from the
     // collab ticket). Grant edit rights only to owner/member (positive check →
     // fail-closed for null / any future non-editor role); viewers stay read-only.
@@ -433,6 +484,9 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
   // Hydrate on scope change. `cancelled` guards against late-arriving loads
   // when the user navigates rapidly between boards.
   useEffect(() => {
+    // Jazz owns this board's whole hydration lifecycle; never let a late
+    // syncEngine registry result reset its ready state.
+    if (jazzEnabled) return
     if (!boardId) {
       setReady(false)
       return
@@ -528,7 +582,7 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
     return () => {
       cancelled = true
     }
-  }, [boardId, rootId, store, local, v2, syncEngine, setIsLoading, setCanEdit, setBoardRole, setBoardLabel, setBoardVisibility])
+  }, [boardId, rootId, store, local, jazzEnabled, v2, syncEngine, setIsLoading, setCanEdit, setBoardRole, setBoardLabel, setBoardVisibility])
 
   return (
     <CanvasProvider store={store}>
@@ -596,6 +650,7 @@ function HarnessCanvasInner({
 }: InnerProps) {
   const renderView = useRenderCustomNodeView()
   const isBoard = viewMode === "board"
+  const jazzMode = import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1"
   // Hide non-essential chrome (toolbar, viewport controls, minimap)
   // during presentation so the canvas reads as a clean slide. Other
   // already-self-hiding chrome (readonly chip, top-right strip) stays
@@ -651,7 +706,7 @@ function HarnessCanvasInner({
           )}
           {!presenting && <HarnessViewportControls />}
           <StyleSidebar />
-          {canCollab && <RemoteCursors />}
+          {canCollab && !jazzMode && <RemoteCursors />}
           <EmptyBoardCoachmarks ready={ready} />
         </>
       ) : viewMode === "files" ? (
@@ -669,12 +724,16 @@ function HarnessCanvasInner({
           canvas overlay, above the surface backdrop so it stays crisp +
           interactive while a sheet is open; desktop renders it in the reserved
           title bar (see SidebarLabel), which the backdrop never covers. */}
-      {!presenting && !isTauri() && (
+      {!presenting && !isTauri() && (jazzMode ? (
+        <a href="/jazz-signin" className="absolute left-4 top-4 z-[60] rounded-md border bg-background/80 px-3 py-2 text-xs font-medium backdrop-blur">
+          ← Jazz boards
+        </a>
+      ) : (
         <BoardBreadcrumb
           local={!canCollab}
           className="absolute left-14 top-4 z-[60] max-w-[calc(100vw-8rem)]"
         />
-      )}
+      ))}
       {/*
         Top-right chrome row: save status + share button live in one
         flex container so they never overlap (z-stack collisions cost
@@ -682,13 +741,14 @@ function HarnessCanvasInner({
         — the container is invisible when empty.
       */}
       <div className="absolute right-3 top-3 z-50 flex items-center gap-2">
-        {canCollab && <HarnessPeerChip />}
+        {canCollab && !jazzMode && <HarnessPeerChip />}
         <HarnessReadonlyChip />
         {/* Local boards have no collab chrome, so surface an explicit
             "On device" badge so they're not mistaken for synced. */}
         {!canCollab && <BoardKindBadge kind="local-only" />}
-        {canCollab && <HarnessCollabStatus />}
-        {canCollab && <ShareButton />}
+        {jazzMode && <span className="rounded-md border bg-background/90 px-3 py-2 text-xs font-medium shadow-sm">Jazz · MCP</span>}
+        {canCollab && !jazzMode && <HarnessCollabStatus />}
+        {canCollab && <ShareButton jazz={jazzMode} />}
       </div>
       <NodeSurfaceHost />
       <SlidesSheet />

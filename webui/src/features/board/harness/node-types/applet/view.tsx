@@ -10,13 +10,13 @@
 // exactly like the `sheet` node type — no snapshot bitmaps in the LOD path. (`snapshotApplet`
 // exists only for on-demand PNG/SVG export of selected nodes, not for this placeholder.)
 
-import { useCallback, useEffect, useMemo, useRef } from "react"
+import { useMemo, useRef } from "react"
 
 import { ChartLineIcon } from "@phosphor-icons/react"
 import { type NodeId } from "@canvas-harness/core"
 import { useCanvasStore, useNode, useSelection } from "@canvas-harness/react"
 
-import { AppletRenderer, deleteAppletState, saveAppletState, useAppletInitialState } from "@/features/applet/render"
+import { AppletRenderer, deleteAppletState, useAppletInitialState } from "@/features/applet/render"
 import { removeNodeSubtree } from "@/features/board/harness/graph/subtree"
 import { cn } from "@/lib/utils"
 
@@ -34,6 +34,53 @@ const useAppletMount = createDeferredMount({ cap: 10 })
 
 export interface AppletViewProps {
   id: NodeId
+}
+
+
+/** A transient status must intercept native canvas pointer capture to be clickable. */
+function AppletSaveNotice({ status, onRetry }: {
+  status: "saving" | "saved" | "unsaved" | "conflict"
+  onRetry: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  useStopCanvasGesture(ref)
+  return (
+    <div
+      ref={ref}
+      role={status === "unsaved" ? "alert" : "status"}
+      className="absolute right-1 top-1 z-20 flex items-center gap-2 rounded-md border border-border bg-background px-2 py-1 text-xs pointer-events-auto"
+    >
+      <span>{status === "saved" ? "Saved" : status === "unsaved" ? "Unsaved" : "Saving…"}</span>
+      {status === "unsaved" && (
+        <button type="button" className="font-medium underline" onClick={onRetry}>
+          Retry
+        </button>
+      )}
+    </div>
+  )
+}
+
+
+/** Keep the remote value visible and retain the draft until an explicit action. */
+function AppletConflictNotice({ shared, onCopy, onRefresh }: {
+  shared: Record<string, unknown> | null
+  onCopy: () => void
+  onRefresh: () => void
+}) {
+  const ref = useRef<HTMLDivElement>(null)
+  useStopCanvasGesture(ref)
+  return (
+    <div ref={ref} role="alert" className="absolute inset-x-1 top-1 z-20 rounded-lg border border-amber-500 bg-background p-2 text-xs pointer-events-auto">
+      State conflict: another editor saved first. Your local draft is preserved.
+      {shared && <span className="ml-1">Shared value: {JSON.stringify(shared)}</span>}
+      <button type="button" className="ml-2 underline" onClick={onCopy}>
+        Copy local draft
+      </button>
+      <button type="button" className="ml-2 underline" onClick={onRefresh}>
+        Reload shared state
+      </button>
+    </div>
+  )
 }
 
 
@@ -72,35 +119,12 @@ export function AppletNodeView({ id }: AppletViewProps) {
   // Hydrate persisted state before mounting the renderer, so the applet inits with
   // saved state instead of flashing defaults then re-mounting (shared with the
   // inspect surface).
-  const { initialState, stateLoaded } = useAppletInitialState(noteId)
+  const { initialState, stateLoaded, stateRevision, persistState, hasConflict,
+    refreshSharedState, saveStatus, retrySave, copyLocalDraft,
+    conflictingSharedValue } = useAppletInitialState(noteId, shouldMount || isSelected)
 
-  // Debounce persistence: a rapidly-updating applet (slider, text field) would
-  // otherwise issue an IndexedDB write per keystroke. Coalesce to one write ~300ms
-  // after the last change, and flush the pending state on unmount.
-  const pendingState = useRef<Record<string, unknown> | null>(null)
-  const persistTimer = useRef<number | null>(null)
-  /** Persist the latest pending applet state now: cancel any debounce timer and, if a
-   *  change is pending, write it to the local store. Called on the debounced settle and
-   *  once on unmount so the final state isn't lost. */
-  const flushPersist = useCallback(() => {
-    if (persistTimer.current !== null) {
-      clearTimeout(persistTimer.current)
-      persistTimer.current = null
-    }
-    if (pendingState.current !== null) {
-      void saveAppletState(noteId, pendingState.current)
-      pendingState.current = null
-    }
-  }, [noteId])
-  const onPersist = useCallback(
-    (next: Record<string, unknown>) => {
-      pendingState.current = next
-      if (persistTimer.current !== null) clearTimeout(persistTimer.current)
-      persistTimer.current = window.setTimeout(flushPersist, 300)
-    },
-    [flushPersist],
-  )
-  useEffect(() => () => flushPersist(), [flushPersist])
+  // Persistence and remote revision checks are coordinated in one hook.
+  // A stale writer gets an explicit conflict instead of overwriting a peer.
 
   // Live iff mounted-by-the-pool (or selected) and ready to render.
   const live = (shouldMount || isSelected) && !!source && stateLoaded
@@ -109,8 +133,9 @@ export function AppletNodeView({ id }: AppletViewProps) {
   // e.g. a pan settle or a select) so React skips re-reconciling the interpreted subtree —
   // AppletRenderer isn't memoized and would otherwise re-interpret on every such re-render.
   const appletEl = useMemo(
-    () => <AppletRenderer source={source} initialState={initialState} onPersist={onPersist} className="h-full w-full" />,
-    [source, initialState, onPersist],
+    () => <AppletRenderer source={source} initialState={initialState}
+      stateRevision={stateRevision} onPersist={persistState} className="h-full w-full" />,
+    [source, initialState, stateRevision, persistState],
   )
 
   if (!node) return null
@@ -137,6 +162,16 @@ export function AppletNodeView({ id }: AppletViewProps) {
             isSelected ? "pointer-events-auto" : "pointer-events-none",
           )}
         >
+          {hasConflict && (
+            <AppletConflictNotice
+              shared={conflictingSharedValue}
+              onCopy={() => { void copyLocalDraft() }}
+              onRefresh={() => { void refreshSharedState() }}
+            />
+          )}
+          {!hasConflict && saveStatus !== "idle" && (
+            <AppletSaveNotice status={saveStatus} onRetry={() => { void retrySave() }} />
+          )}
           {live ? (
             appletEl
           ) : (

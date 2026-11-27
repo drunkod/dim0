@@ -35,6 +35,8 @@ notebooks.exclude/
 # Ignore Codex files
 .codex/
 SKILL.md
+# Package-local skill is intentionally published with the Dim0 plugin.
+!plugins/dim0/skills/dim0-board/SKILL.md
 .codex
 
 # Local design / working notes — keep on disk, never publish.
@@ -43,6 +45,9 @@ sharing-archi.md
 next-steps.md
 # internal design/planning docs — local only
 dev-docs/
+
+# Private preview ZIPs contain the current endpoint and are never committed.
+integrations/dim0-mcp-plugin/dist/
 
 # signing secrets — never commit
 *.p12

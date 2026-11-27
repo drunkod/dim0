@@ -45,6 +45,8 @@ export interface AppletRendererProps {
   source: string
   /** Persisted state to hydrate over the declared defaults (Phase 2b wires this). */
   initialState?: Record<string, JsonValue>
+  /** Remote Jazz revision used to rehydrate from a different writer. */
+  stateRevision?: number
   /** Called with the next state after each change when the applet is `persist`. */
   onPersist?: (state: Record<string, unknown>) => void
   className?: string
@@ -52,7 +54,7 @@ export interface AppletRendererProps {
 
 
 /** Compile + render an applet, contained and wrapped in an error boundary. */
-export function AppletRenderer({ source, initialState, onPersist, className }: AppletRendererProps) {
+export function AppletRenderer({ source, initialState, stateRevision = 0, onPersist, className }: AppletRendererProps) {
   const compiled = useMemo(() => compileApplet(source), [source])
 
   return (
@@ -61,7 +63,7 @@ export function AppletRenderer({ source, initialState, onPersist, className }: A
         // Reset on source change so an edited applet re-hydrates fresh state and
         // clears any prior error; `key={source}` remounts TreeView's state ref.
         <AppletErrorBoundary resetKey={source} fallback={(e, reset) => <ErrorCard message={e.message} onRetry={reset} />}>
-          <TreeView key={source} tree={compiled.tree} initialState={initialState} onPersist={onPersist} />
+          <TreeView key={source + ":" + stateRevision} tree={compiled.tree} initialState={initialState} onPersist={onPersist} />
         </AppletErrorBoundary>
       ) : (
         <ErrorCard message={compiled.message} line={compiled.line} />

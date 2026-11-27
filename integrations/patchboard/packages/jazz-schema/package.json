@@ -1,0 +1,25 @@
+{
+  "name": "@patchboard/jazz-schema",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./jazz.generated.ts",
+  "types": "./jazz.generated.ts",
+  "exports": {
+    ".": "./jazz.generated.ts",
+    "./note-defaults": "./note-defaults.ts",
+    "./jazz.permissions.json": "./jazz.permissions.json",
+    "./private.permissions.json": "./private.permissions.json"
+  },
+  "scripts": {
+    "generate": "jazz-tools generate",
+    "generate:private": "tsx scripts/generate-private-permissions.ts",
+    "generate:private:check": "tsx scripts/generate-private-permissions.ts --check"
+  },
+  "dependencies": {
+    "jazz-tools": "catalog:"
+  },
+  "devDependencies": {
+    "tsx": "4.21.0"
+  }
+}

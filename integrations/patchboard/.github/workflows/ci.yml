@@ -1,0 +1,69 @@
+name: Patchboard checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.11.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install pinned dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm --filter @patchboard/web exec playwright install --with-deps chromium
+      - name: Verify shared build, browser acceptance and backend durability
+        run: pnpm verify
+      - name: Save browser report and demo
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            apps/web/playwright-report/
+            apps/web/test-results/
+          retention-days: 7
+      - name: Save preview bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: patchboard-preview-${{ github.sha }}
+          path: apps/web/dist/
+          retention-days: 7
+
+
+  private-oauth:
+    name: Private OAuth passkey, consent and scoped MCP acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.11.2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - name: Install pinned dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Install Chromium
+        run: pnpm --filter @patchboard/web exec playwright install --with-deps chromium
+      - name: Verify private OAuth PKCE, consent, scope, roles, and enrollments
+        run: pnpm test:private:ci
+        timeout-minutes: 12

@@ -22,6 +22,7 @@ const shouldAnalyzeBundle = process.env.ANALYZE === "true"
 const allowedHosts = [
   "app.dim0.net",
   "mini-app.dim0.net",
+  ...(process.env.DIM0_JAZZ_PUBLIC_HOST ? [process.env.DIM0_JAZZ_PUBLIC_HOST] : []),
 ]
 
 
@@ -90,6 +91,29 @@ const PICKER_ONLY_ICON_NAMES = new Set(
 )
 
 
+/** Experimental private-Jazz proxy for both dev and production-like preview.
+ * Keep the OAuth issuer, MCP resource metadata and canvas API on one origin.
+ */
+const jazzPrivateProxy = process.env.VITE_DIM0_JAZZ_CANVAS === "1" ? {
+  "/patchboard-private": {
+    target: `http://127.0.0.1:${process.env.PATCHBOARD_PRIVATE_PORT ?? "8792"}`,
+    changeOrigin: true,
+    ws: true,
+  },
+  "/patchboard-auth": {
+    target: `http://127.0.0.1:${process.env.PATCHBOARD_PRIVATE_PORT ?? "8792"}`,
+    changeOrigin: true,
+  },
+  "/patchboard-private-mcp": {
+    target: `http://127.0.0.1:${process.env.PATCHBOARD_PRIVATE_PORT ?? "8792"}`,
+    changeOrigin: true,
+  },
+  "/.well-known": {
+    target: `http://127.0.0.1:${process.env.PATCHBOARD_PRIVATE_PORT ?? "8792"}`,
+    changeOrigin: true,
+  },
+} : undefined
+
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
@@ -141,7 +165,16 @@ export default defineConfig({
         // It's a real document, not an SPA route — without this the nav fallback
         // serves the host app shell into the iframe once the SW is active, so
         // every mini-app would render the host app instead of the widget.
-        navigateFallbackDenylist: [/^\/mini-app\//],
+        // Auth, OAuth/MCP metadata, and private Jazz UI are served by the
+        // same-origin backend. Workbox must never turn their navigation into
+        // the Dim0 SPA shell (which breaks ChatGPT's OAuth reconnect flow).
+        navigateFallbackDenylist: [
+          /^\/mini-app\//,
+          /^\/patchboard-auth(?:\/|$)/,
+          /^\/patchboard-private(?:\/|$)/,
+          /^\/patchboard-private-mcp(?:\/|$)/,
+          /^\/\.well-known(?:\/|$)/,
+        ],
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
         // Never precache these — both would trip Workbox's 2 MiB cache-entry
         // limit and (because that's fatal here) fail the prod build:
@@ -289,10 +322,12 @@ export default defineConfig({
     allowedHosts,
     host: "0.0.0.0",
     port: Number(process.env.APP_PORT) || 5173,
+    proxy: jazzPrivateProxy,
   },
   preview: {
     allowedHosts,
     host: "0.0.0.0",
     port: Number(process.env.APP_PORT) || 5173,
+    proxy: jazzPrivateProxy,
   },
 })

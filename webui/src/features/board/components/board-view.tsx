@@ -32,14 +32,15 @@ export const BoardView: React.FC = () => {
   // `local` — that would suppress its transcript backup). This screen is only
   // mounted for synced boards, so `local` is always false here.
   const browserAgent = useBrowserAgentActive(boardId, false)
-  const syncTranscript = browserAgent
+  const jazzMode = import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1"
+  const syncTranscript = browserAgent && !jazzMode
 
   // Own the local-store init at the screen level (mirrors LocalBoardScreen), so
   // the store is populated regardless of which chat surface is currently mounted
   // — otherwise opening the drawer (which unmounts the pill) would show nothing.
   const openBoard = useLocalMessagesStore((s) => s.openBoard)
   useEffect(() => {
-    if (!(browserAgent && boardId)) return
+    if (!(browserAgent && boardId) || jazzMode) return
     let cancelled = false
     void (async () => {
       await seedTranscriptsFromServer(boardId)
@@ -48,7 +49,7 @@ export const BoardView: React.FC = () => {
     return () => {
       cancelled = true
     }
-  }, [browserAgent, boardId, openBoard])
+  }, [browserAgent, boardId, jazzMode, openBoard])
 
   // current_chat_id from the URL — shared between the floating island
   // and the full chat sheet so opening one continues the same chat.
@@ -62,14 +63,14 @@ export const BoardView: React.FC = () => {
     <div className="absolute inset-0 h-full w-full overflow-hidden">
       <div className="relative h-full w-full bg-background">
         <HarnessCanvas />
-        {!chatSheetOpen && !presentationMode && boardId && (
+        {!jazzMode && !chatSheetOpen && !presentationMode && boardId && (
           <FloatingAssistant
             boardId={boardId}
             currentChatId={currentChatId}
             onOpenFullSheet={() => setChatSheetOpen(true)}
           />
         )}
-        <CopilotSheet
+        {!jazzMode && <CopilotSheet
           open={chatSheetOpen}
           onOpenChange={setChatSheetOpen}
           boardId={boardId ?? undefined}
@@ -89,12 +90,12 @@ export const BoardView: React.FC = () => {
               })
             }
           }}
-        />
+        />}
         {/* Off-board tool gate (web search / fetch / code). Mounted at the board
             level — like LocalBoardScreen does — so it survives the pill↔drawer
             swap; without it a browser-agent turn would await a confirm that can
             never be answered and hang forever. Only the browser engine gates. */}
-        {browserAgent && <ToolConfirmDialog />}
+        {browserAgent && !jazzMode && <ToolConfirmDialog />}
       </div>
     </div>
   )

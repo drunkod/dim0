@@ -64,7 +64,7 @@ export const AppletPanel = memo(function AppletPanel({
 
   // Hydrate the preview from persisted state; `stateLoaded` gates the render so we
   // don't flash defaults then re-mount (shared with the on-canvas node view).
-  const { initialState, stateLoaded } = useAppletInitialState(nodeId)
+  const { initialState, stateLoaded, stateRevision } = useAppletInitialState(nodeId)
 
   const source = (node?.content ?? "").trim()
   const displayTitle = label?.trim() || "Untitled applet"
@@ -133,7 +133,8 @@ export const AppletPanel = memo(function AppletPanel({
                 // `overflow-auto` container above scroll. h-full pinned it to the viewport and
                 // the applet-root's `contain: paint` then clipped the overflow, making the bottom
                 // (e.g. the step table) unreachable.
-                <AppletRenderer source={source} initialState={initialState} className="w-full" />
+                <AppletRenderer source={source} initialState={initialState}
+                  stateRevision={stateRevision} className="w-full" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-sm text-muted-foreground">Loading…</div>
               )

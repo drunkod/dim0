@@ -158,6 +158,22 @@ export function RootLayout() {
     </>
   )
 
+  // The opt-in Jazz canvas has its own Better Auth session and no legacy Dim0
+  // backend, sidebar or connectivity ping. Keep its prototype shell standalone.
+  if (import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" &&
+    (location.pathname === "/jazz-signin" || location.pathname.startsWith("/boards/"))) {
+    return (
+      <ThemeProvider>
+        <StyleDefaultsProvider>
+          <div className="relative h-dvh w-full overflow-hidden bg-background">
+            <Outlet />
+            <Toaster position="top-right" closeButton />
+          </div>
+        </StyleDefaultsProvider>
+      </ThemeProvider>
+    )
+  }
+
   return (
     <ThemeProvider>
       <StyleDefaultsProvider>

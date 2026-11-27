@@ -1,0 +1,32 @@
+{
+  "name": "agent-staff-board",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @patchboard/web dev",
+    "check": "pnpm --filter @patchboard/web typecheck && pnpm --filter @patchboard/server typecheck",
+    "test": "pnpm --filter @patchboard/web test",
+    "build": "pnpm --filter @patchboard/web build",
+    "lint": "pnpm --filter @patchboard/web lint && pnpm --filter @patchboard/server lint",
+    "format": "pnpm --filter @patchboard/web format",
+    "generate": "pnpm --filter @patchboard/jazz-schema generate",
+    "test:e2e": "VITE_JAZZ_SERVER_URL=/jazz pnpm build && pnpm --filter @patchboard/web exec playwright test",
+    "verify": "pnpm generate && pnpm --filter @patchboard/jazz-schema generate:private:check && git diff --exit-code -- packages/jazz-schema/jazz.generated.ts packages/jazz-schema/jazz.permissions.json && pnpm lint && pnpm test && pnpm test:integration && pnpm check && pnpm test:e2e && pnpm --filter @patchboard/web exec node test/backend-write-proof.mjs && pnpm test:demo-proof",
+    "test:integration": "pnpm --filter @patchboard/jazz-schema exec node --test test/runtime.test.mjs && pnpm --filter @patchboard/server exec tsx --test test/private-authz.test.mjs && pnpm test:mcp",
+    "test:mcp": "pnpm --filter @patchboard/server exec tsx --test test/mcp-board.test.mjs",
+    "test:backend-proof": "VITE_JAZZ_SERVER_URL=/jazz pnpm build && pnpm --filter @patchboard/web exec node test/backend-write-proof.mjs",
+    "test:demo-proof": "pnpm build && pnpm --filter @patchboard/server exec node test/demo-start-proof.mjs",
+    "test:public-proof": "pnpm --filter @patchboard/server exec node test/public-funnel-proof.mjs",
+    "demo:start": "PATCHBOARD_WEB_BASE=/patchboard/ VITE_JAZZ_SERVER_URL=/patchboard/jazz pnpm build && pnpm --filter @patchboard/server exec tsx src/demo.ts",
+    "demo:private": "PATCHBOARD_WEB_BASE=/patchboard-private/ VITE_JAZZ_SERVER_URL=/patchboard-private/jazz VITE_PATCHBOARD_PRIVATE=1 pnpm build && pnpm --filter @patchboard/server exec tsx src/private-demo.ts",
+    "auth:migrate:private": "pnpm --filter @patchboard/server exec auth migrate --config ./src/private-auth/auth.ts --yes",
+    "test:private:browser": "pnpm --filter @patchboard/web exec node test/private-collaboration-proof.mjs",
+    "test:private:passkey": "pnpm --filter @patchboard/web exec node test/private-passkey-proof.mjs",
+    "test:private:policy": "pnpm --filter @patchboard/web exec vitest run src/private-policy.test.ts",
+    "test:private:oauth": "pnpm --filter @patchboard/web exec node test/private-oauth-mcp-proof.mjs",
+    "test:private:enrollment": "pnpm --filter @patchboard/server exec tsx --test test/enrollment.test.mjs",
+    "test:private:ci": "node apps/server/test/private-ci.mjs"
+  },
+  "packageManager": "pnpm@12.11.2"
+}

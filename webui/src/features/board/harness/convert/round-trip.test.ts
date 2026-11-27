@@ -486,6 +486,21 @@ describe("link ↔ edge round-trip", () => {
     expect(back.properties.edgeControlPoint.position).toBeUndefined()
   })
 
+  it("defaults sparse MCP-created connectors to a renderable bezier path", () => {
+    // The MCP tool permits partial JSON. A link with style: {} reaches this
+    // converter without the WS inbound normalizer and must remain paintable.
+    const link = {
+      ...createDefaultLink(BOARD_ID, "node-a", "node-b"),
+      style: {} as ReturnType<typeof createDefaultLink>["style"],
+      properties: {} as ReturnType<typeof createDefaultLink>["properties"],
+    }
+    const edge = linkToEdge(link, makeNodes())
+    expect(edge.pathStyle).toBe("bezier")
+    expect(edge.source).toHaveProperty("nodeId")
+    expect(edge.target).toHaveProperty("nodeId")
+    expect(edge.groups).toEqual([])
+  })
+
   it("preserves arrowheads + pathStyle", () => {
     const link = createDefaultLink(BOARD_ID, "node-a", "node-b")
     link.style.sourceArrowhead = "barb"

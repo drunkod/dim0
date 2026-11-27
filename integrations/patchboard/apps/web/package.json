@@ -1,0 +1,35 @@
+{
+  "name": "@patchboard/web",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vite build",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "lint": "oxlint src",
+    "format": "oxfmt src"
+  },
+  "dependencies": {
+    "@better-auth/passkey": "1.7.1",
+    "@foldkit/ui": "catalog:",
+    "@patchboard/jazz-schema": "workspace:*",
+    "better-auth": "1.7.1",
+    "effect": "catalog:",
+    "foldkit": "catalog:",
+    "jazz-tools": "catalog:"
+  },
+  "devDependencies": {
+    "@foldkit/oxlint-plugin": "catalog:",
+    "@foldkit/vite-plugin": "catalog:",
+    "@modelcontextprotocol/sdk": "1.29.0",
+    "@playwright/test": "1.63.0",
+    "happy-dom": "catalog:",
+    "oxfmt": "catalog:",
+    "oxlint": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}
