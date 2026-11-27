@@ -69,7 +69,7 @@ for(const fixture of fixtures)test("preserve persisted "+fixture.hash+" through 
       await assert.rejects(()=>requirePrivateBoardAccess(db,boardId,outsider,true));
       await server.close();server=null;
     }
-    console.log("CANVAS_ANCESTRY_MIGRATION_PASS",JSON.stringify({from:fixture.hash,to:"8d726a3304d2",reopened:true,boardAndMemberIdsPreserved:true,entityIdPreserved:true,version:7,writerPreserved:true,inheritedDenied:true}));
+    console.log("CANVAS_ANCESTRY_MIGRATION_PASS",JSON.stringify({from:fixture.hash,through:"8d726a3304d2",reopened:true,boardAndMemberIdsPreserved:true,entityIdPreserved:true,version:7,writerPreserved:true,inheritedDenied:true}));
   }finally{
     await server?.close();process.env.JAZZ_APP_DIR=currentDir;
     await rm(path,{recursive:true,force:true,maxRetries:5,retryDelay:250});

@@ -18,6 +18,7 @@ import {
   CanvasPermissionDenied, CanvasConflict, CanvasInvalid, type CanvasPayload,
 } from "./canvas-entity-service.ts";
 import { getSharedAppletState, saveSharedAppletState } from "./applet-state-service.ts";
+import { patchCanvasLabelMarkdown, CanvasPatchRequestConflict, CanvasPatchCommitUnknown } from "./canvas-versioned-patch.ts";
 import { privateAuthConfig } from "./private-auth/config.ts";
 import { privateAuthDatabase } from "./private-auth/db.ts";
 import { requireConsentBoundBoardGrant, type VerifiedBoardGrant } from "./private-auth/grants.ts";
@@ -33,6 +34,7 @@ const errorText = (message: string) => ({
   isError: true as const,
   content: [{ type: "text" as const, text: message }],
 });
+class CanvasPatchAdmissionRevoked extends Error {}
 const output = (value: unknown) => ({
   content: [{ type: "text" as const, text: JSON.stringify(value) }],
 });
@@ -118,7 +120,10 @@ async function executePrivateMcp(
 
   // Dim0 JSON entities remain in Jazz; every tool is scoped to this OAuth grant.
   const canvasFailure = (error: unknown) => errorText(
-    error instanceof CanvasPermissionDenied ? "BOARD_ACCESS_DENIED"
+    error instanceof CanvasPatchAdmissionRevoked ? "GRANT_ADMISSION_EXPIRED_OR_INVALID"
+      : error instanceof CanvasPatchRequestConflict ? "REQUEST_ID_CONFLICT"
+      : error instanceof CanvasPatchCommitUnknown ? "COMMIT_OUTCOME_UNKNOWN: retry same request_id"
+      : error instanceof CanvasPermissionDenied ? "BOARD_ACCESS_DENIED"
       : error instanceof CanvasConflict ? "VERSION_CONFLICT"
       : error instanceof CanvasInvalid ? "INVALID_ENTITY"
       : "CANVAS_OPERATION_FAILED",
@@ -184,6 +189,30 @@ async function executePrivateMcp(
       });
       return output({ id: entity.id, board_id, version: entity.version });
     } catch (error) { return canvasFailure(error); }
+  });
+
+  if (canWrite()) mcpServer.registerTool("patch_canvas_entity", {
+    description:"Patch one canvas note label.markdown with version CAS and a stable request_id; authoritative Jazz transaction writes entity, receipt and audit event once.",
+    annotations:{readOnlyHint:false,destructiveHint:false},
+    inputSchema:z.object({
+      board_id:boardId,entity_id:canvasId,
+      expected_version:z.number().int().positive(),
+      request_id:z.string().trim().min(1).max(128),
+      field_patch:z.object({label_markdown:z.string().max(2000)}).strict()
+    }).strict(),
+  },async ({board_id,entity_id,expected_version,request_id,field_patch})=>{
+    if(!admitted("board:write"))return errorText("GRANT_ADMISSION_EXPIRED_OR_INVALID");
+    if(!canWrite())return errorText("INSUFFICIENT_SCOPE: board:write required");
+    if(board_id!==grant.boardId)return errorText("BOARD_ACCESS_DENIED");
+    try {
+      const updated=await patchCanvasLabelMarkdown(db,{
+        boardId:board_id,actorId,id:entity_id,
+        expectedVersion:expected_version,requestId:request_id,patch:field_patch,
+      },{beforeWriteSubmit:()=>{
+        if(!admitted("board:write"))throw new CanvasPatchAdmissionRevoked();
+      }});
+      return output(updated);
+    } catch(error){return canvasFailure(error);}
   });
 
   if (canWrite()) mcpServer.registerTool("delete_canvas_entity", {
