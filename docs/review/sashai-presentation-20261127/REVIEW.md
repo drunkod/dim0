@@ -1,6 +1,6 @@
 # SashAI presentation: persistent HTTPS staging review
 
-Application commit:  (PR #38). Base: .
+Application commit: f58de49c5e6b868c1ba20e573cac79c49f135464 (PR #38). Base: e7ffc6db79d010d91ae279518243b6375c4b2fc1.
 Tested on the MacBook in a disposable local HTTPS persistent profile with virtual passkeys, QA flags off, one persistent store and board; two independent account sessions. No public deployment or installed ChatGPT client test.
 
 ## Acceptance
@@ -24,7 +24,7 @@ Tested on the MacBook in a disposable local HTTPS persistent profile with virtua
 
 ## Verification
 
- in integrations/patchboard passed on the exact application commit above; an initial signup click timed out, and an unmodified retry passed. An earlier pre-commit Profile locator mismatch was corrected. 31 focused frontend tests and 29 focused server tests passed on the exact application commit; pre-commit web lint/typecheck, server typecheck, generated schema/private checks passed. CodeGraph and the repository Jazz Tools skill were used to trace authenticated preference and consent paths. No schema, migration, dependency, grant, or MCP execution change. The combined replay/disconnect evidence from #37 is reused, not rerun.
+pnpm test:native:sashai-presentation in integrations/patchboard passed on the exact application commit above; an initial signup click timed out, and an unmodified retry passed. An earlier pre-commit Profile locator mismatch was corrected. 31 focused frontend tests and 29 focused server tests passed on the exact application commit; pre-commit web lint/typecheck, server typecheck, generated schema/private checks passed. CodeGraph and the repository Jazz Tools skill were used to trace authenticated preference and consent paths. No schema, migration, dependency, grant, or MCP execution change. The combined replay/disconnect evidence from #37 is reused, not rerun.
 
 [Prior combined engineering acceptance](https://github.com/drunkod/dim0/blob/1e1be56ec5f3b83ca38107ef05b66afca15c0774/docs/review/persistent-web-handover-20261127/HANDOVER.md)
 
