@@ -4,6 +4,7 @@ import type { Db } from "jazz-tools";
 import { app } from "@patchboard/jazz-schema";
 import { requirePrivateBoardAccess } from "../board-service.ts";
 import { privateAuthDatabase } from "./db.ts";
+import { revokeGrantWithReceipt } from "../account-adapters/grant-admission.ts";
 
 /** One consent transaction per AsyncLocalStorage context, never per cookie, tab or client. */
 const pending = new AsyncLocalStorage<{ id: string }>();
@@ -73,17 +74,22 @@ export function requireConsentBoundBoardGrant(
   return boards.size === 1 ? boards.values().next().value ?? null : null;
 }
 
-/** Old and unbound tokens receive no Patchboard board authority. */
-export function tokenBoardGrantClaim(id: string | undefined, userId: string | undefined) {
-  if (!id || !userId) return {};
-  const row = rowFor(id);
-  if (!row || row.revoked_at_ms !== null || row.user_id !== userId) return {};
+/**
+ * A known provider referenceId MUST remain explicit even after revocation.
+ * Returning {} when the row is revoked would turn an explicit invalid token
+ * into an absent-reference token, enabling legacy consent fallback onto an
+ * unrelated board. The live grant check below always rejects that ID.
+ * Issuer-supplied referenceId (not caller JSON) is opaque and non-secret.
+ * Truly unbound legacy tokens retain their existing constrained fallback.
+ */
+export function tokenBoardGrantClaim(id: string | undefined, _userId: string | undefined) {
+  if (!id) return {};
   return { patchboard_grant_id: id };
 }
 export function revokeBoardGrant(id: string) {
-  privateAuthDatabase().prepare(
-    "UPDATE patchboard_oauth_grant SET revoked_at_ms=? WHERE id=? AND revoked_at_ms IS NULL",
-  ).run(Date.now(), id);
+  // Same SQLite serialization point as every admitted MCP request.
+  // Idempotent durable receipt and audit; no OAuth browser logout implied.
+  revokeGrantWithReceipt(privateAuthDatabase(), id);
 }
 export async function listPrivateBoards(db: Db, actorId: string) {
   const own = await db.all(app.boards.where({ ownerId: actorId }).limit(200));
