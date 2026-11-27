@@ -24,3 +24,21 @@ Updated 27 November 2026 for [Dim0 PR #28](https://github.com/drunkod/dim0/pull/
 Two independently controlled ChatGPT users collaborating on a board, physical-passkey return, and Firefox collaboration each need their own participants and evidence. The table-creation rehearsal uses one QA Owner. Track those broader journeys separately; production approval is a separate decision.
 
 The [21 November Patchboard checklist and evidence](https://github.com/drunkod/dim0/blob/66789d1a59f14ea35b6c1629fd4880ea3ce5159b/integrations/patchboard/docs/HUMAN_ACCEPTANCE_RUNBOOK.md) preserve the earlier note demo, staging references and H1–H3 procedures. Its hostname, board, fixed ports and custom-connector instructions are historical.
+
+## Email draft for the programmer
+
+**Subject: Finish PR #28 with one installed ChatGPT plugin test**
+
+Hi,
+
+Please run the remaining human acceptance test on candidate `66789d1a`. The automated checks have passed. We need to see the installed ChatGPT plugin create one table and confirm what happens after disconnect. Use the [operator instructions](https://github.com/drunkod/dim0/blob/66789d1a59f14ea35b6c1629fd4880ea3ce5159b/integrations/patchboard/docs/QA_INSTALLED_CATALOG_RUNBOOK.md) and the evidence worksheet linked above.
+
+Before creating the disposable store, have the QA account holder verify ZIP upload in ChatGPT Plugins and the Tailscale operator enroll the dedicated node. Prepare teardown first. The 30-minute window starts when the store is created. If either person lacks access, record the missing prerequisite and leave the window unopened.
+
+Install the archive built for the dedicated hostname. Verify consent for `board:write` and `table:create` on the selected board. Through the installed plugin, create **Plugin rehearsal** and replay the identical request. In native Data, match the dataset, primary **Title** field and **All rows** view IDs before and after backend restart.
+
+Disconnect the client in native Settings. Try one fresh creation from ChatGPT and record exactly what happens. Verify the original table remains the only table, retire the route and check it from outside the tailnet.
+
+Please post the completed worksheet on PR #28 with the public ZIP digest, three IDs, post-disconnect counts and teardown result. If a step fails, include the first observed failure and mark unattempted steps NOT_RUN. That gives us a specific fix and a clear stopping point.
+
+Thanks.
