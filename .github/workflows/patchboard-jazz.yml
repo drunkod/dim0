@@ -1,0 +1,69 @@
+name: Patchboard Jazz checks
+
+on:
+  pull_request:
+    paths:
+      - 'integrations/patchboard/**'
+      - '.github/workflows/patchboard-jazz.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'integrations/patchboard/**'
+      - '.github/workflows/patchboard-jazz.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Jazz build, schema, integration and browser checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: integrations/patchboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.11.2
+          package_json_file: integrations/patchboard/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: integrations/patchboard/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @patchboard/web exec playwright install --with-deps chromium
+      - run: pnpm verify
+      - name: Verify complete generated schema and migration ancestry
+        run: git diff --exit-code -- packages/jazz-schema/jazz.app.json packages/jazz-schema/jazz.generated.ts packages/jazz-schema/jazz.permissions.json packages/jazz-schema/private.permissions.json packages/jazz-schema/migrations
+
+  private-oauth:
+    name: Private OAuth and MCP (QA typed slice = ${{ matrix.qa }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        qa: ['0', '1']
+    defaults:
+      run:
+        working-directory: integrations/patchboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12.11.2
+          package_json_file: integrations/patchboard/package.json
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+          cache-dependency-path: integrations/patchboard/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @patchboard/web exec playwright install --with-deps chromium
+      - run: pnpm test:private:ci
+        env:
+          PATCHBOARD_QA_TYPED_RECORD: ${{ matrix.qa }}
+          DIM0_QA_LIVE_SETTINGS: ${{ matrix.qa }}

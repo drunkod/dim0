@@ -183,8 +183,8 @@ catalogs:
       specifier: 20.14.5
       version: 20.14.5
     jazz-tools:
-      specifier: 2.0.0-alpha.69
-      version: 2.0.0-alpha.69
+      specifier: 2.0.0-beta.5
+      version: 2.0.0-beta.5
     oxfmt:
       specifier: 0.66.0
       version: 0.66.0
@@ -236,7 +236,7 @@ importers:
         version: 4.0.0
       jazz-tools:
         specifier: 'catalog:'
-        version: 2.0.0-alpha.69(better-auth@1.7.1(@opentelemetry/api@1.10.0))(effect@4.0.0)(ws@8.23.0)
+        version: 2.0.0-beta.5(better-auth@1.7.1(@opentelemetry/api@1.10.0))(effect@4.0.0)(ws@8.23.0)
       jose:
         specifier: 6.2.10
         version: 6.2.10
@@ -282,7 +282,7 @@ importers:
         version: 0.165.0(@effect/platform-browser@4.0.0(effect@4.0.0))(effect@4.0.0)
       jazz-tools:
         specifier: 'catalog:'
-        version: 2.0.0-alpha.69(better-auth@1.7.1(@opentelemetry/api@1.10.0)(vitest@5.0.2(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(happy-dom@20.14.5)(vite@8.3.1(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.23.15))))(effect@4.0.0)(ws@8.23.0)
+        version: 2.0.0-beta.5(better-auth@1.7.1(@opentelemetry/api@1.10.0)(vitest@5.0.2(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(happy-dom@20.14.5)(vite@8.3.1(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.23.15))))(effect@4.0.0)(ws@8.23.0)
     devDependencies:
       '@foldkit/oxlint-plugin':
         specifier: 'catalog:'
@@ -331,7 +331,7 @@ importers:
     dependencies:
       jazz-tools:
         specifier: 'catalog:'
-        version: 2.0.0-alpha.69(better-auth@1.7.1(@opentelemetry/api@1.10.0))(effect@4.0.0)(ws@8.23.0)
+        version: 2.0.0-beta.5(better-auth@1.7.1(@opentelemetry/api@1.10.0))(effect@4.0.0)(ws@8.23.0)
     devDependencies:
       tsx:
         specifier: 4.21.0
@@ -1004,30 +1004,30 @@ packages:
       foldkit: '>=0.165.0'
       vite: ^8.0.0
 
-  '@garden-co/jazz-napi-darwin-arm64@2.0.0-alpha.69':
-    resolution: {integrity: sha512-022fQkweLkGaGKJKme+8mer134Wn15iUqzs9WrhtCxE3KCpQRy13oIjgISN2V4QWDrkJiUEXstXzD4EzQ5Rzpg==}
+  '@garden-co/jazz-napi-darwin-arm64@2.0.0-beta.5':
+    resolution: {integrity: sha512-+xZW02yAYjJVwpryi20xcMZVuUc2lnGV+GCzuuKdHmQN5YyQoGZKLqFuAlLcC+v7hxHqEb/ciJTlomq1f0iKWg==}
     cpu: [arm64]
     os: [darwin]
 
-  '@garden-co/jazz-napi-darwin-x64@2.0.0-alpha.69':
-    resolution: {integrity: sha512-XKdcGNsE6ArDoRql+UtK+jJwVlNP44qtW/cHSzKhNv7DirTdvau+4lfubnypk0UqLcT0D4xfveuJsDUR1AIHCw==}
+  '@garden-co/jazz-napi-darwin-x64@2.0.0-beta.5':
+    resolution: {integrity: sha512-2BScApgY9eJSseKNypfkVxknXjjFgfu815K7KywseyFyq09BRAruFk34p5TUbFO4N7e5Sr18Ze84prs8dRRpWA==}
     cpu: [x64]
     os: [darwin]
 
-  '@garden-co/jazz-napi-linux-arm64-gnu@2.0.0-alpha.69':
-    resolution: {integrity: sha512-Q9EpOOpzrw6EisBUCbFqo5AmlR1MLgK1E5ROGD19g1RFJcGyhHHJfMWIz7ZOmxb3+eqfvGsALN0cuePJ5u87Qw==}
+  '@garden-co/jazz-napi-linux-arm64-gnu@2.0.0-beta.5':
+    resolution: {integrity: sha512-ffJdB01d0Z1k8vnFMb5Ic9h3LNi4PR+QxMMYy4C778MndrNj8An5wThFNl0Rp3KAm6G3Mzj94Y28LvaVnQd7qA==}
     cpu: [arm64]
     os: [linux]
     libc: [glibc]
 
-  '@garden-co/jazz-napi-linux-x64-gnu@2.0.0-alpha.69':
-    resolution: {integrity: sha512-RV1RWtdsRKZ/jltPZ4dmWicOO76pDFU9tFTINWOxGesEZFC3SrMEJrlLC0Trbd0+2zVBGNsNYCInYen39sHTVw==}
+  '@garden-co/jazz-napi-linux-x64-gnu@2.0.0-beta.5':
+    resolution: {integrity: sha512-IQQC/t6AMrPTUExtKvXZoyXefICAvqZKmg/hez7x/g811Ngk/YufTXWoj0AaCGTD5ejG3TgEokHO557tvH8oBw==}
     cpu: [x64]
     os: [linux]
     libc: [glibc]
 
-  '@garden-co/jazz-napi-win32-x64-msvc@2.0.0-alpha.69':
-    resolution: {integrity: sha512-ELRXudq2CDPTguVqjyNzNnINif/Xw0omuX4Zp68KQIzofSzw2HXDAWW/O2WtwcukI8+uZiPIyy4wgibCLaycpw==}
+  '@garden-co/jazz-napi-win32-x64-msvc@2.0.0-beta.5':
+    resolution: {integrity: sha512-u9N6Os8ZVMIeW59SUm6XIFNPXs3ttGii/UWrsdTQEhLJvK9inwMqztD+FtT1pUFs7vz96d2LPJ8FqxZgMWPrcQ==}
     cpu: [x64]
     os: [win32]
 
@@ -2328,12 +2328,12 @@ packages:
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
 
-  jazz-napi@2.0.0-alpha.69:
-    resolution: {integrity: sha512-a1+7P7zF8IiyCvhiE5Qvp9y0oFLk3t0TZf7brXVwvSCo8CJJd4foVirYfxQlpMTX4XXnqAi+IQvp8S0/wbFCQg==}
+  jazz-napi@2.0.0-beta.5:
+    resolution: {integrity: sha512-dH/r/5v+/32gQsCdVe+8RuF9Au2rf4xEE79AqkTbdVSvhLCFJRkfA6UQyfeQITSd+nJTjR+1kr4Bijkq1Z75Uw==}
 
-  jazz-tools@2.0.0-alpha.69:
-    resolution: {integrity: sha512-D2Hs+gqL++08/Wxr+CmOoEhTak0hzMNe2UQkCEcPyH8mUoXfr/Q2sBeN/XrL+sI7Q6OSpRJglz0o2yfAAIuBKQ==}
-    engines: {node: '>=22.12'}
+  jazz-tools@2.0.0-beta.5:
+    resolution: {integrity: sha512-WbBKiPzbF8/j/8LynWzITyK0yI9lTMCA6FjgqgDQF3Eqnl+gRiYOm8iBx96xszLtIbJSDtDzYh4wxWTQPF5yVw==}
+    engines: {node: '>=22.18'}
     hasBin: true
     peerDependencies:
       '@vercel/functions': '>=3.10.0'
@@ -2343,7 +2343,7 @@ packages:
       expo: '>=54'
       expo-crypto: '>=14.0.0'
       expo-secure-store: '>=14.0.0'
-      jazz-rn: 2.0.0-alpha.69
+      jazz-rn: 2.0.0-beta.5
       prosemirror-model: ^1.22.0
       prosemirror-state: ^1.4.0
       prosemirror-view: ^1.33.0
@@ -2389,8 +2389,8 @@ packages:
       ws:
         optional: true
 
-  jazz-wasm@2.0.0-alpha.69:
-    resolution: {integrity: sha512-csfJu3y4HDkoaM9oIyYm3/Jqnt2Grl0Hciv03euRAQeB8Mg2YtPTQ19rnGp/o82Aq7sPCyOLM82w5zoIUwcCSA==}
+  jazz-wasm@2.0.0-beta.5:
+    resolution: {integrity: sha512-m9iw18y2nKmfuaUHYMugdqwcvv5OisWXhR2dHA4xqWgir+xYgE7h0EyF2gpAncxlZDpWu/S9o5PiLqqqrkqlnw==}
 
   jiti@2.7.0:
     resolution: {integrity: sha512-AC/7JofJvZGrrneWNaEnJeOLUx+JlGt7tNa0wZiRPT4MY1wmfKjt2+6O2p2uz2+skll8OZZmJMNqeke7kKbNgQ==}
@@ -3687,19 +3687,19 @@ snapshots:
       - redis
       - utf-8-validate
 
-  '@garden-co/jazz-napi-darwin-arm64@2.0.0-alpha.69':
+  '@garden-co/jazz-napi-darwin-arm64@2.0.0-beta.5':
     optional: true
 
-  '@garden-co/jazz-napi-darwin-x64@2.0.0-alpha.69':
+  '@garden-co/jazz-napi-darwin-x64@2.0.0-beta.5':
     optional: true
 
-  '@garden-co/jazz-napi-linux-arm64-gnu@2.0.0-alpha.69':
+  '@garden-co/jazz-napi-linux-arm64-gnu@2.0.0-beta.5':
     optional: true
 
-  '@garden-co/jazz-napi-linux-x64-gnu@2.0.0-alpha.69':
+  '@garden-co/jazz-napi-linux-x64-gnu@2.0.0-beta.5':
     optional: true
 
-  '@garden-co/jazz-napi-win32-x64-msvc@2.0.0-alpha.69':
+  '@garden-co/jazz-napi-win32-x64-msvc@2.0.0-beta.5':
     optional: true
 
   '@hexagon/base64@1.1.28': {}
@@ -4902,16 +4902,16 @@ snapshots:
 
   isexe@2.0.0: {}
 
-  jazz-napi@2.0.0-alpha.69:
+  jazz-napi@2.0.0-beta.5:
     optionalDependencies:
-      '@garden-co/jazz-napi-darwin-arm64': 2.0.0-alpha.69
-      '@garden-co/jazz-napi-darwin-x64': 2.0.0-alpha.69
-      '@garden-co/jazz-napi-linux-arm64-gnu': 2.0.0-alpha.69
-      '@garden-co/jazz-napi-linux-x64-gnu': 2.0.0-alpha.69
-      '@garden-co/jazz-napi-win32-x64-msvc': 2.0.0-alpha.69
+      '@garden-co/jazz-napi-darwin-arm64': 2.0.0-beta.5
+      '@garden-co/jazz-napi-darwin-x64': 2.0.0-beta.5
+      '@garden-co/jazz-napi-linux-arm64-gnu': 2.0.0-beta.5
+      '@garden-co/jazz-napi-linux-x64-gnu': 2.0.0-beta.5
+      '@garden-co/jazz-napi-win32-x64-msvc': 2.0.0-beta.5
     optional: true
 
-  jazz-tools@2.0.0-alpha.69(better-auth@1.7.1(@opentelemetry/api@1.10.0)(vitest@5.0.2(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(happy-dom@20.14.5)(vite@8.3.1(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.23.15))))(effect@4.0.0)(ws@8.23.0):
+  jazz-tools@2.0.0-beta.5(better-auth@1.7.1(@opentelemetry/api@1.10.0)(vitest@5.0.2(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(happy-dom@20.14.5)(vite@8.3.1(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.23.15))))(effect@4.0.0)(ws@8.23.0):
     dependencies:
       '@noble/curves': 2.0.1
       '@noble/hashes': 2.0.1
@@ -4925,20 +4925,20 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       esbuild: 0.27.7
       fs-native-extensions: 1.5.0
-      jazz-wasm: 2.0.0-alpha.69
-      jose: 6.2.18
+      jazz-wasm: 2.0.0-beta.5
+      jose: 6.2.10
       tr46: 5.1.1
       web-streams-polyfill: 4.5.1
       whatwg-url-without-unicode: 8.0.0-3
     optionalDependencies:
       better-auth: 1.7.1(@opentelemetry/api@1.10.0)(vitest@5.0.2(@opentelemetry/api@1.10.0)(@types/node@26.6.6)(happy-dom@20.14.5)(vite@8.3.1(@types/node@26.6.6)(esbuild@0.27.7)(jiti@2.7.0)(tsx@4.23.15)))
       effect: 4.0.0
-      jazz-napi: 2.0.0-alpha.69
+      jazz-napi: 2.0.0-beta.5
       ws: 8.23.0
     transitivePeerDependencies:
       - bare-url
 
-  jazz-tools@2.0.0-alpha.69(better-auth@1.7.1(@opentelemetry/api@1.10.0))(effect@4.0.0)(ws@8.23.0):
+  jazz-tools@2.0.0-beta.5(better-auth@1.7.1(@opentelemetry/api@1.10.0))(effect@4.0.0)(ws@8.23.0):
     dependencies:
       '@noble/curves': 2.0.1
       '@noble/hashes': 2.0.1
@@ -4952,20 +4952,20 @@ snapshots:
       '@standard-schema/spec': 1.1.0
       esbuild: 0.27.7
       fs-native-extensions: 1.5.0
-      jazz-wasm: 2.0.0-alpha.69
-      jose: 6.2.18
+      jazz-wasm: 2.0.0-beta.5
+      jose: 6.2.10
       tr46: 5.1.1
       web-streams-polyfill: 4.5.1
       whatwg-url-without-unicode: 8.0.0-3
     optionalDependencies:
       better-auth: 1.7.1(@opentelemetry/api@1.10.0)
       effect: 4.0.0
-      jazz-napi: 2.0.0-alpha.69
+      jazz-napi: 2.0.0-beta.5
       ws: 8.23.0
     transitivePeerDependencies:
       - bare-url
 
-  jazz-wasm@2.0.0-alpha.69: {}
+  jazz-wasm@2.0.0-beta.5: {}
 
   jiti@2.7.0: {}
 
