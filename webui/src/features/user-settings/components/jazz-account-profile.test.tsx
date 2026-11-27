@@ -192,3 +192,33 @@ it("uses a fresh intent after a definitive conflict and authoritative grant refr
   expect(revocations.map(body => body.expected_version)).toEqual([3, 4])
   expect(revocations[1].request_id).not.toBe(revocations[0].request_id)
 })
+
+it("switches language only after the saved locale response and switches back", async () => {
+  const { clearAccountLocale } = await import("@/i18n")
+  clearAccountLocale()
+  try {
+    let version = 0
+    const requests: Record<string, unknown>[] = []
+    vi.stubGlobal("fetch", vi.fn(async (url: string, options?: RequestInit) => {
+      if (url.endsWith("/preferences") && options?.method === "PATCH") {
+        const input = JSON.parse(String(options.body))
+        requests.push(input)
+        return Response.json({ locale: input.locale, version: ++version, changed: true })
+      }
+      if (url.endsWith("/connected-apps")) return Response.json({ grants: [], hasMore: false })
+      return Response.json(url.endsWith("/profile") ? profile : { events: [] })
+    }))
+    render(<JazzAccountProfile />)
+    fireEvent.change(await screen.findByRole("combobox", { name: "Interface language" }), { target: { value: "ru" } })
+    expect(screen.getByRole("button", { name: "Save locale preference" })).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "Save locale preference" }))
+    await screen.findByText("Язык сохранён.")
+    expect(document.documentElement.lang).toBe("ru")
+    expect(requests[0]).toMatchObject({ locale: "ru-RU", expected_version: 0 })
+    fireEvent.change(screen.getByRole("combobox", { name: "Язык интерфейса" }), { target: { value: "en" } })
+    fireEvent.click(screen.getByRole("button", { name: "Сохранить язык" }))
+    await screen.findByText("Locale preference saved.")
+    expect(document.documentElement.lang).toBe("en")
+    expect(requests[1]).toMatchObject({ locale: "en", expected_version: 1 })
+  } finally { cleanup(); clearAccountLocale() }
+})

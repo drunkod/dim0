@@ -136,8 +136,8 @@ export default defineConfig({
         "dim0.svg",
       ],
       manifest: {
-        name: "Dim0",
-        short_name: "Dim0",
+        name: "SashAI",
+        short_name: "SashAI",
         description: "Visual workspace for boards, notes, and agent-assisted thinking.",
         theme_color: "#f7f1e8",
         background_color: "#f7f1e8",

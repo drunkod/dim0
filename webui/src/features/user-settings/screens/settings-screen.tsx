@@ -1,3 +1,4 @@
+import { useCopy } from "@/i18n"
 import { useEffect, useMemo, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 
@@ -11,6 +12,7 @@ import { useAppStore } from "@/store"
 
 
 export function SettingsScreen() {
+  const { t } = useCopy()
   const navigate = useNavigate()
   const userEmail = useAppStore(s => s.userEmail)
   const userPlan = useAppStore(s => s.userPlan)
@@ -42,8 +44,8 @@ export function SettingsScreen() {
       <div className="mx-auto w-full max-w-4xl px-6 py-24 space-y-6">
         <Card>
           <CardHeader>
-            <CardTitle>Profile</CardTitle>
-            <CardDescription>{passkeyJazz ? "Passkey account and preferences" : "Basic account details"}</CardDescription>
+            <CardTitle>{t("Profile")}</CardTitle>
+            <CardDescription>{passkeyJazz ? t("Passkey account and preferences") : "Basic account details"}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {passkeyJazz ? <JazzAccountProfile /> : (

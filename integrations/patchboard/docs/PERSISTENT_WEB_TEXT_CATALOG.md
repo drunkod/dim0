@@ -156,3 +156,35 @@ This is a manual review boundary, not a saved-view idempotency receipt.
 This is a local staging-profile proof, not a public-hostname or persistent
 production deployment. Later #33 increments cover supported staging/production operation, branding
 and a combined journey. #24 upgrade remains separate.
+
+## Native SashAI presentation
+
+The native web delivery title, PWA manifest name, consent heading, and new
+passkey/account presentation use SashAI. Existing display names, provider
+identifiers, storage keys, OAuth scopes, board IDs and data are unchanged.
+The retired Patchboard UI and desktop release identity are separate.
+
+Settings offers English and Russian with the existing BCP 47 preference field
+for other language tags. A confirmed preference save updates the current UI;
+startup reads the authenticated preference without a device-wide language
+cache. Regional English/Russian tags select their respective catalog; other
+valid tags remain saved but render English. Sign-out clears account-derived
+language. Consent reads the same verified subject preference server-side;
+only presentation is localized. Board/table/view/field names, row contents and
+protocol scope identifiers are not translated. Coverage is the native board
+list/navigation, profile, catalog Data, Share, shared-view landing and OAuth
+consent, not all canvas tools, assistant UI or desktop surfaces.
+
+Reproduce the presentation rehearsal from integrations/patchboard:
+
+```sh
+pnpm test:native:sashai-presentation
+```
+
+It uses a disposable local persistent HTTPS profile with all three persistent
+flags enabled, two independent virtual-passkey accounts and real OAuth/SDK
+consent. The same board/table and bilingual row value survive Russian locale
+save, reload, restart and switching back to English. The actual selected
+board and scopes remain identical in both consent languages. It also checks
+the independent recipient locale and unsupported-tag fallback. Reuse the
+combined web engineering proof for the unchanged replay/disconnect behavior.

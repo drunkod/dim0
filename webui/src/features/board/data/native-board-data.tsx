@@ -1,3 +1,4 @@
+import { useCopy } from "@/i18n"
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react"
 import { useParams } from "@tanstack/react-router"
 import { Button } from "@/components/ui/button"
@@ -29,6 +30,7 @@ export function NativeBoardDataControl() {
 }
 
 export function NativeBoardData(props: DataProps) {
+  const { t } = useCopy()
   const { boardId, readOnly = false } = props
   const [scope, setScope] = useState<CatalogIntentScope | null>(null)
   const [failed, setFailed] = useState(false)
@@ -46,11 +48,12 @@ export function NativeBoardData(props: DataProps) {
     return () => { active = false }
   }, [boardId, readOnly, attempt])
   if (readOnly) return <NativeBoardDataPanel key={boardId} {...props} />
-  if (!scope || scope.boardId !== boardId) return failed ? <Button size="sm" variant="ghost" onClick={() => setAttempt(n => n + 1)}>Retry Data</Button> : null
+  if (!scope || scope.boardId !== boardId) return failed ? <Button size="sm" variant="ghost" onClick={() => setAttempt(n => n + 1)}>{t("Retry Data")}</Button> : null
   return <NativeBoardDataPanel key={JSON.stringify(scope)} {...props} scope={scope} />
 }
 
 function NativeBoardDataPanel({ boardId, readOnly = false, allowSaveView = true, scope }: DataProps & { scope?: CatalogIntentScope }) {
+  const { t } = useCopy()
   const [restored] = useState(() => restore(scope))
   const [pending, setPending] = useState<CatalogIntent | null>(restored.intent)
   const [storageBlocked, setStorageBlocked] = useState(restored.blocked)
@@ -237,53 +240,53 @@ function NativeBoardDataPanel({ boardId, readOnly = false, allowSaveView = true,
     }
   }
 
-  if (!views) return listFailed ? <Button size="sm" variant="ghost" onClick={() => setEpoch(n => n + 1)}>Retry Data</Button> : null
+  if (!views) return listFailed ? <Button size="sm" variant="ghost" onClick={() => setEpoch(n => n + 1)}>{t("Retry Data")}</Button> : null
   const inputClass = "w-full rounded-md border bg-background px-2 py-1.5 text-sm disabled:opacity-60"
   return <>
-    <button type="button" aria-label="Open board Data"
+    <button type="button" aria-label={t("Open board Data")}
       className="flex items-center rounded-md px-1.5 py-1 text-xs font-medium text-card-foreground hover:opacity-70"
-      onClick={() => { setOpen(true); setEpoch(n => n + 1) }}>Data</button>
+      onClick={() => { setOpen(true); setEpoch(n => n + 1) }}>{t("Data")}</button>
     <Sheet open={open} onOpenChange={next => { if (!busy) setOpen(next) }}>
       <SheetContent className="w-full max-w-lg overflow-y-auto">
-        <SheetHeader><SheetTitle>Board Data</SheetTitle><SheetDescription>{readOnly ? "Read-only catalog rehearsal. Create tables through the authorized MCP connection." : allowSaveView ? "Create primary-text tables and read-only saved views." : "Create primary-text tables and add rows."}</SheetDescription></SheetHeader>
-        <section aria-label="Board Data" className="space-y-4 px-4 pb-6">
-          {views.length === 0 && <p className="text-sm text-muted-foreground">No saved views on this board.</p>}
-          {!readOnly && <form aria-label="Create text table" className="space-y-2 rounded-md border p-3" onSubmit={newTable}>
-            <h3 className="text-sm font-medium">Create text table</h3>
-            <label className="block text-xs">Table name<input className={inputClass} required maxLength={80} value={tableName} disabled={locked} onChange={e => setTableName(e.target.value)} /></label>
-            <label className="block text-xs">Primary text field<input className={inputClass} required maxLength={80} value={fieldName} disabled={locked} onChange={e => setFieldName(e.target.value)} /></label>
-            <label className="block text-xs">Default grid name<input className={inputClass} required maxLength={80} value={defaultViewName} disabled={locked} onChange={e => setDefaultViewName(e.target.value)} /></label>
-            <Button type="submit" size="sm" disabled={locked || !tableName.trim() || !fieldName.trim() || !defaultViewName.trim()}>Create table</Button>
+        <SheetHeader><SheetTitle>{t("Board Data")}</SheetTitle><SheetDescription>{readOnly ? t("Read-only catalog rehearsal. Create tables through the authorized MCP connection.") : allowSaveView ? t("Create primary-text tables and read-only saved views.") : t("Create primary-text tables and add rows.")}</SheetDescription></SheetHeader>
+        <section aria-label={t("Board Data")} className="space-y-4 px-4 pb-6">
+          {views.length === 0 && <p className="text-sm text-muted-foreground">{t("No saved views on this board.")}</p>}
+          {!readOnly && <form aria-label={t("Create text table")} className="space-y-2 rounded-md border p-3" onSubmit={newTable}>
+            <h3 className="text-sm font-medium">{t("Create text table")}</h3>
+            <label className="block text-xs">{t("Table name")}<input className={inputClass} required maxLength={80} value={tableName} disabled={locked} onChange={e => setTableName(e.target.value)} /></label>
+            <label className="block text-xs">{t("Primary text field")}<input className={inputClass} required maxLength={80} value={fieldName} disabled={locked} onChange={e => setFieldName(e.target.value)} /></label>
+            <label className="block text-xs">{t("Default grid name")}<input className={inputClass} required maxLength={80} value={defaultViewName} disabled={locked} onChange={e => setDefaultViewName(e.target.value)} /></label>
+            <Button type="submit" size="sm" disabled={locked || !tableName.trim() || !fieldName.trim() || !defaultViewName.trim()}>{t("Create table")}</Button>
           </form>}
           {pending && pending.kind !== "view-review" && !readOnly && <Button size="sm" disabled={busy || storageBlocked} onClick={() => void submit(pending, true)}>
-            {pending.kind === "table" ? "Retry Create table" : "Retry Add row"}
+            {pending.kind === "table" ? t("Retry Create table") : t("Retry Add row")}
           </Button>}
-          {message && <p role="status" className="text-sm">{message}</p>}
-          {problem && <p role="alert" className="text-sm text-destructive">{problem}</p>}
+          {message && <p role="status" className="text-sm">{t(message)}</p>}
+          {problem && <p role="alert" className="text-sm text-destructive">{problem.startsWith("Retry did not confirm the original outcome. ") ? t("Retry did not confirm the original outcome. {{reason}}", { reason: t(problem.slice("Retry did not confirm the original outcome. ".length)) }) : t(problem)}</p>}
           {pending?.kind === "view-review" && <>
-            <Button size="sm" variant="outline" disabled={busy || storageBlocked} onClick={() => { setReviewEpoch(epoch + 1); setEpoch(n => n + 1) }}>Refresh and review saved views</Button>
-            {reviewed && <Button size="sm" variant="outline" disabled={busy || storageBlocked} onClick={() => void acknowledgeViewReview()}>I reviewed the saved views</Button>}
+            <Button size="sm" variant="outline" disabled={busy || storageBlocked} onClick={() => { setReviewEpoch(epoch + 1); setEpoch(n => n + 1) }}>{t("Refresh and review saved views")}</Button>
+            {reviewed && <Button size="sm" variant="outline" disabled={busy || storageBlocked} onClick={() => void acknowledgeViewReview()}>{t("I reviewed the saved views")}</Button>}
           </>}
           {[...new Set(views.map(v => v.datasetId))].map(id => {
             const group = views.filter(v => v.datasetId === id)
             return <section key={id} className="space-y-2">
               <h3 className="text-sm font-semibold">{group[0].datasetName}</h3>
               <div className="flex flex-wrap gap-2">{group.map(v => <Button key={v.viewId} size="sm" variant="outline"
-                aria-label={"Open saved view " + v.name} aria-pressed={selected === v.viewId}
+                aria-label={t("Open saved view {{name}}", { name: v.name })} aria-pressed={selected === v.viewId}
                 disabled={locked} onClick={() => setSelected(v.viewId)}>{v.name}</Button>)}</div>
             </section>
           })}
           {open && view && <SavedViewGrid key={view.viewId + ":" + epoch} view={view} />}
           {!readOnly && view && primary && <>
-            <form aria-label="Add text row" onSubmit={newRow} className="space-y-2 rounded-md border p-3">
-              <label className="block text-xs">New row {primary.name}<input className={inputClass} required maxLength={2000}
+            <form aria-label={t("Add text row")} onSubmit={newRow} className="space-y-2 rounded-md border p-3">
+              <label className="block text-xs">{t("New row {{name}}", { name: primary.name })}<input className={inputClass} required maxLength={2000}
                 value={value} disabled={locked} onChange={e => setValue(e.target.value)} /></label>
-              <Button type="submit" size="sm" disabled={locked || !value.trim()}>Add row</Button>
+              <Button type="submit" size="sm" disabled={locked || !value.trim()}>{t("Add row")}</Button>
             </form>
-            {allowSaveView && <form aria-label="Save filtered view" onSubmit={newView} className="space-y-2 rounded-md border p-3">
-              <label className="block text-xs">Saved view name<input className={inputClass} required maxLength={80} value={viewName} disabled={locked} onChange={e => setViewName(e.target.value)} /></label>
-              <label className="block text-xs">{primary.name} starts with<input className={inputClass} maxLength={80} value={prefix} disabled={locked} onChange={e => setPrefix(e.target.value)} /></label>
-              <Button type="submit" size="sm" disabled={locked || !viewName.trim()}>Save view</Button>
+            {allowSaveView && <form aria-label={t("Save filtered view")} onSubmit={newView} className="space-y-2 rounded-md border p-3">
+              <label className="block text-xs">{t("Saved view name")}<input className={inputClass} required maxLength={80} value={viewName} disabled={locked} onChange={e => setViewName(e.target.value)} /></label>
+              <label className="block text-xs">{t("{{name}} starts with", { name: primary.name })}<input className={inputClass} maxLength={80} value={prefix} disabled={locked} onChange={e => setPrefix(e.target.value)} /></label>
+              <Button type="submit" size="sm" disabled={locked || !viewName.trim()}>{t("Save view")}</Button>
             </form>}
           </>}
         </section>

@@ -179,7 +179,7 @@ async function authorize(account,board,scope,label,wrongBoard){
   await page.goto(auth.href,{waitUntil:"domcontentloaded"});
   await expect(page).toHaveURL(url=>url.origin===origin&&url.searchParams.get("client_id")===client_id&&["/signin","/patchboard-private/oauth-consent"].includes(url.pathname));
   if(new URL(page.url()).pathname==="/signin")await page.getByRole("button",{name:"Sign in with passkey",exact:true}).click();
-  await expect(page.getByRole("heading",{name:"Authorize a Dim0 connection",exact:true})).toBeVisible(options);
+  await expect(page.getByRole("heading",{name:"Authorize a SashAI connection",exact:true})).toBeVisible(options);
   if(scope.includes("table:create"))await expect(page.getByText("table:create",{exact:true})).toBeVisible(options);
   const optionsShown=await page.getByLabel("Approved board").locator("option").evaluateAll(elements=>elements.map(e=>e.value).filter(Boolean));
   assert.deepEqual(optionsShown,[board],"only approved board available in sealed profile");
