@@ -5,12 +5,14 @@ import { startBoardServer } from "./http-server.ts";
 import { auth } from "./private-auth/auth.ts";
 import { privateBoardRequest } from "./private-board-routes.ts";
 import { handlePrivateCanvasStream } from "./private-canvas-stream.ts";
+import {qaHttpsCatalogProfile} from "./qa-https-catalog-profile.ts";
 import { privateAuthConfig } from "./private-auth/config.ts";
 import { closePrivateAuthDatabase } from "./private-auth/db.ts";
 import { handlePrivateAuth } from "./private-auth/http.ts";
 import { handlePrivateMcp } from "./private-mcp.ts";
 import privatePermissions from "@patchboard/jazz-schema/private.permissions.json" with { type: "json" };
 
+const httpsCatalog = qaHttpsCatalogProfile();
 const config = privateAuthConfig();
 const staticDir = resolve(fileURLToPath(new URL("../../web/dist", import.meta.url)));
 const jazzDataPath = join(config.root, "jazz");
@@ -32,12 +34,28 @@ const server = await startBoardServer({
       expiresAt: Math.floor(session.session.expiresAt.getTime() / 1000),
     };
   },
-  extraHandler: (request, response, db) =>
-    handlePrivateCanvasStream(request, response, db, (subject) => server.jazz.createAccountFor(subject)) ||
+  extraHandler: (request, response, db) => {
+    if(httpsCatalog){
+      // Reject a wrong Host, including the health and legacy entry routes.
+      if(request.headers.host!==new URL(httpsCatalog.origin).host){
+        response.writeHead(421,{"cache-control":"no-store"});response.end();return true;
+      }
+      // Expired or altered seal closes the profile instead of falling back.
+      try {
+        const live=qaHttpsCatalogProfile();
+        if(!live||live.origin!==httpsCatalog.origin||live.boardId!==httpsCatalog.boardId||
+          live.root!==httpsCatalog.root||live.createdAtMs!==httpsCatalog.createdAtMs)
+          throw new Error("QA profile changed");
+      } catch {
+        response.writeHead(503,{"cache-control":"no-store"});response.end();return true;
+      }
+    }
+    return handlePrivateCanvasStream(request, response, db, (subject) => server.jazz.createAccountFor(subject)) ||
     handlePrivateAuth(request, response, db, (subject) => server.jazz.createAccountFor(subject),
       (received) => privateBoardRequest(received, db,
         (subject) => server.jazz.createAccountFor(subject)),
-    ) || handlePrivateMcp(request, response, db, (subject) => server.jazz.createAccountFor(subject)),
+    ) || handlePrivateMcp(request, response, db, (subject) => server.jazz.createAccountFor(subject));
+  },
 });
 // Test-only process identification, never enabled for public HTTPS.
 const testPidPath = process.env.PATCHBOARD_PRIVATE_TEST_PID_FILE;

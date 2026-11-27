@@ -5,10 +5,14 @@ import { passkey } from "@better-auth/passkey";
 import { privateAuthConfig } from "./config.ts";
 import { privateAuthDatabase } from "./db.ts";
 import { consentGrantReference, tokenBoardGrantClaim } from "./grants.ts";
+import { typedRecordQaEnabled } from "../typed-record-qa-gate.ts";
+import {qaHttpsCatalogProfile} from "../qa-https-catalog-profile.ts";
 import { passkeyOnlyIdentitySchemaPlugin } from "./passkey-only-identity.ts";
 import { resolveRegistrationIntent } from "./enrollment.ts";
 import { finalizeVerifiedPasskeyRegistration } from "./finalize-registration.ts";
 
+// Validate the opt-in before auth configuration creates any store or secret.
+const httpsCatalog = qaHttpsCatalogProfile();
 const config = privateAuthConfig();
 // ChatGPT’s custom MCP connector currently requests board:read/write without
 // offline_access. Keep the production 15-minute default, but allow an explicit,
@@ -50,13 +54,17 @@ export const auth = betterAuth({
         tokenBoardGrantClaim(referenceId, user?.id),
       // offline_access permits a refresh token; the referenceId survives
       // rotation, so it cannot widen a consented single-board grant.
-      scopes: ["board:read", "board:write", "offline_access"],
+      // Explicit opt-in QA action: source table|create -> Dim0 table:create.
+      // Never part of OAuth's default client scopes or production issuer.
+      scopes: ["board:read", "board:write", "offline_access",
+        ...((typedRecordQaEnabled()||httpsCatalog) ? ["table:create"] : [])],
       grantTypes: ["authorization_code", "refresh_token"],
       allowDynamicClientRegistration: true,
       allowUnauthenticatedClientRegistration: true,
       clientRegistrationRequirePKCE: true,
       clientRegistrationDefaultScopes: ["board:read", "board:write"],
-      clientRegistrationAllowedScopes: ["offline_access"],
+      clientRegistrationAllowedScopes: ["offline_access",
+        ...((typedRecordQaEnabled()||httpsCatalog) ? ["table:create"] : [])],
       accessTokenExpiresIn: accessTokenSeconds,
       refreshTokenExpiresIn: 604800,
     }) as unknown as import("better-auth").BetterAuthPlugin,

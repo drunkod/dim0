@@ -11,7 +11,7 @@ import privatePermissions from "@patchboard/jazz-schema/private.permissions.json
 import guestPermissions from "@patchboard/jazz-schema/jazz.permissions.json" with {type:"json"};
 import {
   installTypedViewShareLedger,createSavedTypedView,changeSavedTypedView,
-  issueTypedViewShare,revokeTypedViewShare,querySavedTypedView,
+  issueTypedViewShare,revokeTypedViewShare,querySavedTypedView,listOwnerSavedTypedViews,listOwnerTypedViewShares,
   TypedViewAccessDenied,TypedViewCursorChanged,TypedViewNotFound,
   TypedViewUnsupported
 } from "../src/typed-shared-view.ts";
@@ -78,6 +78,25 @@ test("one persisted view scans canonical rows with share filter, opaque cursor a
     share=await issueTypedViewShare(jazz.db,sql,{
       boardId,datasetId,viewId:view.viewId,
       actorId:owner,verifiedSubjectId:ownerSubject
+    });
+    await t.test("owner metadata and tokenless preview are owner-only and use same projection",async()=>{
+      const views=await listOwnerSavedTypedViews(jazz.db,{boardId,actorId:owner});
+      assert.equal(views.views.length,1);
+      assert.deepEqual(views.views[0].fields,[{id:textFieldId,name:"Title"}]);
+      const metadata=await listOwnerTypedViewShares(jazz.db,sql,{boardId,datasetId,viewId:view.viewId,actorId:owner});
+      assert.deepEqual(metadata.shares,[{shareId:share.shareId,shareVersion:1,revoked:false}]);
+      const input={boardId,datasetId,viewId:view.viewId,ownerActorId:owner,verifiedSubjectId:ownerSubject,channel:"browser",pageSize:1};
+      const preview=await querySavedTypedView(jazz.db,sql,input);
+      assert.deepEqual(preview.columns,[{id:textFieldId,name:"Title"}]);
+      assert.deepEqual(preview.rows,(await query()).rows);
+      assert.equal(preview.total,2);
+      assert.equal((await querySavedTypedView(jazz.db,sql,{...input,cursor:preview.nextCursor})).rows[0].id,ids.R3);
+      await assert.rejects(()=>querySavedTypedView(jazz.db,sql,{...input,ownerActorId:visitor}),TypedViewAccessDenied);
+      await assert.rejects(()=>querySavedTypedView(jazz.db,sql,{...input,channel:"mcp"}),TypedViewAccessDenied);
+      await assert.rejects(()=>querySavedTypedView(jazz.db,sql,{...input,shareToken:share.shareToken}),TypedViewAccessDenied);
+      await assert.rejects(()=>listOwnerSavedTypedViews(jazz.db,{boardId,actorId:visitor}),TypedViewAccessDenied);
+      await assert.rejects(()=>listOwnerTypedViewShares(jazz.db,sql,{boardId,datasetId,viewId:view.viewId,actorId:visitor}),TypedViewAccessDenied);
+      await assert.rejects(()=>query({cursor:preview.nextCursor}),TypedViewUnsupported);
     });
     await t.test("P: two signed-in subjects read two filtered rows and no hidden fields",async()=>{
       const one=await query();

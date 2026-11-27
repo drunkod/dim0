@@ -1,3 +1,5 @@
+import { SavedViewShareControls } from "@/features/board/data/saved-view-share-controls"
+import { nativeSavedViewsEnabled, nativeCatalogReadOnly } from "@/features/board/data/saved-view-api"
 import { disableJazzLinks, jazzLinks, jazzMembers, mintJazzLink, removeJazzMember, revokeJazzLink, updateJazzMemberRole } from "./jazz-api"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -271,6 +273,7 @@ export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenCha
             </ul>
           )}
         </section>
+        {jazz && open && nativeSavedViewsEnabled && !nativeCatalogReadOnly && <SavedViewShareControls key={boardId} boardId={boardId} />}
         {jazz && <section className="space-y-2 border-t pt-3">
           <label className="text-sm font-medium" htmlFor="mcp-endpoint">Connect ChatGPT</label>
           <input id="mcp-endpoint" readOnly value={location.origin + "/patchboard-private-mcp"}

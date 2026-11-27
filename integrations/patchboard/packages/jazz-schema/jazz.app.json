@@ -2,7 +2,7 @@
   "$schema": "https://jazz.tools/schemas/jazz.app.v1.json",
   "$generated": {
     "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
-    "sha256": "b06496ee566d821c333edfe9a49a2ceffbfae9345eded94131f18239fcf5cf48"
+    "sha256": "905f7055bc6b6cb1d29cbcf3175fc6cc5da7cf320deb5c35ee79995ebc963f9d"
   },
   "tables": {
     "agentRuns": {
@@ -228,6 +228,33 @@
       },
       "indexes": ["boardId", "status", "rank"]
     },
+    "typedCatalogEvents": {
+      "columns": {
+        "boardId": "uuid",
+        "actorId": "uuid",
+        "requestId": "string",
+        "receiptId": "uuid",
+        "datasetId": "uuid",
+        "fieldId": "uuid",
+        "viewId": "uuid"
+      },
+      "relations": { "board": { "rel": "boards", "column": "boardId" } },
+      "indexes": ["boardId", "datasetId"]
+    },
+    "typedCatalogReceipts": {
+      "columns": {
+        "boardId": "uuid",
+        "actorId": "uuid",
+        "requestId": "string",
+        "fingerprint": "string",
+        "datasetId": "uuid",
+        "fieldId": "uuid",
+        "viewId": "uuid",
+        "eventId": "uuid"
+      },
+      "relations": { "board": { "rel": "boards", "column": "boardId" } },
+      "indexes": ["boardId", "actorId", "requestId"]
+    },
     "typedDatasets": {
       "columns": {
         "boardId": "uuid",
@@ -244,6 +271,7 @@
         "datasetId": "uuid",
         "name": "string",
         "kind": { "enum": ["text", "computed"] },
+        "primary": "boolean?",
         "computeFromFieldId": "uuid?"
       },
       "relations": {
@@ -2001,6 +2029,637 @@
           }
         }
       }
+    },
+    "ed9b0d151df4": {
+      "tables": {
+        "agentRuns": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "agentId": "uuid",
+            "action": "string",
+            "status": { "enum": ["running", "complete", "failed"] },
+            "input": { "json": true },
+            "result": { "json": true, "optional": true }
+          },
+          "indexes": ["boardId"]
+        },
+        "appletStates": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "noteId": "uuid",
+            "value": { "json": true },
+            "version": "int",
+            "updatedBy": "uuid"
+          },
+          "indexes": ["boardId", "noteId"]
+        },
+        "baseMemberships": {
+          "columns": {
+            "workspaceId": { "type": "uuid", "references": "workspaces" },
+            "boardId": { "type": "uuid", "references": "boards" },
+            "actorId": "uuid",
+            "role": { "enum": ["creator", "editor", "commenter", "viewer"] },
+            "state": { "enum": ["active", "disabled"], "default": "active" },
+            "version": { "type": "int", "default": 1 },
+            "legacyMemberId": "uuid?"
+          },
+          "indexes": ["boardId", "actorId"]
+        },
+        "boardInvites": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "token": "string",
+            "role": { "enum": ["viewer", "editor"] },
+            "singleUse": { "type": "boolean", "default": false },
+            "expiresAtEpochMs": "float?",
+            "intendedUserId": "uuid?"
+          },
+          "indexes": ["boardId", "token"]
+        },
+        "boardMemberRoleReceipts": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "memberId": "uuid",
+            "actorId": "uuid",
+            "requestId": "string",
+            "fingerprint": "string",
+            "previousRole": { "enum": ["viewer", "editor"] },
+            "assignedRole": { "enum": ["viewer", "editor"] },
+            "membershipVersion": "int",
+            "changed": "boolean"
+          },
+          "indexes": ["boardId", "actorId", "requestId"]
+        },
+        "boardMembers": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "userId": "uuid",
+            "role": { "enum": ["viewer", "editor", "admin", "agent"] },
+            "roleVersion": { "type": "int", "default": 1 }
+          },
+          "indexes": ["boardId", "userId"]
+        },
+        "boardWorkspaceBindings": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "workspaceId": { "type": "uuid", "references": "workspaces" },
+            "version": { "type": "int", "default": 1 }
+          },
+          "indexes": ["boardId"]
+        },
+        "boards": { "columns": { "title": "string", "ownerId": "uuid" } },
+        "canvasEntities": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "kind": { "enum": ["node", "link"] },
+            "payload": { "json": true },
+            "version": "int",
+            "updatedBy": "uuid"
+          },
+          "indexes": ["boardId", "kind"]
+        },
+        "canvasPatchEvents": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "entityId": "uuid",
+            "actorId": "uuid",
+            "requestId": "string",
+            "receiptId": "uuid",
+            "previousVersion": "int",
+            "committedVersion": "int",
+            "field": { "enum": ["label.markdown"] }
+          },
+          "indexes": ["boardId", "entityId"]
+        },
+        "canvasPatchReceipts": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "entityId": "uuid",
+            "actorId": "uuid",
+            "requestId": "string",
+            "fingerprint": "string",
+            "previousVersion": "int",
+            "committedVersion": "int",
+            "committedPayload": { "json": true },
+            "eventId": "uuid"
+          },
+          "indexes": ["boardId", "actorId", "requestId"]
+        },
+        "checkpoints": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "label": "string",
+            "snapshot": { "json": true }
+          },
+          "indexes": ["boardId"]
+        },
+        "comments": {
+          "columns": {
+            "taskId": { "type": "uuid", "references": "tasks" },
+            "authorId": "uuid",
+            "body": "string"
+          },
+          "indexes": ["taskId"]
+        },
+        "cursors": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "userId": "uuid",
+            "name": "string",
+            "x": "float",
+            "y": "float",
+            "active": { "type": "boolean", "default": false }
+          },
+          "indexes": ["boardId", "userId"]
+        },
+        "mcpRequests": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "requestId": "string",
+            "textHash": "string",
+            "noteId": "uuid"
+          },
+          "indexes": ["boardId", "requestId"]
+        },
+        "proposals": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "proposerId": "uuid",
+            "targetId": "uuid?",
+            "operation": { "enum": ["create_note", "move_shape", "create_task"] },
+            "payload": { "json": true },
+            "status": { "enum": ["pending", "approved", "rejected"] },
+            "reviewedBy": "uuid?"
+          },
+          "indexes": ["boardId", "status"]
+        },
+        "shapes": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "kind": { "enum": ["note", "rect"] },
+            "text": "string",
+            "authorId": "uuid?",
+            "authorName": "string?",
+            "x": "float",
+            "y": "float",
+            "width": "float",
+            "height": "float",
+            "fill": "string",
+            "zIndex": "int"
+          },
+          "indexes": ["boardId", "zIndex"]
+        },
+        "tasks": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "shapeId": { "type": "uuid", "optional": true, "references": "shapes" },
+            "title": "string",
+            "notes": "string?",
+            "status": { "enum": ["todo", "doing", "review", "done"] },
+            "rank": "float",
+            "assigneeId": "uuid?"
+          },
+          "indexes": ["boardId", "status", "rank"]
+        },
+        "typedDatasets": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "name": "string",
+            "schemaVersion": "int",
+            "state": { "enum": ["active", "read_only"], "default": "active" }
+          },
+          "indexes": ["boardId"]
+        },
+        "typedFields": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "datasetId": { "type": "uuid", "references": "typedDatasets" },
+            "name": "string",
+            "kind": { "enum": ["text", "computed"] },
+            "computeFromFieldId": "uuid?"
+          },
+          "indexes": ["datasetId"]
+        },
+        "typedPatchEvents": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "datasetId": { "type": "uuid", "references": "typedDatasets" },
+            "recordId": "uuid",
+            "actorId": "uuid",
+            "requestId": "string",
+            "receiptId": "uuid",
+            "previousVersion": "int",
+            "committedVersion": "int",
+            "fieldIds": { "json": true }
+          },
+          "indexes": ["boardId", "recordId"]
+        },
+        "typedPatchReceipts": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "datasetId": { "type": "uuid", "references": "typedDatasets" },
+            "recordId": "uuid",
+            "actorId": "uuid",
+            "requestId": "string",
+            "fingerprint": "string",
+            "schemaVersion": "int",
+            "previousVersion": "int",
+            "committedVersion": "int",
+            "committedCells": { "json": true },
+            "eventId": "uuid"
+          },
+          "indexes": ["boardId", "actorId", "requestId"]
+        },
+        "typedRecords": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "datasetId": { "type": "uuid", "references": "typedDatasets" },
+            "cells": { "json": true },
+            "version": "int",
+            "updatedBy": "uuid"
+          },
+          "indexes": ["datasetId"]
+        },
+        "typedViews": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "datasetId": { "type": "uuid", "references": "typedDatasets" },
+            "name": "string",
+            "kind": { "enum": ["grid"] },
+            "definitionVersion": "int",
+            "allowedFieldIds": { "json": true },
+            "filter": { "json": true },
+            "sort": { "json": true }
+          },
+          "indexes": ["boardId", "datasetId"]
+        },
+        "workspaceAccountReceipts": {
+          "columns": {
+            "workspaceId": { "type": "uuid", "references": "workspaces" },
+            "actorId": "uuid",
+            "operation": { "enum": ["legacy_backfill", "owner_transfer"] },
+            "requestId": "string",
+            "fingerprint": "string",
+            "committedVersion": "int",
+            "result": { "json": true }
+          },
+          "indexes": ["workspaceId", "actorId", "requestId"]
+        },
+        "workspaceMemberships": {
+          "columns": {
+            "workspaceId": { "type": "uuid", "references": "workspaces" },
+            "actorId": "uuid",
+            "role": { "enum": ["owner", "creator", "editor", "commenter", "viewer"] },
+            "state": { "enum": ["active", "disabled"], "default": "active" },
+            "version": { "type": "int", "default": 1 },
+            "proof": { "enum": ["legacy_private_owner", "verified_better_auth"] }
+          },
+          "indexes": ["workspaceId", "actorId"]
+        },
+        "workspaceOwnerSets": {
+          "columns": {
+            "workspaceId": { "type": "uuid", "references": "workspaces" },
+            "version": "int",
+            "ownerActorIds": { "json": true }
+          },
+          "indexes": ["workspaceId"]
+        },
+        "workspaces": {
+          "columns": {
+            "name": "string",
+            "createdBy": "uuid",
+            "state": { "enum": ["active", "disabled"], "default": "active" }
+          }
+        }
+      }
+    },
+    "9906825b7802": {
+      "tables": {
+        "agentRuns": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "agentId": "uuid",
+            "action": "string",
+            "status": { "enum": ["running", "complete", "failed"] },
+            "input": { "json": true },
+            "result": { "json": true, "optional": true }
+          },
+          "indexes": ["boardId"]
+        },
+        "appletStates": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "noteId": "uuid",
+            "value": { "json": true },
+            "version": "int",
+            "updatedBy": "uuid"
+          },
+          "indexes": ["boardId", "noteId"]
+        },
+        "baseMemberships": {
+          "columns": {
+            "workspaceId": { "type": "uuid", "references": "workspaces" },
+            "boardId": { "type": "uuid", "references": "boards" },
+            "actorId": "uuid",
+            "role": { "enum": ["creator", "editor", "commenter", "viewer"] },
+            "state": { "enum": ["active", "disabled"], "default": "active" },
+            "version": { "type": "int", "default": 1 },
+            "legacyMemberId": "uuid?"
+          },
+          "indexes": ["boardId", "actorId"]
+        },
+        "boardInvites": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "token": "string",
+            "role": { "enum": ["viewer", "editor"] },
+            "singleUse": { "type": "boolean", "default": false },
+            "expiresAtEpochMs": "float?",
+            "intendedUserId": "uuid?"
+          },
+          "indexes": ["boardId", "token"]
+        },
+        "boardMemberRoleReceipts": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "memberId": "uuid",
+            "actorId": "uuid",
+            "requestId": "string",
+            "fingerprint": "string",
+            "previousRole": { "enum": ["viewer", "editor"] },
+            "assignedRole": { "enum": ["viewer", "editor"] },
+            "membershipVersion": "int",
+            "changed": "boolean"
+          },
+          "indexes": ["boardId", "actorId", "requestId"]
+        },
+        "boardMembers": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "userId": "uuid",
+            "role": { "enum": ["viewer", "editor", "admin", "agent"] },
+            "roleVersion": { "type": "int", "default": 1 }
+          },
+          "indexes": ["boardId", "userId"]
+        },
+        "boardWorkspaceBindings": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "workspaceId": { "type": "uuid", "references": "workspaces" },
+            "version": { "type": "int", "default": 1 }
+          },
+          "indexes": ["boardId"]
+        },
+        "boards": { "columns": { "title": "string", "ownerId": "uuid" } },
+        "canvasEntities": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "kind": { "enum": ["node", "link"] },
+            "payload": { "json": true },
+            "version": "int",
+            "updatedBy": "uuid"
+          },
+          "indexes": ["boardId", "kind"]
+        },
+        "canvasPatchEvents": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "entityId": "uuid",
+            "actorId": "uuid",
+            "requestId": "string",
+            "receiptId": "uuid",
+            "previousVersion": "int",
+            "committedVersion": "int",
+            "field": { "enum": ["label.markdown"] }
+          },
+          "indexes": ["boardId", "entityId"]
+        },
+        "canvasPatchReceipts": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "entityId": "uuid",
+            "actorId": "uuid",
+            "requestId": "string",
+            "fingerprint": "string",
+            "previousVersion": "int",
+            "committedVersion": "int",
+            "committedPayload": { "json": true },
+            "eventId": "uuid"
+          },
+          "indexes": ["boardId", "actorId", "requestId"]
+        },
+        "checkpoints": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "label": "string",
+            "snapshot": { "json": true }
+          },
+          "indexes": ["boardId"]
+        },
+        "comments": {
+          "columns": {
+            "taskId": { "type": "uuid", "references": "tasks" },
+            "authorId": "uuid",
+            "body": "string"
+          },
+          "indexes": ["taskId"]
+        },
+        "cursors": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "userId": "uuid",
+            "name": "string",
+            "x": "float",
+            "y": "float",
+            "active": { "type": "boolean", "default": false }
+          },
+          "indexes": ["boardId", "userId"]
+        },
+        "mcpRequests": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "requestId": "string",
+            "textHash": "string",
+            "noteId": "uuid"
+          },
+          "indexes": ["boardId", "requestId"]
+        },
+        "proposals": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "proposerId": "uuid",
+            "targetId": "uuid?",
+            "operation": { "enum": ["create_note", "move_shape", "create_task"] },
+            "payload": { "json": true },
+            "status": { "enum": ["pending", "approved", "rejected"] },
+            "reviewedBy": "uuid?"
+          },
+          "indexes": ["boardId", "status"]
+        },
+        "shapes": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "kind": { "enum": ["note", "rect"] },
+            "text": "string",
+            "authorId": "uuid?",
+            "authorName": "string?",
+            "x": "float",
+            "y": "float",
+            "width": "float",
+            "height": "float",
+            "fill": "string",
+            "zIndex": "int"
+          },
+          "indexes": ["boardId", "zIndex"]
+        },
+        "tasks": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "shapeId": { "type": "uuid", "optional": true, "references": "shapes" },
+            "title": "string",
+            "notes": "string?",
+            "status": { "enum": ["todo", "doing", "review", "done"] },
+            "rank": "float",
+            "assigneeId": "uuid?"
+          },
+          "indexes": ["boardId", "status", "rank"]
+        },
+        "typedCatalogEvents": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "actorId": "uuid",
+            "requestId": "string",
+            "receiptId": "uuid",
+            "datasetId": "uuid",
+            "fieldId": "uuid",
+            "viewId": "uuid"
+          },
+          "indexes": ["boardId", "datasetId"]
+        },
+        "typedCatalogReceipts": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "actorId": "uuid",
+            "requestId": "string",
+            "fingerprint": "string",
+            "datasetId": "uuid",
+            "fieldId": "uuid",
+            "viewId": "uuid",
+            "eventId": "uuid"
+          },
+          "indexes": ["boardId", "actorId", "requestId"]
+        },
+        "typedDatasets": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "name": "string",
+            "schemaVersion": "int",
+            "state": { "enum": ["active", "read_only"], "default": "active" }
+          },
+          "indexes": ["boardId"]
+        },
+        "typedFields": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "datasetId": { "type": "uuid", "references": "typedDatasets" },
+            "name": "string",
+            "kind": { "enum": ["text", "computed"] },
+            "computeFromFieldId": "uuid?"
+          },
+          "indexes": ["datasetId"]
+        },
+        "typedPatchEvents": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "datasetId": { "type": "uuid", "references": "typedDatasets" },
+            "recordId": "uuid",
+            "actorId": "uuid",
+            "requestId": "string",
+            "receiptId": "uuid",
+            "previousVersion": "int",
+            "committedVersion": "int",
+            "fieldIds": { "json": true }
+          },
+          "indexes": ["boardId", "recordId"]
+        },
+        "typedPatchReceipts": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "datasetId": { "type": "uuid", "references": "typedDatasets" },
+            "recordId": "uuid",
+            "actorId": "uuid",
+            "requestId": "string",
+            "fingerprint": "string",
+            "schemaVersion": "int",
+            "previousVersion": "int",
+            "committedVersion": "int",
+            "committedCells": { "json": true },
+            "eventId": "uuid"
+          },
+          "indexes": ["boardId", "actorId", "requestId"]
+        },
+        "typedRecords": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "datasetId": { "type": "uuid", "references": "typedDatasets" },
+            "cells": { "json": true },
+            "version": "int",
+            "updatedBy": "uuid"
+          },
+          "indexes": ["datasetId"]
+        },
+        "typedViews": {
+          "columns": {
+            "boardId": { "type": "uuid", "references": "boards" },
+            "datasetId": { "type": "uuid", "references": "typedDatasets" },
+            "name": "string",
+            "kind": { "enum": ["grid"] },
+            "definitionVersion": "int",
+            "allowedFieldIds": { "json": true },
+            "filter": { "json": true },
+            "sort": { "json": true }
+          },
+          "indexes": ["boardId", "datasetId"]
+        },
+        "workspaceAccountReceipts": {
+          "columns": {
+            "workspaceId": { "type": "uuid", "references": "workspaces" },
+            "actorId": "uuid",
+            "operation": { "enum": ["legacy_backfill", "owner_transfer"] },
+            "requestId": "string",
+            "fingerprint": "string",
+            "committedVersion": "int",
+            "result": { "json": true }
+          },
+          "indexes": ["workspaceId", "actorId", "requestId"]
+        },
+        "workspaceMemberships": {
+          "columns": {
+            "workspaceId": { "type": "uuid", "references": "workspaces" },
+            "actorId": "uuid",
+            "role": { "enum": ["owner", "creator", "editor", "commenter", "viewer"] },
+            "state": { "enum": ["active", "disabled"], "default": "active" },
+            "version": { "type": "int", "default": 1 },
+            "proof": { "enum": ["legacy_private_owner", "verified_better_auth"] }
+          },
+          "indexes": ["workspaceId", "actorId"]
+        },
+        "workspaceOwnerSets": {
+          "columns": {
+            "workspaceId": { "type": "uuid", "references": "workspaces" },
+            "version": "int",
+            "ownerActorIds": { "json": true }
+          },
+          "indexes": ["workspaceId"]
+        },
+        "workspaces": {
+          "columns": {
+            "name": "string",
+            "createdBy": "uuid",
+            "state": { "enum": ["active", "disabled"], "default": "active" }
+          }
+        }
+      }
     }
   },
   "migrations": [
@@ -2060,6 +2719,15 @@
         "typedRecords"
       ]
     },
-    { "from": "7ddacb95394d", "createTables": ["typedViews"] }
+    { "from": "7ddacb95394d", "to": "ed9b0d151df4", "createTables": ["typedViews"] },
+    {
+      "from": "ed9b0d151df4",
+      "to": "9906825b7802",
+      "createTables": ["typedCatalogEvents", "typedCatalogReceipts"]
+    },
+    {
+      "from": "9906825b7802",
+      "migrate": { "typedFields": { "primary": { "add": "boolean", "default": null } } }
+    }
   ]
 }

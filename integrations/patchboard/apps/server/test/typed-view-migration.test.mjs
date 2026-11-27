@@ -45,10 +45,13 @@ test("persisted #19 typed rows, receipts and events survive additive saved-view 
     await seed(older.typedPatchReceipts,{boardId,datasetId,recordId,actorId:editor,requestId:"parent-typed",fingerprint:"a".repeat(64),schemaVersion:3,previousVersion:7,committedVersion:8,committedCells:cells,eventId},receiptId);
     await seed(older.typedPatchEvents,{boardId,datasetId,recordId,actorId:editor,requestId:"parent-typed",receiptId,previousVersion:7,committedVersion:8,fieldIds:[title]},eventId);
     const before=await snapshot(jazz.db,older);
+    // Catalog migration adds a nullable primary marker; legacy fields must
+    // keep their original identity and must NOT become primary fields.
+    const expected=before.map((row,i)=>i===3||i===4?{...row,primary:null}:row);
     await jazz.close();jazz=null;
     process.env.JAZZ_APP_DIR=newDir;
     jazz=await open(app,permissions);
-    assert.deepEqual(await snapshot(jazz.db,app),before);
+    assert.deepEqual(await snapshot(jazz.db,app),expected);
     assert.equal(await jazz.createAccountFor(ownerSubject),owner);
     assert.equal(await jazz.createAccountFor(editorSubject),editor);
     assert.deepEqual(await jazz.db.all(app.typedViews.where({datasetId})),[]);
@@ -62,7 +65,7 @@ test("persisted #19 typed rows, receipts and events survive additive saved-view 
     const viewBefore=await jazz.db.one(app.typedViews.where({id:view.viewId}));
     await jazz.close();jazz=null;sql.close();sql=null;
     jazz=await open(app,permissions);sql=new DatabaseSync(sqlPath);installTypedViewShareLedger(sql);
-    assert.deepEqual(await snapshot(jazz.db,app),before);
+    assert.deepEqual(await snapshot(jazz.db,app),expected);
     assert.deepEqual(await jazz.db.one(app.typedViews.where({id:view.viewId})),viewBefore);
     const query={boardId,datasetId,viewId:view.viewId,verifiedSubjectId:readerSubject,channel:"browser",pageSize:1};
     const result=await querySavedTypedView(jazz.db,sql,{...query,shareToken:active.shareToken});

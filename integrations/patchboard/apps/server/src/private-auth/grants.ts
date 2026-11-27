@@ -55,7 +55,8 @@ export function requireConsentBoundBoardGrant(
   if (typeof userId !== "string" || typeof clientId !== "string" ||
       !userId || !clientId || typeof tokenScope !== "string") return null;
   const requested = tokenScope.split(/\s+/).filter((scope) =>
-    scope === "board:read" || scope === "board:write");
+    scope === "board:read" || scope === "board:write" ||
+    scope === "table:create");
   if (requested.length === 0) return null;
   const consents = privateAuthDatabase().prepare(
     "SELECT referenceId,scopes FROM oauthConsent WHERE userId=? AND clientId=? AND referenceId IS NOT NULL LIMIT 101",
@@ -72,6 +73,20 @@ export function requireConsentBoundBoardGrant(
     if (grant) boards.set(grant.boardId, grant);
   }
   return boards.size === 1 ? boards.values().next().value ?? null : null;
+}
+
+/** Exact table-create action consent, not merely a signed board:write token.
+ * The provider's consent row binds scopes to subject, client AND grant ID.
+ * Existing consents cannot acquire this operation through a scope upgrade. */
+export function hasExplicitTableCreateConsent(grant:VerifiedBoardGrant):boolean{
+  const rows=privateAuthDatabase().prepare(
+    "SELECT scopes FROM oauthConsent WHERE userId=? AND clientId=? AND referenceId=? LIMIT 2"
+  ).all(grant.userId,grant.clientId,grant.id) as {scopes:string}[];
+  if(rows.length!==1)return false;
+  try{
+    const scopes=JSON.parse(rows[0]!.scopes) as unknown;
+    return Array.isArray(scopes)&&scopes.every(scope=>typeof scope==="string")&&scopes.includes("table:create")&&scopes.includes("board:write");
+  }catch{return false;}
 }
 
 /**
