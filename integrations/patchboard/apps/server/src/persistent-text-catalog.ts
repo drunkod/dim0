@@ -27,3 +27,12 @@ export function persistentTextCatalogEnabled(env:NodeJS.ProcessEnv=process.env):
   }catch{return invalid();}
   return true;
 }
+
+
+/** Browser-only filtered sharing is a second explicit opt-in. Never widen
+ * the OAuth issuer or the disposable QA tool/route inventory. */
+export function persistentFilteredSharingEnabled(env:NodeJS.ProcessEnv=process.env):boolean{
+  if(env.PATCHBOARD_PERSISTENT_FILTERED_SHARING!=="1")return false;
+  if(!persistentTextCatalogEnabled(env))throw new Error("INVALID_PERSISTENT_FILTERED_SHARING_PROFILE");
+  return true;
+}

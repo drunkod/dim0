@@ -27,7 +27,7 @@ import {
 } from "./typed-record-patch.ts";
 import {qaHttpsCatalogBoardAllowed,qaHttpsCatalogProfile} from "./qa-https-catalog-profile.ts";
 import {typedRecordQaEnabled} from "./typed-record-qa-gate.ts";
-import {persistentTextCatalogEnabled} from "./persistent-text-catalog.ts";
+import {persistentTextCatalogEnabled,persistentFilteredSharingEnabled} from "./persistent-text-catalog.ts";
 import {createTextTable,addTextRow,
   TypedCatalogInvalid,TypedCatalogConflict,
   TypedCatalogLimit,TypedCatalogCommitUnknown
@@ -330,7 +330,7 @@ export async function privateBoardRequest(
       }));
     }
     // Shared authoritative catalog commands; persistent opt-in only enables
-    // Owner table/row creation and Owner readback, never QA sharing or MCP.
+    // Owner table/row creation and Owner readback; sharing is separately opted in.
     if(pathname==="/patchboard-private/api/records/tables/create" &&
       request.method==="POST"){
       if(!typedRecordQaEnabled()&&!persistentTextCatalogEnabled())return json({error:"Not found"},404);
@@ -376,7 +376,7 @@ export async function privateBoardRequest(
     }
     if(pathname==="/patchboard-private/api/records/views/shares" &&
       request.method==="GET"){
-      if(!typedRecordQaEnabled())return json({error:"Not found"},404);
+      if(!typedRecordQaEnabled()&&!persistentFilteredSharingEnabled())return json({error:"Not found"},404);
       const boardId=boardIdSchema.parse(url.searchParams.get("board_id"));
       const datasetId=boardIdSchema.parse(url.searchParams.get("dataset_id"));
       const viewId=boardIdSchema.parse(url.searchParams.get("view_id"));
@@ -396,16 +396,21 @@ export async function privateBoardRequest(
       const entityId = entityIdSchema.parse(url.searchParams.get("entity_id"));
       return json(await getCanvasEntity(db, boardId, accountId, entityId));
     }
-    // First typed relational-record vertical slice: disabled except for a
-    // disposable loopback CI issuer with explicit opt-in. No old OAuth scope
-    // gains a new live capability from this browser route.
-    // One persisted typed read view; its credential never joins the board
-    // membership table. Shared-view creation/sharing remains disposable-QA only;
-    // owner preview also serves the explicit persistent text catalog.
+    // Server-only saved projection. Persistent browser sharing has its own
+    // opt-in and exact action allowlist; it never grants membership or
+    // expands the OAuth/MCP inventory. Owner preview is also available in
+    // the narrower text catalog and external read-only QA profile.
     if(pathname.startsWith("/patchboard-private/api/records/views/") &&
       request.method==="POST"){
-      if(!typedRecordQaEnabled()&&(!(persistentTextCatalogEnabled()||qaHttpsCatalogProfile())||
-        pathname!=="/patchboard-private/api/records/views/owner-query"))return json({error:"Not found"},404);
+      const ownerPreview=pathname==="/patchboard-private/api/records/views/owner-query"&&
+        (persistentTextCatalogEnabled()||qaHttpsCatalogProfile());
+      const persistentShareAction=persistentFilteredSharingEnabled()&&[
+        "/patchboard-private/api/records/views/create",
+        "/patchboard-private/api/records/views/share",
+        "/patchboard-private/api/records/views/revoke",
+        "/patchboard-private/api/records/views/query"
+      ].includes(pathname);
+      if(!typedRecordQaEnabled()&&!ownerPreview&&!persistentShareAction)return json({error:"Not found"},404);
       const definition=z.object({
         name:z.string().trim().min(1).max(80),
         allowed_field_ids:z.array(boardIdSchema).min(1).max(20),

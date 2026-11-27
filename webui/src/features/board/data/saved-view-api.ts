@@ -4,8 +4,10 @@ export const nativeCatalogReadOnly = import.meta.env.VITE_DIM0_JAZZ_CANVAS === "
   import.meta.env.VITE_DIM0_QA_NATIVE_CATALOG_READONLY === "1"
 export const nativePersistentTextCatalogEnabled = !nativeCatalogReadOnly && import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" &&
   import.meta.env.VITE_DIM0_PERSISTENT_TEXT_CATALOG === "1"
-export const nativeSavedViewsEnabled = !nativeCatalogReadOnly && !nativePersistentTextCatalogEnabled && import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" &&
-  import.meta.env.VITE_DIM0_QA_NATIVE_SAVED_VIEW === "1"
+export const nativePersistentFilteredSharingEnabled = nativePersistentTextCatalogEnabled &&
+  import.meta.env.VITE_DIM0_PERSISTENT_FILTERED_SHARING === "1"
+export const nativeSavedViewsEnabled = !nativeCatalogReadOnly && import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" &&
+  (nativePersistentTextCatalogEnabled ? nativePersistentFilteredSharingEnabled : import.meta.env.VITE_DIM0_QA_NATIVE_SAVED_VIEW === "1")
 const uuid = z.string().uuid()
 const field = z.object({ id: uuid, name: z.string() })
 const view = z.object({

@@ -25,7 +25,7 @@ export function NativeBoardDataControl() {
   const role = useBoardAppStore(s => s.boardRole)
   const presenting = useBoardAppStore(s => s.presentationMode)
   if ((!nativeSavedViewsEnabled && !nativeCatalogReadOnly && !nativePersistentTextCatalogEnabled) || !id || id !== boardId || role !== "owner" || presenting) return null
-  return <NativeBoardData key={id} boardId={id} readOnly={nativeCatalogReadOnly} allowSaveView={!nativePersistentTextCatalogEnabled} />
+  return <NativeBoardData key={id} boardId={id} readOnly={nativeCatalogReadOnly} allowSaveView={nativeSavedViewsEnabled} />
 }
 
 export function NativeBoardData(props: DataProps) {
