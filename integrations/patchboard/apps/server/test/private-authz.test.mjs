@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { Effect } from "effect";
 import { createJazz, sqlite } from "jazz-tools/backend";
+import { WriteWaitTimeoutError } from "jazz-tools";
 import { app } from "@patchboard/jazz-schema";
 import privatePermissions from "@patchboard/jazz-schema/private.permissions.json" with { type: "json" };
 import {
@@ -162,4 +163,21 @@ test("private owner/editor note mutation remains authorized and durable", async 
     await server.close();
     await rm(path, { recursive: true, force: true });
   }
+});
+
+test("create_note does not replay or retry a write with an unknown authority outcome",async()=>{
+  const actorId=randomUUID(),boardId=randomUUID();
+  let calls=0,fences=0;
+  const unknown=new WriteWaitTimeoutError("global",10000);
+  const db={serializableTransaction:async()=>{
+    calls++;
+    if(calls===1)return {value:null,wait:async()=>{}};
+    if(calls===2)return {value:randomUUID(),wait:async()=>{throw unknown;}};
+    throw new PrivatePermissionDenied();
+  }};
+  await assert.rejects(Effect.runPromise(createMcpNote(db,{
+    actorId,boardId,text:"unknown outcome",requestId:"stable-note-request",
+  },()=>{fences++;})),error=>error===unknown);
+  assert.equal(calls,2);
+  assert.equal(fences,2);
 });

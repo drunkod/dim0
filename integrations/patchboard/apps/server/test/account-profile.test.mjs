@@ -9,6 +9,7 @@ import {
   updateAccountPreferences, ProfileConflict,
 } from "../src/account-adapters/profile-preferences.ts";
 import { privateAccountProfileRequest } from "../src/account-adapters/profile-routes.ts";
+import { installGrantAdmissionLedger } from "../src/account-adapters/grant-admission.ts";
 
 const subjectA = randomUUID();
 const subjectB = randomUUID();
@@ -157,6 +158,7 @@ test("connected-apps route is private to issuer subject and disconnects only sel
     event_type TEXT NOT NULL,occurred_at_ms INTEGER NOT NULL,
     safe_context TEXT NOT NULL
   )`);
+  installGrantAdmissionLedger(db);
   const grantA=randomUUID(),grantB=randomUUID(),grantC=randomUUID();
   for(const [id,subject,client] of [
     [grantA,subjectA,"account-app-A"],[grantB,subjectB,"account-app-B"],[grantC,subjectA,"account-app-C"]

@@ -151,6 +151,7 @@ const isTransactionConflict = (error: unknown) =>
 export const createMcpNote = Effect.fn("Board.createMcpNote")(function* (
   db: Db,
   input: { boardId: string; text: string; requestId: string; actorId?: string; authorName?: string },
+  beforeWriteSubmit?: () => void,
 ) {
   return yield* Effect.promise(async () => {
     const text = input.text.trim();
@@ -191,6 +192,7 @@ export const createMcpNote = Effect.fn("Board.createMcpNote")(function* (
     };
     const replay = async () => {
       if (!input.actorId) return lookup(db);
+      beforeWriteSubmit?.();
       const result = await db.serializableTransaction(async (tx) => lookup(tx));
       await result.wait({ timeoutMs: 10_000 });
       return result.value;
@@ -202,6 +204,7 @@ export const createMcpNote = Effect.fn("Board.createMcpNote")(function* (
       const found = await replay();
       if (found) return found;
       try {
+        beforeWriteSubmit?.();
         const write = await db.serializableTransaction(async (tx) => {
           await checkWriter(tx);
           const existing = await tx.one(app.mcpRequests.where({ id: receiptId }));
@@ -232,10 +235,13 @@ export const createMcpNote = Effect.fn("Board.createMcpNote")(function* (
         await write.wait({ timeoutMs: 10_000 });
         return { board_id: boardId, note_id: write.value };
       } catch (error) {
-        // A rejected concurrent request may have raced a successful transaction.
+        // Only a definitively rejected transaction can be reconciled/retried.
+        // A wait timeout may still commit; do not mask it with a later
+        // permission failure or retry and falsely settle its drain lease.
+        if (!isTransactionConflict(error)) throw error;
         const found = await replay();
         if (found) return found;
-        if (!isTransactionConflict(error) || attempt === 5) throw error;
+        if (attempt === 5) throw error;
       }
     }
     throw new Error("Request could not be committed");

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 
@@ -9,14 +9,27 @@ type Profile = {
   email_required: false
   backup_passkey_enrollment_available: false
 }
+type DisconnectIntent = { requestId: string; expectedVersion: number }
 type ConnectedGrant = {
   id: string; clientId: string; boardId: string; grantVersion: number
   createdAtMs: number; revokedAtMs: number | null
+  pendingDisconnect?: DisconnectIntent | null
 }
 type GrantList = { grants: ConnectedGrant[]; hasMore: boolean }
 type GrantRevocation = { grant_id: string; version: number; revoked_at_ms: number }
 type AccountEvent = { type: string; at: number; detail: unknown }
 const path = "/patchboard-private/api/account/"
+/** Preserve the status and retry guidance independently of display copy. */
+class AccountRequestError extends Error {
+  readonly status: number
+  readonly retrySameRequest: boolean
+
+  constructor(message: string, status: number, retrySameRequest: boolean) {
+    super(message)
+    this.status = status
+    this.retrySameRequest = retrySameRequest
+  }
+}
 async function accountFetch<T>(resource: string, body?: object, method: "PATCH" | "POST" = "PATCH"): Promise<T> {
   const response = await fetch(path + resource, {
     credentials: "same-origin",
@@ -27,8 +40,10 @@ async function accountFetch<T>(resource: string, body?: object, method: "PATCH" 
       body: JSON.stringify(body),
     } : {}),
   })
-  const payload = await response.json() as T & { error?: string }
-  if (!response.ok) throw new Error(payload.error ?? "Account settings unavailable")
+  const payload = await response.json() as T & { error?: string; retry_same_request?: boolean }
+  if (!response.ok) throw new AccountRequestError(
+    payload.error ?? "Account settings unavailable", response.status, payload.retry_same_request === true,
+  )
   return payload
 }
 /**
@@ -45,6 +60,7 @@ export function JazzAccountProfile() {
   const [connectedState, setConnectedState] = useState<"loading" | "ready" | "unavailable">("loading")
   const [status, setStatus] = useState("Loading your passkey account…")
   const [busy, setBusy] = useState(false)
+  const disconnectIntents = useRef(new Map<string, DisconnectIntent>())
   useEffect(() => {
     let mounted = true
     void Promise.all([
@@ -114,22 +130,26 @@ export function JazzAccountProfile() {
   /** Revoke exactly one grant, and distinguish confirmation from a list refresh. */
   async function disconnectGrant(grant: ConnectedGrant) {
     if (busy || connectedState !== "ready" || grant.revokedAtMs !== null) return
-    if (!window.confirm("Disconnect this client's board access? MCP callbacks entering after revocation will be denied. Operations already started may finish.")) return
+    const pending = grant.pendingDisconnect ?? disconnectIntents.current.get(grant.id)
+    if (!pending && !window.confirm("Disconnect this client's board access? New MCP writes will be blocked. Disconnection is confirmed only after earlier writes have resolved.")) return
+    const intent = pending ?? { requestId: crypto.randomUUID(), expectedVersion: grant.grantVersion }
+    disconnectIntents.current.set(grant.id, intent)
     setBusy(true)
     setStatus("")
     try {
       const receipt = await accountFetch<GrantRevocation>("connected-apps/revoke", {
         grant_id: grant.id, client_id: grant.clientId,
-        expected_version: grant.grantVersion, request_id: crypto.randomUUID(),
+        expected_version: intent.expectedVersion, request_id: intent.requestId,
       }, "POST")
       if (receipt.grant_id !== grant.id || !Number.isSafeInteger(receipt.version) ||
-          receipt.version < grant.grantVersion || !Number.isFinite(receipt.revoked_at_ms)) {
+          receipt.version < intent.expectedVersion + 1 || !Number.isFinite(receipt.revoked_at_ms)) {
         throw new Error("Revocation could not be confirmed; refresh before retrying.")
       }
+      disconnectIntents.current.delete(grant.id)
       setConnected(current => current && ({
         ...current,
         grants: current.grants.map(item => item.id === grant.id ? {
-          ...item, grantVersion: receipt.version, revokedAtMs: receipt.revoked_at_ms,
+          ...item, grantVersion: receipt.version, revokedAtMs: receipt.revoked_at_ms, pendingDisconnect: null,
         } : item),
       }))
       try {
@@ -141,7 +161,21 @@ export function JazzAccountProfile() {
         setStatus("Connected app grant revoked. Grant list temporarily unavailable; refresh to verify current state.")
       }
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Revocation could not be confirmed; refresh before retrying.")
+      if (error instanceof AccountRequestError && !error.retrySameRequest &&
+          error.status >= 400 && error.status < 500 && error.status !== 408 && error.status !== 429) {
+        disconnectIntents.current.delete(grant.id)
+        setConnected(current => current && ({
+          ...current, grants: current.grants.map(item => item.id === grant.id ? { ...item, pendingDisconnect: null } : item),
+        }))
+        setStatus(error.message)
+      } else if (error instanceof AccountRequestError && error.retrySameRequest) {
+        setConnected(current => current && ({
+          ...current, grants: current.grants.map(item => item.id === grant.id ? { ...item, pendingDisconnect: intent } : item),
+        }))
+        setStatus("Disconnect is waiting for an earlier write to finish. Retry disconnect to check again.")
+      } else {
+        setStatus("Disconnection could not be confirmed. Retry disconnect to check the same request.")
+      }
     } finally { setBusy(false) }
   }
 
@@ -186,12 +220,12 @@ export function JazzAccountProfile() {
                 <li key={grant.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2 text-xs">
                   <div className="min-w-0">
                     <p className="break-all font-medium">Client {grant.clientId}</p>
-                    <p className="text-muted-foreground">Board {grant.boardId.slice(0, 12)} · {grant.revokedAtMs === null ? "Active" : "Revoked"}</p>
+                    <p className="text-muted-foreground">Board {grant.boardId.slice(0, 12)} · {grant.revokedAtMs !== null ? "Revoked" : grant.pendingDisconnect ? "Disconnect pending" : disconnectIntents.current.has(grant.id) ? "Disconnect unconfirmed" : "Active"}</p>
                   </div>
                   <Button size="sm" variant="outline" type="button"
                     disabled={busy || grant.revokedAtMs !== null}
                     onClick={() => void disconnectGrant(grant)}>
-                    {grant.revokedAtMs !== null ? "Disconnected" : "Disconnect"}
+                    {grant.revokedAtMs !== null ? "Disconnected" : grant.pendingDisconnect || disconnectIntents.current.has(grant.id) ? "Retry disconnect" : "Disconnect"}
                   </Button>
                 </li>
               ))}

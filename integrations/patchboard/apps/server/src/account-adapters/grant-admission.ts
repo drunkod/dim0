@@ -21,33 +21,54 @@ export type GrantRevocation = Readonly<{
 export type AccountGrantSummary = Readonly<{
   id:string; clientId:string; boardId:string;
   grantVersion:number; createdAtMs:number; revokedAtMs:number|null;
+  pendingDisconnect:Readonly<{requestId:string;expectedVersion:number}>|null;
 }>;
 export type VerifiedGrantRevokeIntent = Readonly<{
   subjectId:string; clientId:string; expectedVersion:number;
 }>;
+export class GrantDrainPending extends Error {
+  constructor(){super("WRITE_DRAIN_PENDING");this.name="GrantDrainPending";}
+}
 export class GrantOwnerError extends Error {
   constructor(readonly code:"FORBIDDEN"|"STALE_STATE"|"REQUEST_ID_CONFLICT") {
     super(code);
     this.name="GrantOwnerError";
   }
 }
-/** User-scoped, read-only consent metadata; never a bearer access token. */
+/** Owner-scoped consent metadata and original retry intent; never a bearer token. */
 export function listCurrentSubjectGrants(
   db:DatabaseSync,verifiedSubjectId:string
 ):{grants:readonly AccountGrantSummary[];hasMore:boolean} {
   if (!verifiedSubjectId) throw new GrantOwnerError("FORBIDDEN");
-  const rows=db.prepare(`SELECT id,client_id,board_id,grant_version,
-    created_at_ms,revoked_at_ms FROM patchboard_oauth_grant
-    WHERE user_id=? ORDER BY created_at_ms DESC LIMIT 101`)
+  const rows=db.prepare(`SELECT g.id,g.client_id,g.board_id,g.grant_version,
+    g.created_at_ms,g.revoked_at_ms,p.request_id AS pending_request_id,
+    p.expected_version AS pending_expected_version
+    FROM patchboard_oauth_grant g
+    LEFT JOIN patchboard_grant_disconnect_pending p
+      ON p.grant_id=g.id AND p.subject_id=g.user_id AND p.client_id=g.client_id
+      AND p.expected_version=g.grant_version AND g.revoked_at_ms IS NULL
+    WHERE g.user_id=? ORDER BY g.created_at_ms DESC LIMIT 101`)
     .all(verifiedSubjectId) as {
       id:string;client_id:string;board_id:string;grant_version:number;
-      created_at_ms:number;revoked_at_ms:number|null
+      created_at_ms:number;revoked_at_ms:number|null;
+      pending_request_id:string|null;pending_expected_version:number|null;
     }[];
-  return {hasMore:rows.length>100,grants:rows.slice(0,100).map(row=>({
-    id:row.id,clientId:row.client_id,boardId:row.board_id,
-    grantVersion:row.grant_version,createdAtMs:row.created_at_ms,
-    revokedAtMs:row.revoked_at_ms
-  }))};
+  const prefix="self:"+verifiedSubjectId+":";
+  return {hasMore:rows.length>100,grants:rows.slice(0,100).map(row=>{
+    const requestId=row.pending_request_id?.startsWith(prefix)
+      ? row.pending_request_id.slice(prefix.length) : null;
+    // Recover the owner's existing command after a reload. Its eventual retry
+    // still passes the authenticated version/ownership checks in the writer.
+    const pendingDisconnect=requestId && /^[A-Za-z0-9_-]{1,128}$/.test(requestId) &&
+      row.pending_expected_version!==null &&
+      Number.isSafeInteger(row.pending_expected_version) && row.pending_expected_version>0
+      ? {requestId,expectedVersion:row.pending_expected_version} : null;
+    return {
+      id:row.id,clientId:row.client_id,boardId:row.board_id,
+      grantVersion:row.grant_version,createdAtMs:row.created_at_ms,
+      revokedAtMs:row.revoked_at_ms,pendingDisconnect
+    };
+  })};
 }
 
 type Row = {id:string;user_id:string;client_id:string;board_id:string;
@@ -67,6 +88,19 @@ export function installGrantAdmissionLedger(db:DatabaseSync):void {
   );
   CREATE INDEX IF NOT EXISTS patchboard_mcp_admission_expiry
     ON patchboard_mcp_admission(expires_at_ms);
+  -- Durable cross-store drain fence. NEVER time-expire a possibly committed
+  -- Jazz write without authoritative reconciliation.
+  CREATE TABLE IF NOT EXISTS patchboard_mcp_write_lease (
+    id TEXT PRIMARY KEY, grant_id TEXT NOT NULL,
+    admission_id TEXT NOT NULL, opened_at_ms INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS patchboard_mcp_write_lease_grant
+    ON patchboard_mcp_write_lease(grant_id);
+  CREATE TABLE IF NOT EXISTS patchboard_grant_disconnect_pending (
+    grant_id TEXT PRIMARY KEY, subject_id TEXT NOT NULL,
+    client_id TEXT NOT NULL, expected_version INTEGER NOT NULL,
+    request_id TEXT NOT NULL, started_at_ms INTEGER NOT NULL
+  );
   CREATE TABLE IF NOT EXISTS patchboard_grant_revoke_receipt (
     grant_id TEXT NOT NULL, request_id TEXT NOT NULL,
     fingerprint TEXT NOT NULL, committed_version INTEGER NOT NULL,
@@ -112,6 +146,7 @@ export function admitVerifiedMcpGrant(
   return serialized(db,()=>{
     const row=grantRow(db,verified.id);
     if (!row || row.revoked_at_ms!==null ||
+        db.prepare("SELECT 1 FROM patchboard_grant_disconnect_pending WHERE grant_id=?").get(row.id) ||
         row.user_id!==verified.userId ||
         row.client_id!==verified.clientId ||
         row.board_id!==verified.boardId) return null;
@@ -143,8 +178,8 @@ export function admitVerifiedMcpGrant(
  * A callback FIRST entering after durable revoke or grant-version change
  * must be denied, even when its HTTP admission receipt remains within TTL.
  * A read already past this check and the native membership guard may finish.
- * Entry validation alone does not fence writes already running; write
- * submission/retry fencing and disconnect draining are separate increments.
+ * A pending disconnect blocks new callbacks. An exact existing write lease
+ * can finish before the disconnect confirms; it never time-expires.
  * No receipt is accepted from an MCP argument, bearer token or browser body.
  */
 export function authorizeProtectedMcpInvocation(
@@ -153,6 +188,7 @@ export function authorizeProtectedMcpInvocation(
   verified: VerifiedGrantReference,
   scope: "board:read" | "board:write",
   nowEpochMs = Date.now(),
+  activeWriteLeaseId?: string,
 ): boolean {
   if (!Number.isFinite(nowEpochMs) || nowEpochMs < admission.admittedAtMs ||
       nowEpochMs >= admission.expiresAtMs ||
@@ -172,7 +208,12 @@ export function authorizeProtectedMcpInvocation(
   // Revocation/version is authoritative at callback entry, not HTTP admission.
   // SQLite's synchronous read observes commits made before this call starts.
   const liveGrant = grantRow(db, admission.grantId);
+  const activeLease=scope==="board:write" && activeWriteLeaseId && Boolean(db.prepare(
+    "SELECT 1 FROM patchboard_mcp_write_lease WHERE id=? AND grant_id=? AND admission_id=?"
+  ).get(activeWriteLeaseId,admission.grantId,admission.id));
+  const pending=Boolean(db.prepare("SELECT 1 FROM patchboard_grant_disconnect_pending WHERE grant_id=?").get(admission.grantId));
   return Boolean(row && liveGrant && liveGrant.revoked_at_ms === null &&
+    (!pending || activeLease) &&
     liveGrant.grant_version === admission.grantVersion &&
     liveGrant.id === verified.id &&
     liveGrant.user_id === verified.userId &&
@@ -224,6 +265,18 @@ export function revokeGrantWithReceipt(
       }
       return {id,committedVersion:prior.committed_version,revokedAtMs:prior.revoked_at_ms};
     }
+    // A provider or competing owner request cannot overtake a pending intent.
+    // The same SQL lock protects reservation, pending gate, revoke and cleanup.
+    if (db.prepare("SELECT 1 FROM patchboard_mcp_write_lease WHERE grant_id=? LIMIT 1").get(id))
+      throw new GrantDrainPending();
+    const pending = db.prepare("SELECT request_id,subject_id,client_id,expected_version FROM patchboard_grant_disconnect_pending WHERE grant_id=?")
+      .get(id) as {request_id:string;subject_id:string;client_id:string;expected_version:number}|undefined;
+    if (pending && (!verifiedOwner || pending.request_id!==requestId ||
+      pending.subject_id!==verifiedOwner.subjectId || pending.client_id!==verifiedOwner.clientId ||
+      pending.expected_version!==verifiedOwner.expectedVersion)) {
+      if (!verifiedOwner) throw new GrantDrainPending();
+      throw new GrantOwnerError("STALE_STATE");
+    }
     // Replay was handled above. Brand-new requests with a stale version fail,
     // including attempts to re-revoke a grant without refreshing the listing.
     if (verifiedOwner && row.grant_version!==verifiedOwner.expectedVersion)
@@ -249,6 +302,7 @@ export function revokeGrantWithReceipt(
       VALUES(?,?,?,?,?)`).run(
       id,requestId,fingerprint,committedVersion,revokedAtMs
     );
+    if (pending) db.prepare("DELETE FROM patchboard_grant_disconnect_pending WHERE grant_id=? AND request_id=?").run(id,requestId);
     return {id,committedVersion,revokedAtMs};
   });
 }
