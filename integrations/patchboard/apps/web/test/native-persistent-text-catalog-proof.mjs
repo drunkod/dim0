@@ -20,6 +20,7 @@ import {app} from "@patchboard/jazz-schema";
 import permissions from "@patchboard/jazz-schema/private.permissions.json" with {type:"json"};
 import {chromium,expect} from "@playwright/test";
 
+const combined=process.argv.includes("--combined");
 const persistentMcp=process.argv.includes("--persistent-mcp");
 const filteredSharing=process.argv.includes("--filtered-sharing");
 const patchboard=resolve(fileURLToPath(new URL("../../../",import.meta.url)));
@@ -101,7 +102,7 @@ async function startBackend(enabled=backendMode,sharing=sharingMode,mcp=mcpMode)
     await sleep(250);
   }throw Error("Backend readiness failed");
 }
-async function startFrontend(sharing=filteredSharing?"1":"0"){
+async function startFrontend(sharing=filteredSharing||combined?"1":"0"){
   const buildDir=join(root,"native-persistent-"+sharing);
   await execute(vite,["build","--outDir",buildDir],webui,{VITE_DIM0_PERSISTENT_FILTERED_SHARING:sharing});
   frontend=launch(vite,["preview","--outDir",buildDir,"--host","127.0.0.1","--port",String(uiPort),"--strictPort"],webui,{PATCHBOARD_PERSISTENT_TEXT_CATALOG:"1"});
@@ -116,7 +117,7 @@ const api=(page,path,data)=>page.evaluate(async({path,data})=>{
   return {status:r.status,body:await r.json()};
 },{path,data});
 async function account(){
-  const context=await browser.newContext({viewport:{width:1440,height:900},ignoreHTTPSErrors:true,serviceWorkers:"block",permissions:["clipboard-read","clipboard-write"]});
+  const context=await browser.newContext({viewport:{width:1440,height:900},...(combined?{locale:"en-US"}:{}),ignoreHTTPSErrors:true,serviceWorkers:"block",permissions:["clipboard-read","clipboard-write"]});
   await context.route("**/*",route=>{
     const u=new URL(route.request().url());
     return u.origin===origin||["data:","blob:"].includes(u.protocol)?route.continue():route.abort();
@@ -554,10 +555,229 @@ async function runPersistentMcp(board,owner,other){
   console.log("PERSISTENT_MCP_TABLE_CREATE_PASS",JSON.stringify({created,replay,native,afterRestart,disconnectStatus:200,postDisconnectHttp:401,counts:counts(stored)}));
 }
 
+
+/** Final handover: one profile, one board, one MCP-created canonical table.
+ * No production source change or QA flag; reuse the exact existing commands. */
+async function runCombined(board,owner,recipient){
+  const op=owner.page,rp=recipient.page,boardUrl=origin+"/boards/"+board;
+  const scope="board:read board:write table:create";
+  const openData=async()=>{
+    await op.goto(boardUrl);
+    await op.getByRole("button",{name:"Open board Data"}).click();
+    const data=op.getByRole("region",{name:"Board Data"});
+    await expect(data).toBeVisible(options);
+    await data.getByRole("button",{name:"Open saved view All rows",exact:true}).click();
+    return data;
+  };
+  const assertGrid=async(page,created,view,text,total)=>{
+    const t=grid(page);
+    await expect(t).toHaveAttribute("data-dataset-id",created.datasetId,options);
+    await expect(t).toHaveAttribute("data-view-id",view,options);
+    await expect(t.getByRole("columnheader")).toHaveCount(1);
+    await expect(t.getByRole("columnheader",{name:"Title",exact:true})).toHaveAttribute("data-field-id",created.fieldId);
+    if(text)await expect(t.getByRole("cell",{name:text,exact:true})).toBeVisible(options);
+    await expect(page.getByText(total+" matching records",{exact:true})).toBeVisible(options);
+    return t;
+  };
+  stage="combined baseline and product presentation";
+  const metadata=await (await fetch(origin+"/.well-known/oauth-authorization-server/patchboard-auth")).json();
+  assert.ok(metadata.scopes_supported.includes("table:create"));
+  await op.goto(boardUrl);
+  await op.getByRole("button",{name:"Open board Data"}).click();
+  await expect(op.getByText("No saved views on this board.",{exact:true})).toBeVisible(options);
+  await op.screenshot({animations:"disabled",path:join(evidence,"owner-empty-data.png")});
+  // Observe the actual served product identity; do not relabel the build.
+  const branding=await op.evaluate(()=>({title:document.title,documentLanguage:document.documentElement.lang,
+    mobileTitle:document.querySelector('meta[name="apple-mobile-web-app-title"]')?.content??null,
+    browserLocale:navigator.language,visibleDim0:document.body.innerText.includes("Dim0"),
+    visibleSashAI:document.body.innerText.includes("SashAI")}));
+  const localeLabel="Preferred locale (BCP 47)";
+  await op.goto(origin+"/settings");
+  const locale=op.getByLabel(localeLabel,{exact:true});
+  await expect(locale).toHaveValue("en",options);
+  const defaultProfile=(await api(op,"account/profile")).body;
+  assert.equal(defaultProfile.locale,"en");
+  await locale.fill("ru-RU");
+  const preference=op.waitForResponse(r=>r.url().endsWith("/account/preferences")&&r.request().method()==="PATCH");
+  await op.getByRole("button",{name:"Save locale preference",exact:true}).click();
+  const preferenceReply=await preference;assert.equal(preferenceReply.status(),200);
+  const savedLocale=await preferenceReply.json();assert.equal(savedLocale.locale,"ru-RU");
+  await expect(op.getByText("Locale preference saved.",{exact:true})).toBeVisible(options);
+  await expect(op.getByText("Saved privately for your account. This does not change the app language yet.",{exact:true})).toBeVisible();
+  await op.screenshot({animations:"disabled",path:join(evidence,"owner-locale.png")});
+  stage="combined explicit Owner consent and MCP creation/replay";
+  const consent=await authorize(owner,board,scope,"Persistent scoped MCP");
+  const client=await connect(consent);
+  const tools=(await client.listTools()).tools.map(t=>t.name);
+  assert.ok(tools.includes("call-api-write"));
+  assert.ok(!tools.includes("patch_typed_record")&&!tools.includes("read_typed_view"));
+  const command=args(board,randomUUID());
+  const created=success(await invoke(client,command));
+  assert.equal(created.replayed,false);assert.equal(created.boardId,board);
+  const replay=success(await invoke(client,command));assert.deepEqual(replay,{...created,replayed:true});
+  const native=await nativeRead(op,board,created);
+  await op.screenshot({animations:"disabled",path:join(evidence,"owner-mcp-created-grid.png")});
+  stage="three native rows on the original MCP table";
+  let data=op.getByRole("region",{name:"Board Data"});
+  const added=[],rowInputs=[];
+  for(const value of ["Demo alpha","Internal planning","Demo beta"]){
+    const response=op.waitForResponse(r=>r.url().endsWith("/records/rows/create")&&r.request().method()==="POST");
+    await data.getByLabel("New row Title",{exact:true}).fill(value);
+    await data.getByRole("button",{name:"Add row",exact:true}).click();
+    const reply=await response;assert.equal(reply.status(),201);
+    const row=await reply.json(),input=reply.request().postDataJSON();
+    assert.equal(input.dataset_id,created.datasetId);assert.equal(input.board_id,board);
+    assert.equal(input.field_id,created.fieldId);assert.equal(row.updatedBy,owner.identity.accountId);
+    added.push(row);rowInputs.push(input);
+    await expect(op.getByText(added.length+" matching records",{exact:true})).toBeVisible(options);
+    await expect(data.getByLabel("New row Title",{exact:true})).toHaveValue("");
+  }
+  await assertGrid(op,created,created.defaultViewId,"Demo alpha",3);
+  await data.getByRole("button",{name:"Next page"}).click();await assertGrid(op,created,created.defaultViewId,"Demo beta",3);
+  await data.getByRole("button",{name:"Next page"}).click();await assertGrid(op,created,created.defaultViewId,"Internal planning",3);
+  stage="save filtered projection and copy actual view link";
+  await data.getByLabel("Saved view name",{exact:true}).fill("Demo items");
+  await data.getByLabel("Title starts with",{exact:true}).fill("Demo");
+  const saveResponse=op.waitForResponse(r=>r.url().endsWith("/records/views/create")&&r.request().method()==="POST");
+  await data.getByRole("button",{name:"Save view",exact:true}).click();
+  const saved=await saveResponse;assert.equal(saved.status(),201);
+  const view=(await saved.json()).viewId;
+  const definition=saved.request().postDataJSON();assert.equal(definition.dataset_id,created.datasetId);
+  await assertGrid(op,created,view,"Demo alpha",2);
+  await op.screenshot({animations:"disabled",path:join(evidence,"owner-filtered.png")});
+  await op.keyboard.press("Escape");
+  await op.getByRole("button",{name:"Share this board"}).click();
+  const group=op.getByRole("group",{name:"Share saved view Demo items",exact:true});
+  const issueResponse=op.waitForResponse(r=>r.url().endsWith("/records/views/share")&&r.request().method()==="POST");
+  await group.getByRole("button",{name:"Create view link",exact:true}).click();
+  const issue=await issueResponse;assert.equal(issue.status(),201);
+  const issued=await issue.json();
+  await group.getByRole("button",{name:"Copy view link",exact:true}).click();
+  await expect(group.getByText("View link copied.",{exact:true})).toBeVisible(options);
+  const copied=await op.evaluate(()=>navigator.clipboard.readText());
+  const u=new URL(copied);
+  assert.equal(u.origin,origin);assert.equal(u.pathname,"/shared-view/"+board+"/"+created.datasetId+"/"+view);
+  assert.equal(u.search,"");assert.match(u.hash,/^#share=[A-Za-z0-9_-]{43}$/);
+  assert.equal(new URLSearchParams(u.hash.slice(1)).get("share"),issued.shareToken);
+  const ref={board_id:board,dataset_id:created.datasetId,view_id:view};
+  const query={...ref,share_token:issued.shareToken,page_size:1};
+  const metadataPath="records/views/shares?"+new URLSearchParams(ref);
+  const active={shareId:issued.shareId,shareVersion:1,revoked:false};
+  assert.deepEqual((await api(op,metadataPath)).body.shares,[active]);
+  await op.keyboard.press("Escape");
+  stage="independent recipient, not a board member";
+  await rp.getByRole("button",{name:"Sign out",exact:true}).click();
+  await expect(rp).toHaveURL(origin+"/signin",options);
+  const boardFetches=[];
+  const observeLanding=r=>{
+    if(["/patchboard-private/api/board","/patchboard-private/api/canvas","/patchboard-private/api/join"].includes(new URL(r.url()).pathname))boardFetches.push(true);
+  };
+  rp.on("request",observeLanding);
+  await rp.goto(copied,{waitUntil:"domcontentloaded"});
+  await rp.getByRole("button",{name:"Sign in with passkey",exact:true}).click();
+  await assertGrid(rp,created,view,"Demo alpha",2);
+  assert.equal((await api(rp,"me")).body.id,recipient.identity.id);
+  assert.deepEqual(boardFetches,[]);rp.off("request",observeLanding);
+  const first=await api(rp,"records/views/query",query);
+  assert.equal(first.status,200);assert.deepEqual(first.body.fields,[created.fieldId]);
+  assert.deepEqual(first.body.rows.map(r=>({id:r.id,cells:r.cells})),[{id:added[0].recordId,cells:{[created.fieldId]:"Demo alpha"}}]);
+  assert.equal((await api(rp,"records/views/query",{...query,record_id:added[1].recordId})).status,404);
+  assert.equal((await api(rp,"records/views/query",{...query,requested_field_ids:[randomUUID()]})).status,400);
+  assert.equal((await api(rp,"records/views/query",{...query,view_id:created.defaultViewId})).status,403);
+  assert.equal((await api(rp,"records/views?board_id="+board)).status,403);
+  assert.equal((await api(rp,"canvas?board_id="+board)).status,403);
+  assert.deepEqual((await api(rp,"boards")).body.boards,[]);
+  assert.deepEqual((await api(rp,"account/connected-apps")).body.grants,[]);
+  await rp.getByRole("button",{name:"Next page"}).click();await assertGrid(rp,created,view,"Demo beta",2);
+  await expect(rp.getByText("Internal planning",{exact:true})).toHaveCount(0);
+  await rp.screenshot({animations:"disabled",path:join(evidence,"recipient-filtered.png")});
+
+  stage="combined durable audit and backend restart";
+  const expected={typedDatasets:1,typedFields:1,typedViews:2,typedRecords:3,typedCatalogReceipts:1,typedCatalogEvents:1,typedPatchReceipts:3,typedPatchEvents:3};
+  // Quiesce both pages before stopping the authority, preserving browser sessions.
+  await rp.goto("about:blank");
+  const stored=await snapshot(board,op);
+  assert.deepEqual(counts(stored),expected);
+  assert.deepEqual(stored.typedDatasets.map(x=>x.id),[created.datasetId]);
+  assert.deepEqual(stored.typedFields.map(x=>x.id),[created.fieldId]);
+  assert.deepEqual(stored.typedViews.map(x=>x.id).sort(),[created.defaultViewId,view].sort());
+  assert.deepEqual(stored.typedRecords.map(x=>x.id).sort(),added.map(x=>x.recordId).sort());
+  assert.deepEqual(stored.typedRecords.map(x=>x.cells[created.fieldId]).sort(),["Demo alpha","Demo beta","Internal planning"]);
+  assert.deepEqual(stored.typedRecords.map(x=>x.updatedBy),Array(3).fill(owner.identity.accountId));
+  const receipt=stored.typedCatalogReceipts[0],event=stored.typedCatalogEvents[0];
+  assert.equal(receipt.id,created.receiptId);assert.equal(event.id,created.eventId);assert.equal(event.receiptId,receipt.id);
+  assert.equal(receipt.actorId,owner.identity.accountId);assert.equal(receipt.requestId,command.input.request_id);
+  assert.deepEqual(stored.typedPatchReceipts.map(x=>x.id).sort(),added.map(x=>x.receiptId).sort());
+  assert.deepEqual(stored.typedPatchEvents.map(x=>x.id).sort(),added.map(x=>x.eventId).sort());
+  const afterRestartReplay=success(await invoke(client,command));assert.deepEqual(afterRestartReplay,replay);
+  await op.goto(origin+"/settings");
+  await expect(op.getByLabel(localeLabel,{exact:true})).toHaveValue("ru-RU",options);
+  const persistedLocale=(await api(op,"account/profile")).body.locale;
+  assert.equal(persistedLocale,"ru-RU");
+  const localeAfterRestart=await op.evaluate(()=>({documentLanguage:document.documentElement.lang,browserLocale:navigator.language}));
+  assert.equal(localeAfterRestart.documentLanguage,branding.documentLanguage);
+  assert.equal((await api(op,"me")).body.accountId,owner.identity.accountId);
+  await op.screenshot({animations:"disabled",path:join(evidence,"locale-after-restart.png")});
+  data=await openData();
+  await assertGrid(op,created,created.defaultViewId,"Demo alpha",3);
+  await expect(grid(op).locator("[data-record-id]")).toHaveAttribute("data-record-id",added[0].recordId);
+  await op.screenshot({animations:"disabled",path:join(evidence,"owner-after-restart.png")});
+  assert.deepEqual((await api(op,metadataPath)).body.shares,[active]);
+  await rp.goto(copied,{waitUntil:"domcontentloaded"});
+  await assertGrid(rp,created,view,"Demo alpha",2);
+  const next=await api(rp,"records/views/query",{...query,cursor:first.body.nextCursor});
+  assert.equal(next.status,200);assert.deepEqual(next.body.rows.map(r=>({id:r.id,cells:r.cells})),[{id:added[2].recordId,cells:{[created.fieldId]:"Demo beta"}}]);
+  await rp.getByRole("button",{name:"Next page"}).click();await assertGrid(rp,created,view,"Demo beta",2);
+  await rp.screenshot({animations:"disabled",path:join(evidence,"recipient-after-restart.png")});
+
+  stage="disconnect exact MCP grant; independent share and Owner remain";
+  await op.goto(origin+"/settings");
+  const settings=op.getByRole("listitem").filter({hasText:"Client "+consent.clientId});
+  await expect(settings.getByRole("button",{name:"Disconnect",exact:true})).toBeEnabled(options);
+  const response=op.waitForResponse(r=>r.url().endsWith("/account/connected-apps/revoke")&&r.request().method()==="POST");
+  op.once("dialog",dialog=>dialog.accept());
+  await settings.getByRole("button",{name:"Disconnect",exact:true}).click();
+  await expect(settings.getByRole("button",{name:"Disconnected",exact:true})).toBeDisabled(options);
+  const disconnected=await response;assert.equal(disconnected.status(),200);
+  const sql=new DatabaseSync(join(root,"auth","better-auth.sqlite"),{readOnly:true});
+  let grant;
+  try{
+    const row=sql.prepare("SELECT grant_version,revoked_at_ms FROM patchboard_oauth_grant WHERE id=?").get(consent.grant.id);
+    grant={version:row.grant_version,revoked:row.revoked_at_ms!==null,
+      leases:sql.prepare("SELECT count(*) n FROM patchboard_mcp_write_lease WHERE grant_id=?").get(consent.grant.id).n,
+      pending:!!sql.prepare("SELECT 1 FROM patchboard_grant_disconnect_pending WHERE grant_id=?").get(consent.grant.id)};
+    assert.deepEqual(grant,{version:2,revoked:true,leases:0,pending:false});
+  }finally{sql.close();}
+  await assert.rejects(()=>invoke(client,args(board,randomUUID(),"Must not create after disconnect")),error=>error instanceof StreamableHTTPError&&error.code===401);
+  await op.screenshot({animations:"disabled",path:join(evidence,"settings-disconnected.png")});
+  await rp.getByRole("button",{name:"Refresh view"}).click();await assertGrid(rp,created,view,"Demo beta",2);
+  data=await openData();await assertGrid(op,created,created.defaultViewId,"Demo alpha",3);
+  await data.getByRole("button",{name:"Next page"}).click();await assertGrid(op,created,created.defaultViewId,"Demo beta",3);
+  await data.getByRole("button",{name:"Next page"}).click();await assertGrid(op,created,created.defaultViewId,"Internal planning",3);
+  await op.screenshot({animations:"disabled",path:join(evidence,"owner-after-disconnect.png")});
+  await rp.goto("about:blank");
+  assert.deepEqual(await snapshot(board,op),stored);
+  // The revoked grant stays denied even after the final stopped-store audit.
+  await assert.rejects(()=>invoke(client,args(board)),error=>error instanceof StreamableHTTPError&&error.code===401);
+  await op.goto(origin+"/boards");assert.equal((await api(op,"me")).body.accountId,owner.identity.accountId);
+  assert.deepEqual((await api(op,metadataPath)).body.shares,[active]);
+  await save("combined-persistent-web-trace",{profile:"persistent local HTTPS",qaFlags:false,
+    catalog:true,sharing:true,mcp:true,oneBoard:true,oneStore:true,initial:zero,
+    consentedScopes:scope.split(" "),tools,requestId:command.input.request_id,created,replay,native,afterRestartReplay,
+    rows:added.map(x=>({recordId:x.recordId,receiptId:x.receiptId,eventId:x.eventId,updatedBy:x.updatedBy})),
+    filteredViewId:view,shareId:issued.shareId,actualClipboard:true,recipientMemberships:0,recipientGrants:0,
+    canonicalTitles:["Demo alpha","Demo beta","Internal planning"],filteredTitles:["Demo alpha","Demo beta"],
+    activeAfterRestart:true,oldCursorAfterRestart:true,shareStillActiveAfterMcpDisconnect:true,
+    grant,disconnectStatus:200,postDisconnectHttp:401,postRestartDisconnectHttp:401,ownerRetained:3,counts:counts(stored),unchanged:true,
+    branding,locale:{default:defaultProfile.locale,saved:savedLocale.locale,afterRestart:persistedLocale,...localeAfterRestart,uiLanguageChanged:false},
+    installedClientTested:false,publicDeployment:false});
+  console.log("COMBINED_PERSISTENT_WEB_PASS",JSON.stringify({board,created,replayed:replay.replayed,view,shareId:issued.shareId,counts:counts(stored),disconnectStatus:200,postDisconnectHttp:401,branding,locale:{default:defaultProfile.locale,afterRestart:persistedLocale,...localeAfterRestart}}));
+}
+
 let stage="startup";
 try{
   await execute("pnpm",["auth:migrate:private"],patchboard);
-  await startBackend("0");await startFrontend();browser=await chromium.launch({headless:true});
+  await startBackend(combined?"1":"0",combined?"1":"0",combined?"1":"0");await startFrontend();browser=await chromium.launch({headless:true});
   const owner=await account(),other=await account(),op=owner.page,np=other.page;
   assert.notEqual(owner.identity.id,other.identity.id);
   stage="create native board; default off";
@@ -568,13 +788,17 @@ try{
   const board=(await response.json()).board_id;
   await op.goto(origin+"/boards/"+board);
   await expect(op.getByRole("button",{name:"Share this board"})).toBeVisible(options);
+  if(!combined){
   const create={board_id:board,request_id:randomUUID(),name:"Persistent table",primary_field_name:"Title",default_view_name:"All rows"};
   assert.equal((await api(op,"records/tables/create",create)).status,404);
   assert.equal((await api(op,"records/views?board_id="+board)).status,404);
   await expect(op.getByRole("button",{name:"Open board Data"})).toHaveCount(0);
+  }
   assert.deepEqual(counts(await snapshot(board,op)),zero);
 
-  if(persistentMcp){
+  if(combined){
+    await runCombined(board,owner,other);
+  }else if(persistentMcp){
     await runPersistentMcp(board,owner,other);
   }else if(filteredSharing){
     await runFilteredSharing(board,owner,other);

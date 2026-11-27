@@ -29,6 +29,7 @@
     "test:private:ci": "node apps/server/test/private-ci.mjs",
     "test:native:saved-view": "pnpm --filter @patchboard/web exec node test/native-saved-view-proof.mjs",
     "test:native:persistent-text-catalog": "pnpm --filter @patchboard/web exec node test/native-persistent-text-catalog-proof.mjs",
+    "test:native:persistent-combined": "pnpm --filter @patchboard/web exec node test/native-persistent-text-catalog-proof.mjs --combined",
     "test:native:persistent-mcp-table-create": "pnpm --filter @patchboard/web exec node test/native-persistent-text-catalog-proof.mjs --persistent-mcp",
     "test:native:persistent-filtered-sharing": "pnpm --filter @patchboard/web exec node test/native-persistent-text-catalog-proof.mjs --filtered-sharing",
     "test:native:empty-catalog": "pnpm --filter @patchboard/web exec node test/native-empty-catalog-proof.mjs",
