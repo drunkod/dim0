@@ -22,12 +22,32 @@ import { DesktopBrand, WindowControls } from '@/features/desktop/desktop-chrome'
 import { AuthGraphTexture } from '@/features/signin/components/auth-graph-texture'
 
 export function RootLayout() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname })
+  const jazzRoute = pathname === "/jazz-signin" || pathname === "/jazz-signin/" ||
+    pathname.startsWith("/jazz-invite/") || pathname === "/boards" || pathname.startsWith("/boards/")
+
+  if (import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" && jazzRoute) {
+    return (
+      <ThemeProvider>
+        <StyleDefaultsProvider>
+          <div className="relative h-dvh w-full overflow-hidden bg-background">
+            <Outlet />
+            <Toaster position="top-right" closeButton />
+          </div>
+        </StyleDefaultsProvider>
+      </ThemeProvider>
+    )
+  }
+
+  return <LegacyRootLayout pathname={pathname} />
+}
+
+function LegacyRootLayout({ pathname }: { pathname: string }) {
   // only hydrates store from token; does not navigate
   useAuth()
 
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { location } = useRouterState()
 
   // Zustand state
   const userId = useAppStore(s => s.userId)
@@ -70,8 +90,8 @@ export function RootLayout() {
 
   // do not show shell on auth pages (prevents flicker / overlap)
   const onAuthPage = useMemo(
-    () => location.pathname === '/signin' || location.pathname === '/signup' || location.pathname === '/verify-email',
-    [location.pathname]
+    () => pathname === '/signin' || pathname === '/signup' || pathname === '/verify-email',
+    [pathname]
   )
   // One shell for everyone (auth pages excepted): signed-out users get the same
   // frame, with the sidebar showing only local boards + a sign-in CTA. The
@@ -80,14 +100,14 @@ export function RootLayout() {
   const showShell = !onAuthPage
   // Still used to keep offline-first on local boards: the connectivity overlay is
   // suppressed on a /local route so a device-only board never shows "server down".
-  const isLocalRoute = location.pathname.startsWith("/local")
+  const isLocalRoute = pathname.startsWith("/local")
   // The synced board currently open (if any) — drives the board-aware overlay:
   // a downloaded board stays usable offline (non-blocking), an undownloaded one
   // keeps the blocking modal. `/boards/:id[/...surface]` → the id segment.
   const syncedBoardId = useMemo(() => {
-    const match = location.pathname.match(/^\/boards\/([^/]+)/)
+    const match = pathname.match(/^\/boards\/([^/]+)/)
     return match ? match[1] : null
-  }, [location.pathname])
+  }, [pathname])
   // Standalone desktop build: draw our own frameless title bar (brand + custom
   // window controls) instead of the OS chrome.
   const isDesktop = isTauri()
@@ -131,9 +151,9 @@ export function RootLayout() {
     }
     // Skip if we're already on the share landing — avoids a no-op
     // loop and lets the share screen's own consume logic run.
-    if (location.pathname.startsWith("/share/")) return
+    if (pathname.startsWith("/share/")) return
     navigate({ to: "/share/$token", params: { token } })
-  }, [isAuthed, location.pathname, navigate])
+  }, [isAuthed, pathname, navigate])
 
   // Board/content area (same on web + desktop). The board's own header + toolbar
   // float inside this over the canvas, so the desktop title LINE must live above
@@ -157,22 +177,6 @@ export function RootLayout() {
       <div className="md:hidden"><SidebarLabel mobileContextOnly /></div>
     </>
   )
-
-  // The opt-in Jazz canvas has its own Better Auth session and no legacy Dim0
-  // backend, sidebar or connectivity ping. Keep its prototype shell standalone.
-  if (import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" &&
-    (location.pathname === "/jazz-signin" || location.pathname.startsWith("/boards/"))) {
-    return (
-      <ThemeProvider>
-        <StyleDefaultsProvider>
-          <div className="relative h-dvh w-full overflow-hidden bg-background">
-            <Outlet />
-            <Toaster position="top-right" closeButton />
-          </div>
-        </StyleDefaultsProvider>
-      </ThemeProvider>
-    )
-  }
 
   return (
     <ThemeProvider>
