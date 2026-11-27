@@ -17,6 +17,13 @@ const mayRead = (boardId: s.Uuid) =>
   );
 
 export const privatePermissions = definePermissions({
+  // Schema ancestry only; workspace authority and metadata remain dormant.
+  workspaces: { read: false, insert: false, update: false, delete: false },
+  boardWorkspaceBindings: { read: false, insert: false, update: false, delete: false },
+  workspaceMemberships: { read: false, insert: false, update: false, delete: false },
+  baseMemberships: { read: false, insert: false, update: false, delete: false },
+  workspaceOwnerSets: { read: false, insert: false, update: false, delete: false },
+  workspaceAccountReceipts: { read: false, insert: false, update: false, delete: false },
   boards: {
     read: (board) => mayRead(board.id),
     insert: false,
