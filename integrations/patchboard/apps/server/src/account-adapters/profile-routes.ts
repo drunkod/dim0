@@ -9,6 +9,8 @@ import { z } from "zod";
 import type { DatabaseSync } from "node:sqlite";
 import { normalizedDisplayName, normalizedAccountLocale } from "@patchboard/account-domain/profile";
 import { ProfileConflict, readAccountPreferences, updateAccountPreferences } from "./profile-preferences.ts";
+import { GrantOwnerError, listCurrentSubjectGrants, revokeVerifiedSubjectGrant }
+  from "./grant-admission.ts";
 
 type VerifiedSessionUser = Readonly<{ id: string; name: string }>;
 type NameUpdater = (name: string, headers: Headers) => Promise<boolean>;
@@ -45,9 +47,14 @@ export async function privateAccountProfileRequest(
   const isProfile = pathname === "/patchboard-private/api/account/profile";
   const isPreferences = pathname === "/patchboard-private/api/account/preferences";
   const isActivity = pathname === "/patchboard-private/api/account/activity";
-  if (!isProfile && !isPreferences && !isActivity) return json({error:"Not found"},404);
+  const isConnectedApps = pathname === "/patchboard-private/api/account/connected-apps";
+  const isConnectedRevoke = pathname === "/patchboard-private/api/account/connected-apps/revoke";
+  if (!isProfile && !isPreferences && !isActivity && !isConnectedApps && !isConnectedRevoke)
+    return json({error:"Not found"},404);
   const preferences = readAccountPreferences(db, verifiedUser.id);
   if (request.method === "GET") {
+    if (isConnectedApps) return json(listCurrentSubjectGrants(db,verifiedUser.id));
+    if (isConnectedRevoke) return json({error:"METHOD_NOT_ALLOWED"},405);
     if (isProfile) return json({
       display_name:verifiedUser.name, locale:preferences.locale,
       version:preferences.version, email_required:false,
@@ -64,7 +71,32 @@ export async function privateAccountProfileRequest(
       detail:JSON.parse(row.safe_metadata) as unknown
     }))});
   }
-  if (request.method !== "PATCH") return json({error:"METHOD_NOT_ALLOWED"},405);
+  if (isConnectedRevoke && request.method === "POST") {
+    if (request.headers.get("origin") !== new URL(request.url).origin)
+      return json({error:"ORIGIN_MISMATCH"},403);
+    try {
+      const parsed = z.object({
+        grant_id:z.string().uuid(),client_id:z.string().min(1).max(256),
+        expected_version:z.number().int().positive(),
+        request_id:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
+      }).strict().parse(await safeJson(request));
+      const receipt=revokeVerifiedSubjectGrant(db,verifiedUser.id,{
+        grantId:parsed.grant_id,clientId:parsed.client_id,
+        expectedVersion:parsed.expected_version,requestId:parsed.request_id
+      });
+      return json({grant_id:receipt.id,version:receipt.committedVersion,
+        revoked_at_ms:receipt.revokedAtMs});
+    } catch(error) {
+      if (error instanceof GrantOwnerError)
+        return json({error:error.code},error.code==="FORBIDDEN"?403:409);
+      if (error instanceof z.ZodError || error instanceof SyntaxError ||
+          error instanceof Error && error.message.startsWith("INVALID_"))
+        return json({error:"INVALID_CONNECTED_APP_REQUEST"},400);
+      throw error;
+    }
+  }
+  if (request.method !== "PATCH" || isConnectedApps || isConnectedRevoke)
+    return json({error:"METHOD_NOT_ALLOWED"},405);
   // Sensitive cookie-authenticated settings mutations require explicit
   // same-origin browser intent; absent/cross-origin Origin is NOT trusted.
   if (request.headers.get("origin") !== new URL(request.url).origin)

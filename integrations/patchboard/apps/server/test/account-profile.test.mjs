@@ -141,4 +141,57 @@ test("unknown account route does not invoke any issuer operation",async()=>{
   assert.equal(issuerCalls.length,0);
   assert.equal(db.prepare("SELECT count(*) AS n FROM patchboard_account_activity").get().n,3);
 });
+test("connected-apps route is private to issuer subject and disconnects only selected grant",async()=>{
+  db.exec(`CREATE TABLE patchboard_oauth_grant(
+    id TEXT PRIMARY KEY,user_id TEXT NOT NULL,client_id TEXT NOT NULL,
+    board_id TEXT NOT NULL,created_at_ms INTEGER NOT NULL,
+    revoked_at_ms INTEGER,grant_version INTEGER NOT NULL DEFAULT 1
+  )`);
+  db.exec(`CREATE TABLE patchboard_grant_revoke_receipt(
+    grant_id TEXT NOT NULL,request_id TEXT NOT NULL,fingerprint TEXT NOT NULL,
+    committed_version INTEGER NOT NULL,revoked_at_ms INTEGER NOT NULL,
+    PRIMARY KEY(grant_id,request_id)
+  )`);
+  db.exec(`CREATE TABLE patchboard_grant_security_event(
+    id TEXT PRIMARY KEY,grant_id TEXT NOT NULL,
+    event_type TEXT NOT NULL,occurred_at_ms INTEGER NOT NULL,
+    safe_context TEXT NOT NULL
+  )`);
+  const grantA=randomUUID(),grantB=randomUUID(),grantC=randomUUID();
+  for(const [id,subject,client] of [
+    [grantA,subjectA,"account-app-A"],[grantB,subjectB,"account-app-B"],[grantC,subjectA,"account-app-C"]
+  ]) db.prepare("INSERT INTO patchboard_oauth_grant(id,user_id,client_id,board_id,created_at_ms) VALUES(?,?,?,?,?)")
+    .run(id,subject,client,randomUUID(),Date.now());
+  const listing=await route(req("connected-apps"));
+  assert.equal(listing.status,200);
+  const data=await listing.json();
+  assert.equal(data.grants.length,2);
+  assert.deepEqual(data.grants.map(g=>g.id).sort(),[grantA,grantC].sort());
+  assert.equal(data.grants.find(g=>g.id===grantA).clientId,"account-app-A");
+  assert.deepEqual((await (await route(req("connected-apps"),other)).json()).grants.map(g=>g.id),[grantB]);
+  const payload={grant_id:grantA,client_id:"account-app-A",
+    expected_version:1,request_id:"disconnect-01"};
+  const post=(body,user=me)=>privateAccountProfileRequest(new Request(
+    origin+path+"connected-apps/revoke",{
+      method:"POST",headers:{"content-type":"application/json",origin},
+      body:JSON.stringify(body)
+    }),user,db,nameIssuer);
+  assert.equal((await post(payload,other)).status,403);
+  assert.equal((await post({...payload,client_id:"account-app-B"})).status,403);
+  const success=await post(payload);
+  assert.equal(success.status,200);
+  assert.equal((await success.json()).version,2);
+  assert.equal((await post(payload)).status,200);
+  assert.equal(db.prepare("SELECT revoked_at_ms FROM patchboard_oauth_grant WHERE id=?")
+    .get(grantB).revoked_at_ms,null);
+  assert.equal(db.prepare("SELECT revoked_at_ms FROM patchboard_oauth_grant WHERE id=?").get(grantC).revoked_at_ms,null);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM patchboard_grant_security_event WHERE grant_id=?")
+    .get(grantA).n,1);
+  const crossOrigin=await privateAccountProfileRequest(new Request(
+    origin+path+"connected-apps/revoke",{
+      method:"POST",headers:{"content-type":"application/json",origin:"https://evil.example"},
+      body:JSON.stringify({...payload,request_id:"cross-site"})
+    }),me,db,nameIssuer);
+  assert.equal(crossOrigin.status,403);
+});
 test.after(()=>db.close());
