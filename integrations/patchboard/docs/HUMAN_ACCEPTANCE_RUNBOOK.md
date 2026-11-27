@@ -1,44 +1,35 @@
-# Human acceptance runbook — native board and installed ChatGPT catalog
+# Human acceptance runbook — web-first MVP sprint
 
-Updated 27 November 2026 for [Dim0 PR #28](https://github.com/drunkod/dim0/pull/28), application revision `66789d1a59f14ea35b6c1629fd4880ea3ce5159b`. Local native-browser and OAuth/MCP SDK acceptance passed. The five Tests jobs and two packaging checks passed. Actual ChatGPT installation, public creation and public teardown are **NOT_RUN** at handoff.
+Updated 27 November 2026 for [PR #28](https://github.com/drunkod/dim0/pull/28), application revision `66789d1a59f14ea35b6c1629fd4880ea3ce5159b`. Web-first acceptance uses the **actual installed browser-native ChatGPT custom MCP plugin**, not the desktop ZIP path. All seven existing hosted jobs passed. This is a disposable QA demonstration, not production feature rollout.
 
-## Start here
+## Recorded evidence — reuse without rerunning unchanged integrations
 
-- **Programmer / QA operator:** follow the [attended HTTPS runbook](QA_INSTALLED_CATALOG_RUNBOOK.md) for the exact build flags, operator commands, archive packaging, stored-grant inspection and teardown. Use the preserved candidate build if its digest matches.
-- **Evidence recorder:** fill the [installed-client worksheet](https://github.com/drunkod/dim0/blob/56d1a139cc5802446732e8a8b93e122a62234636/docs/review/installed-catalog-evidence/attended-readiness-20261127/INSTALLED_CLIENT_EVIDENCE.md). The [readiness record](https://github.com/drunkod/dim0/blob/56d1a139cc5802446732e8a8b93e122a62234636/docs/review/installed-catalog-evidence/attended-readiness-20261127/readiness.json) separates observations from outstanding steps.
-- **Before creating the store:** the Tailscale operator signs in on a separate dedicated daemon and checks its DNS name and empty Funnel config. The ChatGPT QA account holder opens Plugins and verifies archive upload is available. Prepare an independent teardown supervisor and record the primary Funnel configuration. The 30-minute window starts at fresh store creation. If either account is unavailable, record BLOCKED before opening the route.
+- [Actual Helium acceptance](https://github.com/drunkod/dim0/blob/30735a3cf394fcb7726422cd70d5d17198b27d9e/docs/review/installed-catalog-evidence/helium-installed-20261127/INSTALLED_CLIENT_ACCEPTANCE.md): DCR, explicit selected Owner board and board:read / board:write / table:create, call-api-write, create Plugin rehearsal, replay with identical IDs, native grid after backend restart, Settings disconnect HTTP 200, client-reported 401 on fresh call, unchanged durable counts (1 dataset, 1 field, 1 view, 1 receipt, 1 event, 0 records), Owner readback and teardown. The 401 has no correlated server HTTP trace. Virtual passkey; forced public-address probe after retirement timed out, not a second independent external device.
+- On the unchanged #28 head in the web sprint review, schema generation and private permissions drift check, `pnpm test:native:empty-catalog` and `pnpm test:native:mcp-table-create` passed on disposable stores, including sign-in, table and row retry, filtered view sharing/revocation, restart and MCP disconnect. These are separate loopback QA profiles and use a real MCP SDK in the native MCP suite; neither is a second installed-client test.
+- The HTTPS profile is selected-board read-only native Data with MCP table creation; the writable catalog and filtered sharing are loopback QA only. Do not claim one persistent public web workflow. [Handoff scope decision](https://github.com/drunkod/dim0/issues/29). Before promising reload-safe browser writes, resolve [retry identity loss](https://github.com/drunkod/dim0/issues/30).
 
-## One attended run
+## Merge queue and final smoke
 
-1. Serve the native build via the dedicated Funnel. Verify off-tailnet reachability, the served asset digest, native sign-in, and the legacy entry's redirect. Create one disposable Owner and board, seal the profile to that board, and record zero catalog objects. Verify direct browser table creation returns 404. Keep the primary routes and historical stores untouched.
-2. Build a new ZIP for the actual public MCP origin and record its SHA-256. Upload via ChatGPT Plugins. Record the actual plugin name, selected board, requested and granted scopes, and discovery of `call-api-write`. If either `board:write` or `table:create` is missing, record the first unmet checkpoint and retire the route.
-3. In the installed connection invoke `dataset.create.v1` for **Plugin rehearsal**, primary field **Title**, default view **All rows**. Generate one request ID and replay the identical input. Record the returned dataset, field and view IDs and the replay flag.
-4. Open native Data on the selected board. Compare its grid and field IDs with the installed-client result. Restart only the dedicated backend on the same store and repeat. The stopped-store audit in the operator runbook should show one dataset, field, default view, receipt and event, and zero rows.
-5. Disconnect that client in native Settings. Try another creation from ChatGPT with a fresh request ID. Record any reconnect prompt and whether the request reached the server. Attribute HTTP 401 only to a correlated request. Verify the Owner can still read the original table and the counts are unchanged.
-6. Retire the dedicated route, verify disappearance from outside the tailnet and compare the primary configuration to its baseline. Teardown applies on success, failure or expiry. Record PASS, FAIL or NOT_RUN per step, the first blocker, source SHA and redacted evidence. Omit tokens, cookies, auth codes and enrollment URLs.
+1. Independent review and approval of #1 first; #3 and #4 prepared in parallel. Merge parent before child. Preserve each old parent head/branch and retarget the child only after merge; compare its Files changed with its original parent delta. Prefer merge commits to preserve ancestry; no squash without explicit retarget/diff verification. Keep #23 typography independent and #24 beta.5 upgrade deferred from the pinned alpha.69 web path.
+2. The seven missing hosted-check cases (#3, #5–10) are due to historical workflow base filters. Use recorded local evidence as such, not descendant checks as certification. Retarget to main when appropriate and run normal hosted Tests on the actual merge candidate. Root hosted Tests do not replace Patchboard Jazz verify/private CI. No required main-branch rules were observed at review time.
+3. On the actual final combined SHA, verify generated schema/private policies and migration ancestry using the pinned Jazz CLI; run the relevant native smoke for sign-in, board access, catalog create/replay, filtered sharing, restart, disconnect, and feature-off regression. If #23 is included, also run mixed Latin/Cyrillic typography smoke. Reuse previous results only if source/behavior is unchanged. The current candidate smoke is not a post-merge combined-head certification.
+4. Reopen the installed-client rehearsal only for changed integration behavior or a specific regression. Do not re-run desktop or physical-device acceptance for web review.
 
-**Sprint signoff:** one actual installed-client create/replay, matching IDs after restart, observed disconnect, unchanged counts and observed public teardown. Record failures on PR #28. Repeat an automated suite only for a code change or a specific diagnostic need.
+## If a fresh installed browser-native rehearsal is necessary
 
-## Other human acceptance claims
+Follow [the isolated operator runbook](https://github.com/drunkod/dim0/blob/66789d1a59f14ea35b6c1629fd4880ea3ce5159b/integrations/patchboard/docs/QA_INSTALLED_CATALOG_RUNBOOK.md) for fresh disposable root, dedicated enrolled node, exact build, sealed board, 30-minute window and teardown. Before opening route, check that the authorized ChatGPT account can add a custom MCP server and that the dedicated Funnel is available. Do not reuse production stores, credentials or routes.
 
-Two independently controlled ChatGPT users collaborating on a board, physical-passkey return, and Firefox collaboration each need their own participants and evidence. The table-creation rehearsal uses one QA Owner. Track those broader journeys separately; production approval is a separate decision.
+- In ChatGPT Plugins, Add custom MCP server, enter dedicated HTTPS MCP URL, select OAuth / DCR, verify discovered scopes and create as a plugin. Connect to the selected disposable Owner board. Do not widen consent if discovery is wrong.
+- Use actual installed plugin call-api-write / dataset.create.v1, Plugin rehearsal, Title, All rows. Reuse one request_id for identical replay. Match all returned IDs to native grid and stopped-store Jazz audit before/after restart.
+- Disconnect in native Settings, attempt fresh creation without reconnecting, record the actual client result and independently verify unchanged catalog counts and Owner readback. Only call a 401 server-correlated when an actual trace is available.
+- Retire the exact dedicated Funnel and store regardless of outcome, compare primary configuration and perform independent public reachability check if available. Save redacted evidence and first failing stage. No credentials in the report.
 
-The [21 November Patchboard checklist and evidence](https://github.com/drunkod/dim0/blob/66789d1a59f14ea35b6c1629fd4880ea3ce5159b/integrations/patchboard/docs/HUMAN_ACCEPTANCE_RUNBOOK.md) preserve the earlier note demo, staging references and H1–H3 procedures. Its hostname, board, fixed ports and custom-connector instructions are historical.
+## Deferred milestones and issue owners
 
-## Email draft for the programmer
+- [#32 Desktop ZIP naming and invocation](https://github.com/drunkod/dim0/issues/32): canonical-name collision, unique-name cloud upload opens desktop; manual desktop and release preparation deferred. Required existing CI stays enabled.
+- [#31 Web integration diagnostics](https://github.com/drunkod/dim0/issues/31): intermittent /api/me 500 (escalate only if it recurs and blocks sign-in), factual tool-description wording and denied-request correlation. Owner: repository maintainer.
+- #17/#27 production crash orchestration, physical passkeys, second human account and production-store upgrade are separate from this disposable web demo. Retain current consent, migration history and data-integrity safeguards.
 
-**Subject: Finish PR #28 with one installed ChatGPT plugin test**
+**Current web status:** browser-native integration accepted on #28; local QA native workflows passed; actual combined main smoke and independent approval remain open. No production deployment or merge authorization implied.
 
-Hi,
-
-Please run the remaining human acceptance test on candidate `66789d1a`. The automated checks have passed. We need to see the installed ChatGPT plugin create one table and confirm what happens after disconnect. Use the [operator instructions](https://github.com/drunkod/dim0/blob/66789d1a59f14ea35b6c1629fd4880ea3ce5159b/integrations/patchboard/docs/QA_INSTALLED_CATALOG_RUNBOOK.md) and the evidence worksheet linked above.
-
-Before creating the disposable store, have the QA account holder verify ZIP upload in ChatGPT Plugins and the Tailscale operator enroll the dedicated node. Prepare teardown first. The 30-minute window starts when the store is created. If either person lacks access, record the missing prerequisite and leave the window unopened.
-
-Install the archive built for the dedicated hostname. Verify consent for `board:write` and `table:create` on the selected board. Through the installed plugin, create **Plugin rehearsal** and replay the identical request. In native Data, match the dataset, primary **Title** field and **All rows** view IDs before and after backend restart.
-
-Disconnect the client in native Settings. Try one fresh creation from ChatGPT and record exactly what happens. Verify the original table remains the only table, retire the route and check it from outside the tailnet.
-
-Please post the completed worksheet on PR #28 with the public ZIP digest, three IDs, post-disconnect counts and teardown result. If a step fails, include the first observed failure and mark unattempted steps NOT_RUN. That gives us a specific fix and a clear stopping point.
-
-Thanks.
+The [previous attended runbook and email draft](https://github.com/drunkod/dim0/blob/3457000430628252a694226a74fc793fd0cf4954/integrations/patchboard/docs/HUMAN_ACCEPTANCE_RUNBOOK.md) are historical; the web-first instructions above supersede their ZIP-first acceptance gate.
