@@ -14,6 +14,7 @@ export function handlePrivateCanvasStream(
   res: ServerResponse,
   db: Db,
   jazzAccountFor: (subject: string) => Promise<string>,
+  readShutdown?: AbortSignal,
 ): boolean {
   const url = new URL(req.url ?? "/", "http://127.0.0.1");
   if (url.pathname !== "/patchboard-private/api/canvas/stream") return false;
@@ -47,6 +48,11 @@ export function handlePrivateCanvasStream(
       return;
     }
 
+    if (res.destroyed || res.writableEnded) return;
+    if (readShutdown?.aborted) {
+      res.writeHead(503, { "Cache-Control": "no-store", Connection: "close" }).end();
+      return;
+    }
     res.writeHead(200, {
       "Content-Type": "text/event-stream; charset=utf-8",
       "Cache-Control": "no-cache, no-transform",
@@ -60,11 +66,13 @@ export function handlePrivateCanvasStream(
     const close = () => {
       if (closed) return;
       closed = true;
+      readShutdown?.removeEventListener("abort", close);
       if (heartbeat) clearInterval(heartbeat);
       unsubscribe();
       if (!res.writableEnded) res.end();
     };
     res.once("close", close);
+    readShutdown?.addEventListener("abort", close, { once: true });
 
     // Check current membership on every update and heartbeat. An existing
     // connection cannot retain access indefinitely after membership revocation.
@@ -73,12 +81,13 @@ export function handlePrivateCanvasStream(
         // Long-lived SSE connections must not outlive a revoked or expired
         // Better Auth session, even when board membership is unchanged.
         const currentSession = await auth.api.getSession({ headers });
+        if (closed) return false;
         if (!currentSession || currentSession.user.id !== session.user.id) {
           close();
           return false;
         }
         role = await canvasBoardRole(db, boardId, actorId);
-        return true;
+        return !closed;
       } catch {
         close();
         return false;
@@ -88,7 +97,7 @@ export function handlePrivateCanvasStream(
     unsubscribe = db.subscribe(app.canvasEntities.where({ boardId }).limit(501), {
       onUpdate: (rows) => {
         serial = serial.then(async () => {
-          if (closed || !await recheck()) return;
+          if (closed || !await recheck() || closed) return;
           if (rows.length > 500 || res.writableLength > 2_000_000) {
             close();
             return;
@@ -102,7 +111,7 @@ export function handlePrivateCanvasStream(
     // The query emits its initial complete result on subscribe.
     heartbeat = setInterval(() => {
       serial = serial.then(async () => {
-        if (closed || !await recheck()) return;
+        if (closed || !await recheck() || closed) return;
         res.write(": keepalive\n\n");
       }).catch(close);
     }, 15_000);

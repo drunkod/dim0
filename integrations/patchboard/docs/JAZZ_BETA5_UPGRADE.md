@@ -407,8 +407,20 @@ Jazz and re-raises a signal if no application listener remains; the old
 `process.once` handlers were removed before asynchronous HTTP/auth close.
 Direct Node SIGTERM exited by signal on the base, and the original restore
 harness failed before taking a backup. Persistent, idempotent handlers wait
-for both closes and emit PRIVATE_AUTH_STOPPED before exit 0. No grant,
-permission, schema or transaction change.
+for both closes and emit PRIVATE_AUTH_STOPPED before exit 0.
+
+The follow-up CI diagnosis identified a second shutdown blocker while clients
+remain connected: the stateless MCP transport's standalone GET SSE streams
+outlived Jazz's socket drain, keeping Node's HTTP close callback pending.
+The private entry point now stops admitting new HTTP requests (503) and
+closes only application passive reads: MCP standalone GET streams via the
+pinned SDK's closeStandaloneSSEStream and native canvas read streams via
+their existing unsubscribe/end path. An admitted MCP POST is not aborted
+by this mechanism. Do not equate transport closure with successful completion
+of an admitted write: the pre-stop write freeze and lease/receipt checks
+above are still mandatory. The clean-stop marker is emitted only after the
+server and auth database close. No grant, permission, schema or transaction
+change.
 
 The copy helper requires canonical absolute paths, private roots and existing
 private destination parents, checks local open files with lsof, copies the
@@ -553,7 +565,9 @@ pnpm --filter @patchboard/server exec tsx --test test/private-graceful-stop.test
 The native proof creates a new non-temporary mode-0700 fixture and separate
 backup/destination, starts the direct Node backend on an allocated loopback
 port, enrolls real virtual-passkey accounts, creates one native table/row,
-stops and verifies the whole private root, restores into a new generation
+keeps an authenticated native canvas SSE response open through SIGTERM,
+requires its EOF and clean process exit before copying, verifies the whole
+private root, restores into a new generation
 and reauthenticates with the same passkey at the same local HTTPS origin.
 It asserts unchanged canonical catalog rows/receipts and rejects live
 copy, altered backup and existing destination. No production root can be
@@ -563,7 +577,29 @@ The separate launchd smoke exercises only the backend's bootstrap, readiness,
 bootout, clean-stop marker and absence of open files in a synthetic store.
 Neither test provisions the production Caddy/Tailscale node or tests host loss.
 
-### 8. Release gate
+### 8. Independent operator review record (required, pending)
+
+Use an isolated store, not any live application directory. Another operator
+should check out the final PR SHA with frozen dependencies, follow section 7
+to obtain synthetic fixture IDs and verify the stopped-store helper and
+clean-stop evidence. Independently follow the stop/backup/restore commands in
+section 4 in a separately provisioned isolated staging environment; adapt
+only the isolated origin, paths and ports. No Funnel activation. Hold the
+original store stopped while verifying the restored copy. Record:
+
+- Human operator name and final revision; date/host and isolation boundary.
+- Exact commands, any deviation or instruction that required assistance.
+- Before/after Owner identity match (boolean), board, dataset, record and
+  catalog/row receipt IDs; byte verification and no overwritten store.
+- Clean-stop result, backup/restore timings and same-passkey readback.
+- Explicit pass/fail and blockers. Do not include tokens, cookies, secrets,
+  private manifests or real user data.
+
+An automated author rerun is not independent human signoff. Post the record
+on PR #39. The repo currently has only the maintainer collaborator; no
+independent operator has been assigned or signed off.
+
+### 9. Release gate
 
 - Both baseline post-merge workflows green; review the readiness diff and its
   CI, especially the new clean-stop regression.

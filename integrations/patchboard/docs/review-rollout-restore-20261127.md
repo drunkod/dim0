@@ -72,3 +72,43 @@ Caddy/ingress jobs are proposals, not executed. Independent human rehearsal,
 realistic volume and encrypted backup/restore, actual hostname, supported
 front door, available disk, monitoring/correlation, and release permission
 remain outstanding. Public rollout NO-GO. This is not a production RTO.
+
+## Follow-up: hosted private CI shutdown diagnosis
+
+Candidate 2ca194054d669b063b051bb01680ed7e946309e5 had 7/9 green,
+with both private OAuth/MCP matrix jobs failing at the same first assertion:
+`Disposable Jazz process must exit before offline audit` in
+`restartPrivateCiFixture` (private-oauth-mcp-proof.mjs:236), called
+from acc051-live-typed-record.mjs:69. Both completed the preceding live
+canvas patch and race proof. See [QA off](https://github.com/drunkod/dim0/actions/runs/46010624233/job/140544883000)
+and [QA on](https://github.com/drunkod/dim0/actions/runs/46010624233/job/140544883396).
+The exact candidate reproduced locally (feature off, Node24). A fixture-only
+HTTP observer recorded three standalone MCP GET 200 event streams still
+open at HTTP close, zero upgraded sockets, and those same three streams
+still open after ten seconds. The failure was not an exit-code expectation
+or starting the replacement too early; the listener closed, but process
+exit was blocked by the open HTTP responses.
+
+The patch keeps the SIGTERM/SIGINT application handlers and clean marker.
+The private entry point stops new requests and aborts passive application
+streams; the MCP SDK's closeStandaloneSSEStream is applied only to GET,
+and native canvas read subscriptions unsubscribe/end on shutdown.
+The original process-exit assertion and offline audits are unchanged.
+No active MCP POST is canceled by this read-stream mechanism. Operators
+must still fence writes and reconcile any unknown lease before backup.
+The initial traced feature-off rerun passed, with all 5 observed HTTP
+close starts reporting no pending requests or upgraded sockets. The updated
+native restore test holds a real authenticated canvas SSE response through
+SIGTERM and asserts EOF and exit zero before the backup. It signs out of
+the restored session and uses the original passkey to reauthenticate,
+then verifies identical catalog/row/receipt data and negative copy controls.
+The pre-commit rehearsal on the follow-up code passed (restore to Owner
+grid 2.786 s; stop to grid 3.091 s, 9 files/1945860 bytes).
+Transient HTTP 503s during deliberate shutdown are expected; not the
+historical #31 sign-in 500. The final candidate's exact test results and
+IDs will be recorded in the PR closeout comment.
+
+Independent human review and restore signoff remain **PENDING**.
+The public launch remains NO-GO. This test is a tiny isolated fixture on
+the same Mac, not an encrypted representative-volume backup or an
+independent operator's rehearsal.

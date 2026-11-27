@@ -774,11 +774,27 @@ async function runRestoreRehearsal(board,owner,recipient){
   assert.equal(before.typedCatalogReceipts[0].id,created.receiptId);
   assert.equal(before.typedPatchReceipts[0].id,row.receiptId);
 
-  // Sign out before backup, retain only the virtual passkey in the browser.
-  await op.goto(origin+"/boards");
-  await op.getByRole("button",{name:"Sign out",exact:true}).click();
-  await expect(op).toHaveURL(origin+"/signin",options);
-  await op.goto("about:blank");
+  // Hold a real authenticated canvas read stream open through SIGTERM.
+  // This is a separate fetch so the browser's automatic reconnection cannot
+  // hide whether the original response actually ended.
+  stage="restore with live native read stream";
+  await op.goto(boardUrl);
+  const stream=await op.evaluate(async boardId=>{
+    const response=await fetch("/patchboard-private/api/canvas/stream?board_id="+encodeURIComponent(boardId),
+      {headers:{Accept:"text/event-stream"},signal:AbortSignal.timeout(60000)});
+    const reader=response.body.getReader();
+    window.restoreProbeReader=reader;
+    let snapshot="";
+    const decoder=new TextDecoder();
+    while(!snapshot.includes("event: snapshot")){
+      const chunk=await reader.read();
+      if(chunk.done)break;
+      snapshot+=decoder.decode(chunk.value,{stream:true});
+    }
+    return {status:response.status,contentType:response.headers.get("content-type"),
+      snapshot:snapshot.includes("event: snapshot")};
+  },board);
+  assert.equal(stream.status,200);assert.match(stream.contentType,/text\/event-stream/);assert.equal(stream.snapshot,true);
   const original=storeRoot,bundle=join(root,"backup"),restored=join(root,"restored");
   const helper=join(patchboard,"scripts/stopped-store-copy.mjs");
   const copy=(operation,src,dst)=>{
@@ -793,6 +809,12 @@ async function runRestoreRehearsal(board,owner,recipient){
   stage="graceful stop and verified complete backup";
   const start=performance.now();await stopClosedStore();
   const stoppedAt=performance.now();
+  // Server exit and stream EOF must precede the stopped-store copy.
+  assert.equal(await op.evaluate(async()=>{
+    const reader=window.restoreProbeReader;
+    for(;;){const chunk=await reader.read();if(chunk.done)return true;}
+  }),true);
+  await op.goto("about:blank");
   const backup=copy("backup",original,bundle);
   stage="restore new private directory and verify bytes";
   const restoreStart=performance.now(),restore=copy("restore",bundle,restored);
@@ -803,7 +825,10 @@ async function runRestoreRehearsal(board,owner,recipient){
   await startBackend("1","1","1");
   const healthy=performance.now();
   stage="same Owner passkey and same data after restore";
-  await op.goto(origin+"/signin");
+  // Re-authenticate the copied Owner, not just reuse the restored cookie.
+  await op.goto(origin+"/boards");
+  await op.getByRole("button",{name:"Sign out",exact:true}).click();
+  await expect(op).toHaveURL(origin+"/signin",options);
   await op.getByRole("button",{name:"Sign in with passkey",exact:true}).click();
   await expect(op).toHaveURL(origin+"/boards",options);
   const identity=(await api(op,"me")).body;
@@ -834,7 +859,7 @@ async function runRestoreRehearsal(board,owner,recipient){
   const result={boardId:board,datasetId:created.datasetId,fieldId:created.fieldId,viewId:created.defaultViewId,recordId:row.recordId,
     catalogReceiptId:created.receiptId,catalogEventId:created.eventId,rowReceiptId:row.receiptId,rowEventId:row.eventId,
     rowValue,counts:counts(after),sameOwner:true,sameStoreContents:true,verifiedBytes:restore.bytes,verifiedFiles:restore.files,
-    liveCopyRejected:true,alteredCopyRejected:true,existingDestinationRejected:true,originalKeptStopped:true,qaFlags:false,publicEndpoint:false,times};
+    liveCanvasStreamClosed:true,liveCopyRejected:true,alteredCopyRejected:true,existingDestinationRejected:true,originalKeptStopped:true,qaFlags:false,publicEndpoint:false,times};
   await save("stopped-store-restore-trace",result);
   console.log("STOPPED_STORE_RESTORE_PASS",JSON.stringify(result));
 }
