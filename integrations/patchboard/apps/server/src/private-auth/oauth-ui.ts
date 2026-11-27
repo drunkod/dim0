@@ -2,6 +2,7 @@ import { randomBytes } from "node:crypto";
 import type { Db } from "jazz-tools";
 import { auth } from "./auth.ts";
 import { listPrivateBoards } from "./grants.ts";
+import {qaHttpsCatalogProfile} from "../qa-https-catalog-profile.ts";
 
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char] ?? "");
@@ -27,7 +28,12 @@ export async function oauthConsentPage(
   const scopeList = requestedScopes.map(scope => scope==="table:create"
     ? "<li><strong>table:create</strong> — Create a new primary-text table and default grid on the selected board (owner only, disposable QA). This is separate from board:write.</li>"
     : "<li>" + escapeHtml(scope) + "</li>").join("");
-  const boards = await listPrivateBoards(db, await jazzAccountFor(session.user.id));
+  const catalogProfile=qaHttpsCatalogProfile();
+  const boards = (await listPrivateBoards(db, await jazzAccountFor(session.user.id)))
+    // The isolated HTTPS QA issuer exposes only its one approved OWNER
+    // board, even to old board:write clients without table:create.
+    .filter(board=>!catalogProfile||
+      (board.board_id===catalogProfile.boardId && board.role==="owner"));
   const options = boards.map(board =>
     '<option value="' + escapeHtml(board.board_id) + '">' +
     escapeHtml(board.title) + " (" + escapeHtml(board.role) + ")</option>"

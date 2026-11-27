@@ -3,7 +3,7 @@ import { useParams } from "@tanstack/react-router"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useBoardAppStore } from "../harness/store/board-app-store"
-import { listViews, nativeSavedViewsEnabled, isViewDenied, type OwnerView } from "./saved-view-api"
+import { listViews, nativeSavedViewsEnabled, nativeCatalogReadOnly, isViewDenied, type OwnerView } from "./saved-view-api"
 import { SavedViewGrid } from "./saved-view-grid"
 import { addRow, catalogRejection, createTable, saveView, type RowRequest, type TableRequest, type SaveViewRequest } from "./catalog-api"
 
@@ -14,11 +14,11 @@ export function NativeBoardDataControl() {
   const boardId = useBoardAppStore(s => s.boardId)
   const role = useBoardAppStore(s => s.boardRole)
   const presenting = useBoardAppStore(s => s.presentationMode)
-  if (!nativeSavedViewsEnabled || !id || id !== boardId || role !== "owner" || presenting) return null
-  return <NativeBoardData key={id} boardId={id} />
+  if ((!nativeSavedViewsEnabled && !nativeCatalogReadOnly) || !id || id !== boardId || role !== "owner" || presenting) return null
+  return <NativeBoardData key={id} boardId={id} readOnly={nativeCatalogReadOnly} />
 }
 
-export function NativeBoardData({ boardId }: { boardId: string }) {
+export function NativeBoardData({ boardId, readOnly = false }: { boardId: string; readOnly?: boolean }) {
   const [views, setViews] = useState<OwnerView[] | null>(null)
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<string>()
@@ -59,7 +59,7 @@ export function NativeBoardData({ boardId }: { boardId: string }) {
   const locked = busy || pending !== null || viewSaveUnknown
 
   async function submit(action: Pending) {
-    if (write.current) return
+    if (readOnly || write.current) return
     setPending(action)
     setBusy(true)
     setMessage("")
@@ -99,7 +99,7 @@ export function NativeBoardData({ boardId }: { boardId: string }) {
   }
   function newTable(event: FormEvent) {
     event.preventDefault()
-    if (locked || !views) return
+    if (readOnly || locked || !views) return
     void submit({ kind: "table", input: {
       board_id: boardId, request_id: crypto.randomUUID(), name: tableName.trim(),
       primary_field_name: fieldName.trim(), default_view_name: defaultViewName.trim(),
@@ -107,7 +107,7 @@ export function NativeBoardData({ boardId }: { boardId: string }) {
   }
   function newRow(event: FormEvent) {
     event.preventDefault()
-    if (locked || !view || !primary) return
+    if (readOnly || locked || !view || !primary) return
     void submit({ kind: "row", input: {
       board_id: boardId, dataset_id: view.datasetId, field_id: primary.id,
       schema_version: view.datasetSchemaVersion, value, request_id: crypto.randomUUID(),
@@ -115,7 +115,7 @@ export function NativeBoardData({ boardId }: { boardId: string }) {
   }
   async function newView(event: FormEvent) {
     event.preventDefault()
-    if (locked || write.current || !view || !primary || !viewName.trim()) return
+    if (readOnly || locked || write.current || !view || !primary || !viewName.trim()) return
     const input: SaveViewRequest = { board_id: boardId, dataset_id: view.datasetId,
       definition: { name: viewName.trim(), allowed_field_ids: [primary.id],
         filter: { op: "text_prefix", field_id: primary.id, value: prefix },
@@ -159,16 +159,16 @@ export function NativeBoardData({ boardId }: { boardId: string }) {
       onClick={() => { setOpen(true); setEpoch(n => n + 1) }}>Data</button>
     <Sheet open={open} onOpenChange={next => { if (!busy) setOpen(next) }}>
       <SheetContent className="w-full max-w-lg overflow-y-auto">
-        <SheetHeader><SheetTitle>Board Data</SheetTitle><SheetDescription>Create primary-text tables and read-only saved views.</SheetDescription></SheetHeader>
+        <SheetHeader><SheetTitle>Board Data</SheetTitle><SheetDescription>{readOnly ? "Read-only catalog rehearsal. Create tables through the authorized MCP connection." : "Create primary-text tables and read-only saved views."}</SheetDescription></SheetHeader>
         <section aria-label="Board Data" className="space-y-4 px-4 pb-6">
           {views.length === 0 && <p className="text-sm text-muted-foreground">No saved views on this board.</p>}
-          <form aria-label="Create text table" className="space-y-2 rounded-md border p-3" onSubmit={newTable}>
+          {!readOnly && <form aria-label="Create text table" className="space-y-2 rounded-md border p-3" onSubmit={newTable}>
             <h3 className="text-sm font-medium">Create text table</h3>
             <label className="block text-xs">Table name<input className={inputClass} required maxLength={80} value={tableName} disabled={locked} onChange={e => setTableName(e.target.value)} /></label>
             <label className="block text-xs">Primary text field<input className={inputClass} required maxLength={80} value={fieldName} disabled={locked} onChange={e => setFieldName(e.target.value)} /></label>
             <label className="block text-xs">Default grid name<input className={inputClass} required maxLength={80} value={defaultViewName} disabled={locked} onChange={e => setDefaultViewName(e.target.value)} /></label>
             <Button type="submit" size="sm" disabled={locked || !tableName.trim() || !fieldName.trim() || !defaultViewName.trim()}>Create table</Button>
-          </form>
+          </form>}
           {pending && <Button size="sm" disabled={busy} onClick={() => void submit(pending)}>
             {pending.kind === "table" ? "Retry Create table" : "Retry Add row"}
           </Button>}
@@ -185,7 +185,7 @@ export function NativeBoardData({ boardId }: { boardId: string }) {
             </section>
           })}
           {open && view && <SavedViewGrid key={view.viewId + ":" + epoch} view={view} />}
-          {view && primary && <>
+          {!readOnly && view && primary && <>
             <form aria-label="Add text row" onSubmit={newRow} className="space-y-2 rounded-md border p-3">
               <label className="block text-xs">New row {primary.name}<input className={inputClass} required maxLength={2000}
                 value={value} disabled={locked} onChange={e => setValue(e.target.value)} /></label>

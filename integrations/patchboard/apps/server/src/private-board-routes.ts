@@ -25,6 +25,7 @@ import {
   TypedRecordVersionConflict,TypedRecordRequestConflict,
   TypedRecordCommitUnknown
 } from "./typed-record-patch.ts";
+import {qaHttpsCatalogBoardAllowed,qaHttpsCatalogProfile} from "./qa-https-catalog-profile.ts";
 import {typedRecordQaEnabled} from "./typed-record-qa-gate.ts";
 import {createTextTable,addTextRow,
   TypedCatalogInvalid,TypedCatalogConflict,
@@ -365,8 +366,9 @@ export async function privateBoardRequest(
     // never exposes token hashes, records, credentials or member lists.
     if(pathname==="/patchboard-private/api/records/views" &&
       request.method==="GET"){
-      if(!typedRecordQaEnabled())return json({error:"Not found"},404);
+      if(!typedRecordQaEnabled()&&!qaHttpsCatalogProfile())return json({error:"Not found"},404);
       const boardId=boardIdSchema.parse(url.searchParams.get("board_id"));
+      if(!typedRecordQaEnabled()&&!qaHttpsCatalogBoardAllowed(boardId))return json({error:"Not found"},404);
       return json(await listOwnerSavedTypedViews(db,{
         boardId,actorId:accountId
       }));
@@ -400,7 +402,8 @@ export async function privateBoardRequest(
     // membership table. All routes are disposable-QA opt-in only.
     if(pathname.startsWith("/patchboard-private/api/records/views/") &&
       request.method==="POST"){
-      if(!typedRecordQaEnabled())return json({error:"Not found"},404);
+      if(!typedRecordQaEnabled()&&(!qaHttpsCatalogProfile()||
+        pathname!=="/patchboard-private/api/records/views/owner-query"))return json({error:"Not found"},404);
       const definition=z.object({
         name:z.string().trim().min(1).max(80),
         allowed_field_ids:z.array(boardIdSchema).min(1).max(20),
@@ -427,6 +430,7 @@ export async function privateBoardRequest(
           page_size:z.number().int().min(1).max(20),
           cursor:z.string().max(20000).optional(),
         }).strict().parse(await safeJson(request,32_000));
+        if(!typedRecordQaEnabled()&&!qaHttpsCatalogBoardAllowed(input.board_id))return json({error:"Not found"},404);
         return json(await querySavedTypedView(db,privateAuthDatabase(),{
           boardId:input.board_id,datasetId:input.dataset_id,
           viewId:input.view_id,ownerActorId:accountId,

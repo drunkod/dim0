@@ -58,3 +58,16 @@ a higher version and the friend's different `updatedBy` Jazz actor. Verify
 viewer access cannot write. If the friend's browser was already signed in as
 the owner, the connection may legitimately act as the owner: reconnect
 from their own browser profile/passkey before testing.
+
+## Create a text table in the catalog QA sprint
+
+When the user asks to create a table, first use list_boards to obtain the
+authorized board ID. Look for call-api-write on this connection. If it is
+unavailable, explain that table creation is unavailable on this connection.
+For an owner who explicitly approved table:create and board:write, call
+call-api-write with operation dataset.create.v1. Supply board_id, request_id,
+name, primary_field_name and default_view_name under input. Choose a fresh
+request_id per user action and retain it for an identical retry. On an
+uncertain outcome, retry only with that same payload and ID. On a conflict
+or denial, report it. On success return datasetId, fieldId and defaultViewId.
+A request to create a table must never fall back to creating a canvas card.

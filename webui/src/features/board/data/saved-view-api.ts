@@ -1,6 +1,8 @@
 import { z } from "zod"
 
-export const nativeSavedViewsEnabled = import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" &&
+export const nativeCatalogReadOnly = import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" &&
+  import.meta.env.VITE_DIM0_QA_NATIVE_CATALOG_READONLY === "1"
+export const nativeSavedViewsEnabled = !nativeCatalogReadOnly && import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" &&
   import.meta.env.VITE_DIM0_QA_NATIVE_SAVED_VIEW === "1"
 const uuid = z.string().uuid()
 const field = z.object({ id: uuid, name: z.string() })

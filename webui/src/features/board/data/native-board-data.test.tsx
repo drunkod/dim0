@@ -107,3 +107,17 @@ test("a second submit while a table command is in flight cannot allocate another
   expect(table).toHaveBeenCalledTimes(1)
   await act(async () => release(created))
 })
+
+test("isolated external catalog readback does not expose browser mutation controls", async () => {
+  list.mockResolvedValue([view])
+  render(<NativeBoardData boardId="board" readOnly />)
+  fireEvent.click(await screen.findByRole("button", { name: "Open board Data" }))
+  click("Open saved view All rows")
+  await screen.findByRole("region", { name: "Grid All rows" })
+  expect(screen.queryByRole("button", { name: "Create table" })).toBeNull()
+  expect(screen.queryByRole("button", { name: "Add row" })).toBeNull()
+  expect(screen.queryByRole("button", { name: "Save view" })).toBeNull()
+  expect(table).not.toHaveBeenCalled()
+  expect(row).not.toHaveBeenCalled()
+  expect(save).not.toHaveBeenCalled()
+})
