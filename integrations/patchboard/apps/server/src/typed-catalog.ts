@@ -1,5 +1,5 @@
 /**
- * ACC-051 QA-only typed text catalog and row creation. This is the ONE
+ * Typed text catalog and row creation (explicitly gated by each adapter). This is the ONE
  * authoritative server command path. No client-selected IDs or principals.
  * Existing typed-record patch and shared view projection stay independent.
  */

@@ -6,6 +6,7 @@ import { privateAuthConfig } from "./config.ts";
 import { privateAuthDatabase } from "./db.ts";
 import { consentGrantReference, tokenBoardGrantClaim } from "./grants.ts";
 import { typedRecordQaEnabled } from "../typed-record-qa-gate.ts";
+import {persistentTextCatalogEnabled} from "../persistent-text-catalog.ts";
 import {qaHttpsCatalogProfile} from "../qa-https-catalog-profile.ts";
 import { passkeyOnlyIdentitySchemaPlugin } from "./passkey-only-identity.ts";
 import { resolveRegistrationIntent } from "./enrollment.ts";
@@ -13,6 +14,7 @@ import { finalizeVerifiedPasskeyRegistration } from "./finalize-registration.ts"
 
 // Validate the opt-in before auth configuration creates any store or secret.
 const httpsCatalog = qaHttpsCatalogProfile();
+persistentTextCatalogEnabled(); // Validate before privateAuthConfig creates any data.
 const config = privateAuthConfig();
 // ChatGPT’s custom MCP connector currently requests board:read/write without
 // offline_access. Keep the production 15-minute default, but allow an explicit,

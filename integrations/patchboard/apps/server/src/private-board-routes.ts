@@ -27,6 +27,7 @@ import {
 } from "./typed-record-patch.ts";
 import {qaHttpsCatalogBoardAllowed,qaHttpsCatalogProfile} from "./qa-https-catalog-profile.ts";
 import {typedRecordQaEnabled} from "./typed-record-qa-gate.ts";
+import {persistentTextCatalogEnabled} from "./persistent-text-catalog.ts";
 import {createTextTable,addTextRow,
   TypedCatalogInvalid,TypedCatalogConflict,
   TypedCatalogLimit,TypedCatalogCommitUnknown
@@ -328,11 +329,11 @@ export async function privateBoardRequest(
         actorId: accountId, expectedVersion: parsed.expected_version, value: parsed.value,
       }));
     }
-    // The SAME QA-gated server catalog API is used by browser controls and
-    // isolated server-domain tests. Neither HTTP DTO permits actor or IDs.
+    // Shared authoritative catalog commands; persistent opt-in only enables
+    // Owner table/row creation and Owner readback, never QA sharing or MCP.
     if(pathname==="/patchboard-private/api/records/tables/create" &&
       request.method==="POST"){
-      if(!typedRecordQaEnabled())return json({error:"Not found"},404);
+      if(!typedRecordQaEnabled()&&!persistentTextCatalogEnabled())return json({error:"Not found"},404);
       const parsed=z.object({
         board_id:boardIdSchema,
         request_id:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
@@ -348,7 +349,7 @@ export async function privateBoardRequest(
     }
     if(pathname==="/patchboard-private/api/records/rows/create" &&
       request.method==="POST"){
-      if(!typedRecordQaEnabled())return json({error:"Not found"},404);
+      if(!typedRecordQaEnabled()&&!persistentTextCatalogEnabled())return json({error:"Not found"},404);
       const parsed=z.object({
         board_id:boardIdSchema,dataset_id:boardIdSchema,
         request_id:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
@@ -362,13 +363,13 @@ export async function privateBoardRequest(
         fieldId:parsed.field_id,value:parsed.value
       }),201);
     }
-    // QA only: owner Data picker and share-management metadata. This GET
+    // Owner Data picker for the explicit catalog profiles. This GET
     // never exposes token hashes, records, credentials or member lists.
     if(pathname==="/patchboard-private/api/records/views" &&
       request.method==="GET"){
-      if(!typedRecordQaEnabled()&&!qaHttpsCatalogProfile())return json({error:"Not found"},404);
+      if(!typedRecordQaEnabled()&&!persistentTextCatalogEnabled()&&!qaHttpsCatalogProfile())return json({error:"Not found"},404);
       const boardId=boardIdSchema.parse(url.searchParams.get("board_id"));
-      if(!typedRecordQaEnabled()&&!qaHttpsCatalogBoardAllowed(boardId))return json({error:"Not found"},404);
+      if(!typedRecordQaEnabled()&&!persistentTextCatalogEnabled()&&!qaHttpsCatalogBoardAllowed(boardId))return json({error:"Not found"},404);
       return json(await listOwnerSavedTypedViews(db,{
         boardId,actorId:accountId
       }));
@@ -399,10 +400,11 @@ export async function privateBoardRequest(
     // disposable loopback CI issuer with explicit opt-in. No old OAuth scope
     // gains a new live capability from this browser route.
     // One persisted typed read view; its credential never joins the board
-    // membership table. All routes are disposable-QA opt-in only.
+    // membership table. Shared-view creation/sharing remains disposable-QA only;
+    // owner preview also serves the explicit persistent text catalog.
     if(pathname.startsWith("/patchboard-private/api/records/views/") &&
       request.method==="POST"){
-      if(!typedRecordQaEnabled()&&(!qaHttpsCatalogProfile()||
+      if(!typedRecordQaEnabled()&&(!(persistentTextCatalogEnabled()||qaHttpsCatalogProfile())||
         pathname!=="/patchboard-private/api/records/views/owner-query"))return json({error:"Not found"},404);
       const definition=z.object({
         name:z.string().trim().min(1).max(80),
@@ -430,7 +432,7 @@ export async function privateBoardRequest(
           page_size:z.number().int().min(1).max(20),
           cursor:z.string().max(20000).optional(),
         }).strict().parse(await safeJson(request,32_000));
-        if(!typedRecordQaEnabled()&&!qaHttpsCatalogBoardAllowed(input.board_id))return json({error:"Not found"},404);
+        if(!typedRecordQaEnabled()&&!persistentTextCatalogEnabled()&&!qaHttpsCatalogBoardAllowed(input.board_id))return json({error:"Not found"},404);
         return json(await querySavedTypedView(db,privateAuthDatabase(),{
           boardId:input.board_id,datasetId:input.dataset_id,
           viewId:input.view_id,ownerActorId:accountId,

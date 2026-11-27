@@ -121,3 +121,15 @@ test("isolated external catalog readback does not expose browser mutation contro
   expect(row).not.toHaveBeenCalled()
   expect(save).not.toHaveBeenCalled()
 })
+
+test("persistent Owner catalog exposes table and row actions but not saved-view creation", async () => {
+  list.mockResolvedValue([view])
+  render(<NativeBoardData boardId="board" allowSaveView={false} />)
+  fireEvent.click(await screen.findByRole("button", { name: "Open board Data" }))
+  click("Open saved view All rows")
+  await screen.findByRole("region", { name: "Grid All rows" })
+  expect(screen.getByRole("button", { name: "Create table" })).toBeTruthy()
+  expect(screen.getByRole("button", { name: "Add row" })).toBeTruthy()
+  expect(screen.queryByRole("button", { name: "Save view" })).toBeNull()
+  expect(save).not.toHaveBeenCalled()
+})
