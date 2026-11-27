@@ -192,17 +192,55 @@ try{
   await expect(grid(op)).toHaveAttribute("data-view-id",created.defaultViewId);
   await expect(grid(op).getByRole("columnheader",{name:"Title"})).toHaveAttribute("data-field-id",created.fieldId);
   await expect(op.getByRole("button",{name:"Save view",exact:true})).toHaveCount(0);
-  const rowResponse=op.waitForResponse(r=>r.url().endsWith("/records/rows/create")&&r.request().method()==="POST");
+  stage="committed row response lost; reload and exact retry";
+  // Intercept the actual browser POST, let it reach the authority, capture
+  // its committed 201 and discard the reply before it reaches the UI.
+  let resolveFirstRow, rejectFirstRow;
+  const firstRow=new Promise((yes,no)=>{resolveFirstRow=yes;rejectFirstRow=no;});
+  const dropRowReply=async route=>{
+    try{
+      const input=route.request().postDataJSON();
+      const committed=await route.fetch();
+      assert.equal(committed.status(),201);
+      const result=await committed.json();
+      assert.equal(result.replayed,false);
+      await route.abort("failed");
+      resolveFirstRow({input,result});
+    }catch(error){rejectFirstRow(error);await route.abort("failed").catch(()=>{});}
+  };
+  await op.route("**/patchboard-private/api/records/rows/create",dropRowReply,{times:1});
   await data.getByLabel("New row Title",{exact:true}).fill("Still here after restart");
   await data.getByRole("button",{name:"Add row",exact:true}).click();
+  const first=await firstRow;
+  const row=first.result,rowInput=first.input;
+  assert.equal(row.updatedBy,owner.identity.accountId);
+  await expect(data.getByText(/Commit outcome unconfirmed/)).toBeVisible(options);
+  await expect(data.getByRole("button",{name:"Retry Add row",exact:true})).toBeEnabled(options);
+  await op.reload();
+  await op.getByRole("button",{name:"Open board Data"}).click();
+  await expect(data.getByText(/Commit outcome unconfirmed/)).toBeVisible(options);
+  await expect(data.getByLabel("New row Title",{exact:true})).toHaveValue(rowInput.value);
+  await expect(data.getByLabel("New row Title",{exact:true})).toBeDisabled();
+  await expect(data.getByRole("button",{name:"Add row",exact:true})).toBeDisabled();
+  // Committed row is already visible from authoritative readback, even
+  // though the browser never received the successful write response.
+  await expect(grid(op).locator("[data-record-id]")).toHaveAttribute("data-record-id",row.recordId,options);
+  await expect(op.getByText("1 matching records",{exact:true})).toBeVisible(options);
+  await op.screenshot({path:join(evidence,"reload-before-retry.png")});
+  const rowResponse=op.waitForResponse(r=>r.url().endsWith("/records/rows/create")&&r.request().method()==="POST");
+  await data.getByRole("button",{name:"Retry Add row",exact:true}).click();
   const rowReply=await rowResponse;assert.equal(rowReply.status(),201);
-  const row=await rowReply.json();assert.equal(row.updatedBy,owner.identity.accountId);assert.equal(row.replayed,false);
+  assert.deepEqual(rowReply.request().postDataJSON(),rowInput);
+  const replay=await rowReply.json();assert.deepEqual(replay,{...row,replayed:true});
+  await expect(data.getByText("Row added.",{exact:true})).toBeVisible(options);
+  await expect(data.getByRole("button",{name:"Retry Add row",exact:true})).toHaveCount(0);
+  await expect.poll(()=>op.evaluate(()=>Object.keys(sessionStorage).filter(k=>k.startsWith("dim0:catalog-intent:v1:")).length)).toBe(0);
+  console.log("PERSISTENT_ROW_RELOAD_RETRY_PASS",JSON.stringify({requestId:rowInput.request_id,recordId:row.recordId,receiptId:row.receiptId,eventId:row.eventId,replayed:replay.replayed,identicalInput:true}));
   await expect(grid(op).getByRole("cell",{name:"Still here after restart",exact:true})).toBeVisible(options);
   await expect(grid(op).locator("[data-record-id]")).toHaveAttribute("data-record-id",row.recordId);
   await expect(op.getByText("1 matching records",{exact:true})).toBeVisible();
   await op.screenshot({path:join(evidence,"before-restart.png")});
   const ref={board_id:board,dataset_id:created.datasetId,view_id:created.defaultViewId};
-  const rowInput=rowReply.request().postDataJSON();
 
   stage="nonmember and scope boundaries";
   const denied={
@@ -265,9 +303,9 @@ try{
   await expect(op.getByRole("button",{name:"Open board Data"})).toHaveCount(0);
   assert.deepEqual(await snapshot(board,op),before);
   await save("persistent-text-catalog-trace",{profile:"persistent HTTPS (loopback TLS proxy)",qaFlags:false,
-    nonTemporaryFixture:true,initial:zero,created,row,denied,unsupported,tableCreateScopeAdvertised:false,
+    nonTemporaryFixture:true,initial:zero,created,row,replay,rowRequestId:rowInput.request_id,identicalRowRetry:true,lostCommittedResponse:true,reloadedBeforeConfirmation:true,denied,unsupported,tableCreateScopeAdvertised:false,
     postRestart:counts(after),sameAccount:true,stableIds:true,writerPreserved:true,afterFeatureOff:counts(before),off});
-  console.log("PERSISTENT_TEXT_CATALOG_PASS",JSON.stringify({datasetId:created.datasetId,fieldId:created.fieldId,viewId:created.defaultViewId,recordId:row.recordId,counts:counts(after),denied,unsupported,off}));
+  console.log("PERSISTENT_TEXT_CATALOG_PASS",JSON.stringify({datasetId:created.datasetId,fieldId:created.fieldId,viewId:created.defaultViewId,recordId:row.recordId,counts:counts(after),identicalRowRetry:true,replayed:replay.replayed,denied,unsupported,off}));
 }catch(error){
   console.error("PERSISTENT_TEXT_CATALOG_FAILURE",stage,error?.name??"Error");
   process.exitCode=1;

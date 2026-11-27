@@ -48,7 +48,9 @@ proxy with a fixture TLS certificate, virtual passkeys and a new non-temp
 directory in the test user's home. The test owns and removes only that directory
 at teardown. It starts with the profile disabled; then enables it on the same
 store. Owner creates the board, table, Title field/default grid and row through
-visible controls. A stopped-authority read-only audit and backend restart,
+visible controls. The browser deliberately loses the committed Add row response,
+reloads the same tab and retries the frozen input; the response must be a replay
+of the original row/receipt/event IDs. A stopped-authority read-only audit and backend restart,
 followed by sign-out/sign-in and reopening native Data, must preserve all four
 object IDs, writer and row value, with exactly one catalog and one row
 receipt/event. Nonmember mutation/read is denied; unsupported QA operations and
@@ -56,8 +58,27 @@ feature-off routes return 404. Reopening the same store with the profile off
 leaves data unchanged. Set DIM0_PERSISTENT_CATALOG_EVIDENCE to save redacted trace
 and synthetic screenshots in an operator-owned evidence folder.
 
+## Browser retry boundary (#30)
+
+Table and row intents are validated and saved synchronously in sessionStorage
+before dispatch, scoped to the current verified Better Auth subject, Jazz
+account and board. The same tab can reload and explicitly retry the exact
+input; no automatic retry and no new request ID while the outcome is unknown.
+The server remains authoritative and uses its existing durable receipts.
+Confirmed replies clear only the matching intent. A rejected retry does not
+prove the original attempt failed and therefore retains the intent. A missing
+or changed session, malformed journal or failed storage operation blocks the
+submission rather than silently allocating a replacement request.
+
+The journal contains the pending definition or row text (not auth tokens or
+share credentials). It is tab/origin-scoped browser storage, not encrypted
+backup or a server outbox; tab closure, storage clearing, another browser or
+device are outside this guarantee. Non-idempotent QA saved-view creation
+persists a review marker, never replays automatically, and remains locked until
+the list successfully refreshes and the Owner explicitly acknowledges review.
+This is a manual review boundary, not a saved-view idempotency receipt.
+
 This is a local staging-profile proof, not a public-hostname or persistent
-production deployment. #30 reload-before-confirmation is still a release gate
-for unknown-outcome retry promises. Later #33 increments cover persistent sharing
+production deployment. Later #33 increments cover persistent sharing
 and scoped MCP, then supported staging/production operation, branding and a
 combined journey. #24 upgrade remains separate.
