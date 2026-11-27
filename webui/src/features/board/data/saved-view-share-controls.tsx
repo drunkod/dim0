@@ -47,7 +47,7 @@ function ViewShareRow({ view }: { view: OwnerView }) {
     } catch { setMessage("Could not confirm revocation. Refresh sharing details.") }
     finally { setBusy(false); setRefresh(n => n + 1) }
   }
-  return <div className="space-y-2 rounded-md border p-3">
+  return <div role="group" aria-label={"Share saved view " + view.name} className="space-y-2 rounded-md border p-3">
     <h4 className="text-sm font-medium">{view.name}</h4>
     <Button size="sm" variant="outline" disabled={busy} onClick={() => void create()}>Create view link</Button>
     {minted && shares.some(s => s.shareId === minted.shareId && !s.revoked) &&

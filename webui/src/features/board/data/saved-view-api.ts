@@ -7,6 +7,7 @@ const field = z.object({ id: uuid, name: z.string() })
 const view = z.object({
   boardId: uuid, datasetId: uuid, viewId: uuid, viewVersion: z.number().int().positive(),
   name: z.string(), fields: z.array(field),
+  datasetName: z.string(), datasetSchemaVersion: z.number().int().positive(), singleTextTable: z.boolean(),
 })
 const page = z.object({
   boardId: uuid, datasetId: uuid, viewId: uuid, viewVersion: z.number().int().positive(),
@@ -34,7 +35,7 @@ export function viewErrorText(e: unknown) {
   if (e instanceof ViewError && e.code === "VIEW_DATASET_LIMIT_500") return "This view exceeds the 500-record QA limit. No partial results are shown."
   return "Unable to load this view. Retry when connected."
 }
-async function request(path: string, signal: AbortSignal, body?: object): Promise<unknown> {
+export async function request(path: string, signal: AbortSignal, body?: object): Promise<unknown> {
   const response = await fetch("/patchboard-private/api/records/" + path, {
     credentials: "same-origin", cache: "no-store", redirect: "error", signal,
     ...(body === undefined ? {} : { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),

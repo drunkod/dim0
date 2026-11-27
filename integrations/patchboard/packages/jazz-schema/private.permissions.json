@@ -134,6 +134,18 @@
       "update": "false",
       "delete": "false"
     },
+    "typedCatalogEvents": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "typedCatalogReceipts": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
     "typedDatasets": {
       "read": "false",
       "insert": "false",
