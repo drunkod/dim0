@@ -11,7 +11,7 @@ import {request as httpRequest} from "node:http";
 import {getCACertificates,setDefaultCACertificates} from "node:tls";
 import {spawn} from "node:child_process";
 import {createServer} from "node:net";
-import {mkdtemp,mkdir,rm,writeFile} from "node:fs/promises";
+import {mkdtemp,mkdir,rm,writeFile,cp,access} from "node:fs/promises";
 import {homedir,tmpdir} from "node:os";
 import {join,resolve} from "node:path";
 import {fileURLToPath} from "node:url";
@@ -20,12 +20,15 @@ import {app} from "@patchboard/jazz-schema";
 import permissions from "@patchboard/jazz-schema/private.permissions.json" with {type:"json"};
 import {chromium,expect} from "@playwright/test";
 
+const restoreRehearsal=process.argv.includes("--restore");
 const presentation=process.argv.includes("--presentation");
 const persistentMcp=process.argv.includes("--persistent-mcp");
 const filteredSharing=process.argv.includes("--filtered-sharing");
 const patchboard=resolve(fileURLToPath(new URL("../../../",import.meta.url)));
 const webui=resolve(patchboard,"../../webui");
 const root=await mkdtemp(join(homedir(),".dim0-persistent-catalog-rehearsal-"));
+let storeRoot=root;
+if(restoreRehearsal){storeRoot=join(root,"original");await mkdir(storeRoot,{mode:0o700});}
 const evidence=process.env.DIM0_PERSISTENT_CATALOG_EVIDENCE ? resolve(process.env.DIM0_PERSISTENT_CATALOG_EVIDENCE) : await mkdtemp(join(tmpdir(),"dim0-persistent-catalog-evidence-"));
 await mkdir(evidence,{recursive:true,mode:0o700});
 const freePort=()=>new Promise((yes,no)=>{
@@ -58,7 +61,7 @@ const tls=createHttpsServer({key:await readFile(key),cert:await readFile(cert)},
 });
 await new Promise((yes,no)=>tls.once("error",no).listen(tlsPort,"127.0.0.1",yes));
 const env=Object.fromEntries(Object.entries(process.env).filter(([k])=>!/^(PATCHBOARD_|DIM0_|BETTER_AUTH_|VITE_|JAZZ_|DATABASE_URL$|APP_PORT$|PORT$)/.test(k)));
-Object.assign(env,{CI:"1",PATCHBOARD_PRIVATE_ROOT:root,PATCHBOARD_PRIVATE_DEV:"0",PATCHBOARD_PRIVATE_ORIGIN:origin,
+Object.assign(env,{CI:"1",PATCHBOARD_PRIVATE_ROOT:storeRoot,PATCHBOARD_PRIVATE_DEV:"0",PATCHBOARD_PRIVATE_ORIGIN:origin,
   PATCHBOARD_PRIVATE_PORT:String(backendPort),PATCHBOARD_OAUTH_CI_RESTART:"0",PATCHBOARD_QA_TYPED_RECORD:"0",PATCHBOARD_QA_HTTPS_TEXT_TABLE:"0",PATCHBOARD_PERSISTENT_TEXT_CATALOG:"0",PATCHBOARD_PERSISTENT_FILTERED_SHARING:"0",PATCHBOARD_PERSISTENT_MCP_TABLE_CREATE:"0",PATCHBOARD_ACC051_INFLIGHT_QA:"0",
   PATCHBOARD_PRIVATE_DIM0_ONLY:"1",VITE_DIM0_JAZZ_CANVAS:"1",VITE_DIM0_QA_NATIVE_SAVED_VIEW:"0",VITE_DIM0_QA_NATIVE_CATALOG_READONLY:"0",VITE_DIM0_PERSISTENT_TEXT_CATALOG:"1",VITE_DIM0_PERSISTENT_FILTERED_SHARING:"0",DIM0_JAZZ_PUBLIC_HOST:hostname,APP_PORT:String(uiPort),NODE_EXTRA_CA_CERTS:cert});
 const jobs=[];
@@ -95,14 +98,17 @@ function rawBackend(path,requestHost){
 }
 async function startBackend(enabled=backendMode,sharing=sharingMode,mcp=mcpMode){
   backendMode=enabled;sharingMode=sharing;mcpMode=mcp;
-  backend=launch("pnpm",["--filter","@patchboard/server","exec","tsx","src/private-demo.ts"],patchboard,{PATCHBOARD_PERSISTENT_TEXT_CATALOG:enabled,PATCHBOARD_PERSISTENT_FILTERED_SHARING:sharing,PATCHBOARD_PERSISTENT_MCP_TABLE_CREATE:mcp});
+  const profile={PATCHBOARD_PRIVATE_ROOT:storeRoot,PATCHBOARD_PERSISTENT_TEXT_CATALOG:enabled,PATCHBOARD_PERSISTENT_FILTERED_SHARING:sharing,PATCHBOARD_PERSISTENT_MCP_TABLE_CREATE:mcp};
+  backend=restoreRehearsal
+    ?launch(process.execPath,["--import","tsx","src/private-demo.ts"],join(patchboard,"apps/server"),profile)
+    :launch("pnpm",["--filter","@patchboard/server","exec","tsx","src/private-demo.ts"],patchboard,profile);
   for(let i=0;i<160;i++){
     assert.equal(backend.child.exitCode,null,"QA backend exited");
     try{if((await rawBackend("/health",host)).status===200)return;}catch{}
     await sleep(250);
   }throw Error("Backend readiness failed");
 }
-async function startFrontend(sharing=filteredSharing||presentation?"1":"0"){
+async function startFrontend(sharing=filteredSharing||presentation||restoreRehearsal?"1":"0"){
   const buildDir=join(root,"native-persistent-"+sharing);
   await execute(vite,["build","--outDir",buildDir],webui,{VITE_DIM0_PERSISTENT_FILTERED_SHARING:sharing});
   frontend=launch(vite,["preview","--outDir",buildDir,"--host","127.0.0.1","--port",String(uiPort),"--strictPort"],webui,{PATCHBOARD_PERSISTENT_TEXT_CATALOG:"1"});
@@ -142,10 +148,16 @@ async function account(){
   const identity=(await api(page,"me")).body;assert.ok(identity.signedIn);
   return {context,page,identity};
 }
+async function stopClosedStore(){
+  assert.equal(backend.child.exitCode,null);
+  assert.equal(backend.child.kill("SIGTERM"),true);
+  const result=await Promise.race([backend.done,new Promise((_,reject)=>{const timer=setTimeout(()=>reject(Error("Graceful stop timed out; do not copy")),20000);timer.unref();backend.done.finally(()=>clearTimeout(timer));})]);
+  assert.equal(result,0,"Backend did not close cleanly; do not copy");
+}
 async function offline(action){
-  await stop(backend);
+  if(restoreRehearsal)await stopClosedStore();else await stop(backend);
   process.env.JAZZ_APP_DIR=join(patchboard,"packages/jazz-schema");
-  const jazz=await createJazz({app,permissions,store:sqlite({path:join(root,"jazz")}),authenticate:()=>null}).ready();
+  const jazz=await createJazz({app,permissions,store:sqlite({path:join(storeRoot,"jazz")}),authenticate:()=>null}).ready();
   try{await action(jazz.db);}finally{await jazz.close();}
   await startBackend();
 }
@@ -726,10 +738,111 @@ async function runPresentation(board,owner,recipient){
   console.log("SASHAI_PRESENTATION_PASS",JSON.stringify({board,datasetId:created.datasetId,viewId:view,counts:counts(before),russian:russian.locale,english:english.locale}));
 }
 
+
+/** Backup/restore of a beta.5 store, not another alpha.69 upgrade proof.
+ * Same origin and authenticator, distinct private directory, no live peers.
+ * Uses the documented copy helper and direct Node start command. */
+async function runRestoreRehearsal(board,owner,recipient){
+  const op=owner.page,rp=recipient.page,boardUrl=origin+"/boards/"+board;
+  const open=async()=>{
+    await op.goto(boardUrl);
+    await op.getByRole("button",{name:"Open board Data"}).click();
+    const data=op.getByRole("region",{name:"Board Data"});
+    await expect(data).toBeVisible(options);
+    return data;
+  };
+  stage="restore fixture seed native table and row";
+  let data=await open();
+  await data.getByLabel("Table name",{exact:true}).fill("Restore rehearsal");
+  const createdResponse=op.waitForResponse(r=>r.url().endsWith("/records/tables/create")&&r.request().method()==="POST");
+  await data.getByRole("button",{name:"Create table",exact:true}).click();
+  const reply=await createdResponse;assert.equal(reply.status(),201);
+  const created=await reply.json();
+  await expect(grid(op)).toHaveAttribute("data-dataset-id",created.datasetId,options);
+  const rowValue="Beta.5 stopped-store restore";
+  const rowResponse=op.waitForResponse(r=>r.url().endsWith("/records/rows/create")&&r.request().method()==="POST");
+  await data.getByLabel("New row Title",{exact:true}).fill(rowValue);
+  await data.getByRole("button",{name:"Add row",exact:true}).click();
+  const rowReply=await rowResponse;assert.equal(rowReply.status(),201);
+  const row=await rowReply.json();
+  await expect(grid(op).getByRole("cell",{name:rowValue,exact:true})).toBeVisible(options);
+  await expect(grid(op).locator("[data-record-id]")).toHaveAttribute("data-record-id",row.recordId);
+  await rp.goto("about:blank");
+  const before=await snapshot(board,op);assert.deepEqual(counts(before),one);
+  assert.equal(before.typedRecords[0].updatedBy,owner.identity.accountId);
+  assert.equal(before.typedRecords[0].id,row.recordId);
+  assert.equal(before.typedCatalogReceipts[0].id,created.receiptId);
+  assert.equal(before.typedPatchReceipts[0].id,row.receiptId);
+
+  // Sign out before backup, retain only the virtual passkey in the browser.
+  await op.goto(origin+"/boards");
+  await op.getByRole("button",{name:"Sign out",exact:true}).click();
+  await expect(op).toHaveURL(origin+"/signin",options);
+  await op.goto("about:blank");
+  const original=storeRoot,bundle=join(root,"backup"),restored=join(root,"restored");
+  const helper=join(patchboard,"scripts/stopped-store-copy.mjs");
+  const copy=(operation,src,dst)=>{
+    const line=execFileSync(process.execPath,[helper,operation,src,dst],{encoding:"utf8"});
+    assert.match(line,/^STOPPED_STORE_COPY_PASS /);
+    return JSON.parse(line.trim().slice("STOPPED_STORE_COPY_PASS ".length));
+  };
+  stage="refuse live-store backup";
+  const liveDestination=join(root,"must-not-copy-live");
+  assert.throws(()=>execFileSync(process.execPath,[helper,"backup",original,liveDestination],{stdio:"pipe"}),error=>String(error.stderr).includes("Store may be open"));
+  await assert.rejects(()=>access(liveDestination),error=>error.code==="ENOENT");
+  stage="graceful stop and verified complete backup";
+  const start=performance.now();await stopClosedStore();
+  const stoppedAt=performance.now();
+  const backup=copy("backup",original,bundle);
+  stage="restore new private directory and verify bytes";
+  const restoreStart=performance.now(),restore=copy("restore",bundle,restored);
+  const copyComplete=performance.now();
+  assert.equal(restore.files,backup.files);assert.equal(restore.bytes,backup.bytes);
+  storeRoot=restored;
+  stage="start beta.5 from restored root";
+  await startBackend("1","1","1");
+  const healthy=performance.now();
+  stage="same Owner passkey and same data after restore";
+  await op.goto(origin+"/signin");
+  await op.getByRole("button",{name:"Sign in with passkey",exact:true}).click();
+  await expect(op).toHaveURL(origin+"/boards",options);
+  const identity=(await api(op,"me")).body;
+  assert.equal(identity.id,owner.identity.id);assert.equal(identity.accountId,owner.identity.accountId);
+  await op.getByRole("button",{name:/Persistent catalog rehearsal/}).click();
+  await op.getByRole("button",{name:"Open board Data"}).click();
+  await op.getByRole("button",{name:"Open saved view All rows",exact:true}).click();
+  await expect(grid(op)).toHaveAttribute("data-dataset-id",created.datasetId,options);
+  await expect(grid(op)).toHaveAttribute("data-view-id",created.defaultViewId);
+  await expect(grid(op).getByRole("columnheader",{name:"Title"})).toHaveAttribute("data-field-id",created.fieldId);
+  await expect(grid(op).locator("[data-record-id]")).toHaveAttribute("data-record-id",row.recordId);
+  await expect(grid(op).getByRole("cell",{name:rowValue,exact:true})).toBeVisible(options);
+  await expect(op.getByText("1 matching records",{exact:true})).toBeVisible();
+  const recovered=performance.now();
+  await op.screenshot({path:join(evidence,"restore-native-grid.png")});
+  const after=await snapshot(board,op);assert.deepEqual(after,before);
+  stage="restore negative controls";
+  assert.throws(()=>execFileSync(process.execPath,[helper,"restore",bundle,restored],{stdio:"pipe"}),error=>String(error.stderr).includes("EEXIST"));
+  const altered=join(root,"altered-backup");
+  await cp(bundle,altered,{recursive:true,errorOnExist:true,force:false});
+  await writeFile(join(altered,"store","jazz","store-id"),"synthetic tamper control");
+  const invalidDestination=join(root,"must-not-restore-corrupt");
+  assert.throws(()=>execFileSync(process.execPath,[helper,"restore",altered,invalidDestination],{stdio:"pipe"}),error=>String(error.stderr).includes("Backup integrity verification failed"));
+  await assert.rejects(()=>access(invalidDestination),error=>error.code==="ENOENT");
+  const times={gracefulStopMs:Math.round(stoppedAt-start),backupMs:backup.elapsedMs,verifiedRestoreMs:restore.elapsedMs,
+    restoreCopyWallMs:Math.round(copyComplete-restoreStart),restoreToHealthyMs:Math.round(healthy-restoreStart),
+    restoreToOwnerGridMs:Math.round(recovered-restoreStart),stopToOwnerGridMs:Math.round(recovered-start)};
+  const result={boardId:board,datasetId:created.datasetId,fieldId:created.fieldId,viewId:created.defaultViewId,recordId:row.recordId,
+    catalogReceiptId:created.receiptId,catalogEventId:created.eventId,rowReceiptId:row.receiptId,rowEventId:row.eventId,
+    rowValue,counts:counts(after),sameOwner:true,sameStoreContents:true,verifiedBytes:restore.bytes,verifiedFiles:restore.files,
+    liveCopyRejected:true,alteredCopyRejected:true,existingDestinationRejected:true,originalKeptStopped:true,qaFlags:false,publicEndpoint:false,times};
+  await save("stopped-store-restore-trace",result);
+  console.log("STOPPED_STORE_RESTORE_PASS",JSON.stringify(result));
+}
+
 let stage="startup";
 try{
   await execute("pnpm",["auth:migrate:private"],patchboard);
-  await startBackend(presentation?"1":"0",presentation?"1":"0",presentation?"1":"0");await startFrontend();browser=await chromium.launch({headless:true});
+  await startBackend(presentation||restoreRehearsal?"1":"0",presentation||restoreRehearsal?"1":"0",presentation||restoreRehearsal?"1":"0");await startFrontend();browser=await chromium.launch({headless:true});
   const owner=await account(),other=await account(),op=owner.page,np=other.page;
   assert.notEqual(owner.identity.id,other.identity.id);
   stage="create native board; default off";
@@ -740,7 +853,7 @@ try{
   const board=(await response.json()).board_id;
   await op.goto(origin+"/boards/"+board);
   await expect(op.getByRole("button",{name:"Share this board"})).toBeVisible(options);
-  if(!presentation){
+  if(!presentation&&!restoreRehearsal){
   const create={board_id:board,request_id:randomUUID(),name:"Persistent table",primary_field_name:"Title",default_view_name:"All rows"};
   assert.equal((await api(op,"records/tables/create",create)).status,404);
   assert.equal((await api(op,"records/views?board_id="+board)).status,404);
@@ -748,7 +861,9 @@ try{
   }
   assert.deepEqual(counts(await snapshot(board,op)),zero);
 
-  if(presentation){
+  if(restoreRehearsal){
+    await runRestoreRehearsal(board,owner,other);
+  }else if(presentation){
     await runPresentation(board,owner,other);
   }else if(persistentMcp){
     await runPersistentMcp(board,owner,other);

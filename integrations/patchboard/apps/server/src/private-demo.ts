@@ -73,12 +73,23 @@ console.log("PRIVATE_AUTH_READY", JSON.stringify({
   jazzStore: jazzDataPath,
   public: false,
 }));
-let closed = false;
-async function stop() {
-  if (closed) return;
-  closed = true;
-  await server.close();
-  closePrivateAuthDatabase();
+let stopping = false;
+function stop() {
+  if (stopping) return;
+  stopping = true;
+  void (async () => {
+    await server.close();
+    closePrivateAuthDatabase();
+  })().then(() => {
+    process.stdout.write("PRIVATE_AUTH_STOPPED\n", () => process.exit(0));
+  }, (error: unknown) => {
+    console.error("PRIVATE_AUTH_STOP_FAILED", error instanceof Error ? error.name : "Unknown");
+    process.exit(1);
+  });
 }
-process.once("SIGINT", () => { void stop().then(() => process.exit()); });
-process.once("SIGTERM", () => { void stop().then(() => process.exit()); });
+// Jazz beta.5 drains on these signals and re-raises the signal if no other
+// listener remains. Keep our listeners until both HTTP and auth are closed;
+// once() would disappear while the asynchronous shutdown is still running.
+// Repeated signals must not exit early or start a second close.
+process.on("SIGINT", stop);
+process.on("SIGTERM", stop);
