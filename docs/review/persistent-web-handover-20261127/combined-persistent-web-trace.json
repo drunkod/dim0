@@ -1,0 +1,153 @@
+{
+  "profile": "persistent local HTTPS",
+  "qaFlags": false,
+  "catalog": true,
+  "sharing": true,
+  "mcp": true,
+  "oneBoard": true,
+  "oneStore": true,
+  "initial": {
+    "typedDatasets": 0,
+    "typedFields": 0,
+    "typedViews": 0,
+    "typedRecords": 0,
+    "typedCatalogReceipts": 0,
+    "typedCatalogEvents": 0,
+    "typedPatchReceipts": 0,
+    "typedPatchEvents": 0
+  },
+  "consentedScopes": [
+    "board:read",
+    "board:write",
+    "table:create"
+  ],
+  "tools": [
+    "list_boards",
+    "read_board",
+    "call-api-write",
+    "create_note",
+    "list_canvas_entities",
+    "get_canvas_entity",
+    "create_canvas_entity",
+    "update_canvas_entity",
+    "patch_canvas_entity",
+    "delete_canvas_entity",
+    "get_applet_state",
+    "update_applet_state"
+  ],
+  "requestId": "663b4090-a4d4-43f3-9cea-0e3e04bc127a",
+  "created": {
+    "operation": "dataset.create.v1",
+    "boardId": "01a21cb2-0d95-7220-89aa-2a7f093a59d8",
+    "datasetId": "70c1a07a-f403-50cb-a8c4-a8fdaecdff55",
+    "fieldId": "1a66dcef-b025-595a-8517-27633bb84c3b",
+    "defaultViewId": "e4b2c934-3a23-5e04-a183-0b8e9bb261ba",
+    "schemaVersion": 1,
+    "receiptId": "b8762011-9730-5ef8-9de3-4fc2fa971926",
+    "eventId": "ffdebee4-67cb-5d1e-a0bd-796b8f4f1035",
+    "replayed": false
+  },
+  "replay": {
+    "operation": "dataset.create.v1",
+    "boardId": "01a21cb2-0d95-7220-89aa-2a7f093a59d8",
+    "datasetId": "70c1a07a-f403-50cb-a8c4-a8fdaecdff55",
+    "fieldId": "1a66dcef-b025-595a-8517-27633bb84c3b",
+    "defaultViewId": "e4b2c934-3a23-5e04-a183-0b8e9bb261ba",
+    "schemaVersion": 1,
+    "receiptId": "b8762011-9730-5ef8-9de3-4fc2fa971926",
+    "eventId": "ffdebee4-67cb-5d1e-a0bd-796b8f4f1035",
+    "replayed": true
+  },
+  "native": {
+    "datasetId": "70c1a07a-f403-50cb-a8c4-a8fdaecdff55",
+    "defaultViewId": "e4b2c934-3a23-5e04-a183-0b8e9bb261ba",
+    "fieldId": "1a66dcef-b025-595a-8517-27633bb84c3b"
+  },
+  "afterRestartReplay": {
+    "operation": "dataset.create.v1",
+    "boardId": "01a21cb2-0d95-7220-89aa-2a7f093a59d8",
+    "datasetId": "70c1a07a-f403-50cb-a8c4-a8fdaecdff55",
+    "fieldId": "1a66dcef-b025-595a-8517-27633bb84c3b",
+    "defaultViewId": "e4b2c934-3a23-5e04-a183-0b8e9bb261ba",
+    "schemaVersion": 1,
+    "receiptId": "b8762011-9730-5ef8-9de3-4fc2fa971926",
+    "eventId": "ffdebee4-67cb-5d1e-a0bd-796b8f4f1035",
+    "replayed": true
+  },
+  "rows": [
+    {
+      "recordId": "7a8efd63-517d-577f-925e-d29efbedaec1",
+      "receiptId": "8b173e7c-5a8e-5462-b950-29e47023fd6a",
+      "eventId": "af79254c-90a6-5c3a-ac62-99aa78b92f49",
+      "updatedBy": "47b44b42-321b-4c0d-a270-722e07228c8a"
+    },
+    {
+      "recordId": "5a4b0126-ae1d-5ec8-a2ec-c08253dd1a9e",
+      "receiptId": "21b17a13-7099-5120-afc5-b1d74fe44f6a",
+      "eventId": "aa409136-7a0a-57eb-8c5e-fe2227f67420",
+      "updatedBy": "47b44b42-321b-4c0d-a270-722e07228c8a"
+    },
+    {
+      "recordId": "9086cf8c-fe4f-511a-a0c3-c0fd8e0cb62c",
+      "receiptId": "6f00636d-d1aa-5815-bd8e-588bae8966e5",
+      "eventId": "19d155c4-c8c2-5cbe-b4db-6497b170d806",
+      "updatedBy": "47b44b42-321b-4c0d-a270-722e07228c8a"
+    }
+  ],
+  "filteredViewId": "e9e58d46-62be-4813-95d5-cfa758ad0209",
+  "shareId": "4b7adbd9-b73b-4740-b73c-b257cb2bfdbf",
+  "actualClipboard": true,
+  "recipientMemberships": 0,
+  "recipientGrants": 0,
+  "canonicalTitles": [
+    "Demo alpha",
+    "Demo beta",
+    "Internal planning"
+  ],
+  "filteredTitles": [
+    "Demo alpha",
+    "Demo beta"
+  ],
+  "activeAfterRestart": true,
+  "oldCursorAfterRestart": true,
+  "shareStillActiveAfterMcpDisconnect": true,
+  "grant": {
+    "version": 2,
+    "revoked": true,
+    "leases": 0,
+    "pending": false
+  },
+  "disconnectStatus": 200,
+  "postDisconnectHttp": 401,
+  "postRestartDisconnectHttp": 401,
+  "ownerRetained": 3,
+  "counts": {
+    "typedDatasets": 1,
+    "typedFields": 1,
+    "typedViews": 2,
+    "typedRecords": 3,
+    "typedCatalogReceipts": 1,
+    "typedCatalogEvents": 1,
+    "typedPatchReceipts": 3,
+    "typedPatchEvents": 3
+  },
+  "unchanged": true,
+  "branding": {
+    "title": "Dim0",
+    "documentLanguage": "en",
+    "mobileTitle": "Dim0",
+    "browserLocale": "en-US",
+    "visibleDim0": false,
+    "visibleSashAI": false
+  },
+  "locale": {
+    "default": "en",
+    "saved": "ru-RU",
+    "afterRestart": "ru-RU",
+    "documentLanguage": "en",
+    "browserLocale": "en-US",
+    "uiLanguageChanged": false
+  },
+  "installedClientTested": false,
+  "publicDeployment": false
+}
