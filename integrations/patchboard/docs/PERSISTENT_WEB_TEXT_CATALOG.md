@@ -1,6 +1,6 @@
 # Persistent web text catalog — first #33 increment
 
-Draft, not production rollout. Keep the self-hosted Node/Jazz backend, Better Auth,
+Opt-in staging profile, not production rollout. Keep the self-hosted Node/Jazz backend, Better Auth,
 private permissions and pinned Jazz 2.0.0-alpha.69. No schema change or migration
 reset is needed: reuse createTextTable/addTextRow (serializable receipt/event
 transactions and authority wait), listOwnerSavedTypedViews and querySavedTypedView.
@@ -30,11 +30,53 @@ new designated directory before starting the private server. Stop the existing
 authority before restarting it; never use two writers or reset the directory.
 Back up the complete stopped root (auth, Jazz and blobs) before any upgrade.
 
-This slice permits Owner table and row creation and Owner grid readback.
-100-view/500-row bounds remain. Saved-view creation/sharing, unrestricted typed
-records, typed patch, and MCP table:create remain disabled in this profile.
-No QA flag, grant, or permissions artifact is repurposed. Feature-off keeps
+The text-catalog-only profile permits Owner table and row creation and Owner
+grid readback. 100-view/500-row bounds remain. Unrestricted typed records,
+typed patch and MCP table:create stay disabled in both persistent profiles.
+No QA flag, grant or permissions artifact is repurposed. Feature-off keeps
 ordinary private boards/Share and does not delete persisted objects.
+
+## Optional persistent filtered sharing (#33)
+
+In addition to the text-catalog backend and frontend flags, explicitly set
+PATCHBOARD_PERSISTENT_FILTERED_SHARING=1 at backend startup and
+VITE_DIM0_PERSISTENT_FILTERED_SHARING=1 at native build. Both default off.
+Backend refuses sharing without a valid persistent text-catalog profile.
+The same canonical HTTPS origin, private non-temp root and QA exclusions apply.
+
+Owner Data exposes Save view with Title prefix and the same primary text grid.
+Owner Share exposes create/copy/revoke links and metadata. A separate signed-in
+nonmember landing reads the server-projected rows and fields, never joins
+the board or gains an OAuth grant. Existing versioned SQLite share ledger
+persists the digest, not the bearer token. The copied link keeps its secret in
+the fragment; the bearer is submitted only with the authorized query. The
+recipient can refresh or paginate; each request rechecks the live share and
+definition. Revocation removes the grid/count on the next fetch, not via push
+and cannot retract already seen data. Restart must preserve active and revoked
+links and canonical records. Keep both Jazz and auth stores and the auth secret
+in the stopped-root backup.
+
+Only existing browser create, issue, list, revoke and query operations are
+newly enabled; definition revision remains QA-only, no persistent MCP typed
+tools or scope additions. This remains a bounded primary-text MVP with
+100-view, 100-share-list and 500-row query limits, not an unbounded catalog
+engine. No schema or migration changes.
+
+Reproduce the persistent sharing journey from integrations/patchboard:
+```sh
+pnpm test:native:persistent-filtered-sharing
+```
+This uses the same isolated HTTPS harness, with no QA gates enabled. A native
+Owner creates a table, three rows, and a filtered view, copies a real link from
+Share and an independent virtual-passkey account opens it. It observes two
+filtered rows and only Title, rejects hidden record and extra-field queries,
+checks no board membership or OAuth grant, restarts on the same stores,
+reopens the active link including an old cursor, revokes through Share, verifies
+next-fetch/reload/restart denial, and checks the Owner retains all three rows.
+The real hidden-column fixture is covered separately by typed-shared-view.test.mjs.
+Disable sharing alone and rebuild; table/row Data and ordinary board invites
+still work, share routes return 404, and the stored catalog is unchanged.
+No public endpoint or production data are used.
 
 ## Reproduce the first acceptance gate
 
@@ -79,6 +121,5 @@ the list successfully refreshes and the Owner explicitly acknowledges review.
 This is a manual review boundary, not a saved-view idempotency receipt.
 
 This is a local staging-profile proof, not a public-hostname or persistent
-production deployment. Later #33 increments cover persistent sharing
-and scoped MCP, then supported staging/production operation, branding and a
+production deployment. Later #33 increments cover scoped MCP, then supported staging/production operation, branding and a
 combined journey. #24 upgrade remains separate.

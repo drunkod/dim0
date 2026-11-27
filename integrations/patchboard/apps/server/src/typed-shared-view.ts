@@ -4,7 +4,8 @@
  * restricted share credential; OAuth MCP additionally requires its existing
  * board-scoped board:read admission. No membership is minted on share read.
  *
- * QA ONLY: adapters must call typedRecordQaEnabled() before invoking.
+ * Adapters must enforce their explicit browser/QA profile and scope. MCP
+ * remains separately QA-gated; persistent browser sharing adds no MCP tool.
  */
 import {createHash,createHmac,randomBytes,randomUUID,timingSafeEqual} from "node:crypto";
 import type {DatabaseSync} from "node:sqlite";
@@ -325,7 +326,7 @@ export async function querySavedTypedView(
       throw new TypedViewUnsupported("VIEW_CURSOR_INVALID");
     last={key:decoded.lastKey,recordId:decoded.lastRecordId};
   }
-  // Bounded QA scan, NOT an unbounded production query engine. This runs over
+  // Bounded catalog scan, NOT an unbounded production query engine. This runs over
   // canonical typedRecords; the view never materializes a second table.
   const rows=await db.all(app.typedRecords.where({
     datasetId:input.datasetId
