@@ -160,18 +160,21 @@ export async function patchTypedRecord(
     if(record.version!==input.expectedVersion)
       throw new TypedRecordVersionConflict();
     const fields=await tx.all(app.typedFields.where({datasetId:input.datasetId}));
-    if(fields.length!==2 || fields.some(f=>f.boardId!==input.boardId))
+    if((fields.length!==1 && fields.length!==2) ||
+      fields.some(f=>f.boardId!==input.boardId))
       throw new TypedRecordFieldInvalid();
     const writeField=fields.find(f=>f.id===operation.fieldId);
     const computed=fields.find(f=>f.kind==="computed");
     if(!writeField || writeField.kind!=="text" ||
       writeField.computeFromFieldId!=null ||
-      !computed || computed.computeFromFieldId!==writeField.id ||
-      fields.some(f=>f.id!==writeField.id && f.id!==computed.id))
+      (fields.length===2 && (!computed ||
+        computed.computeFromFieldId!==writeField.id)) ||
+      (fields.length===1 && (computed || writeField.primary!==true)) ||
+      fields.some(f=>f.id!==writeField.id && f.id!==computed?.id))
       throw new TypedRecordFieldInvalid();
     const cells={...cellsObject(record.cells),
       [writeField.id]:operation.value,
-      [computed.id]:Array.from(operation.value).length};
+      ...(computed?{[computed.id]:Array.from(operation.value).length}:{})};
     tx.update(app.typedRecords,record.id,{
       cells,version:record.version+1,updatedBy:input.actorId
     });

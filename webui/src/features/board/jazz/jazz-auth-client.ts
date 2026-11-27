@@ -1,3 +1,4 @@
+import { clearAccountLocale } from "@/i18n"
 import { createAuthClient } from "better-auth/client"
 import { passkeyClient } from "@better-auth/passkey/client"
 import { redeemJazzInvite, type JazzInviteRedemption } from "./jazz-invite-lifecycle"
@@ -34,7 +35,7 @@ export async function createJazzAccount(): Promise<JazzIdentity> {
   const intent = await response.json() as { context?: string }
   if (!intent.context) throw new Error("Missing verified registration intent")
   const result = await client.passkey.addPasskey({
-    context: intent.context, createSession: true, name: "Dim0 passkey",
+    context: intent.context, createSession: true, name: "SashAI passkey",
   })
   if (result.error) throw new Error(result.error.message ?? "Passkey creation failed")
   const identity = await currentJazzIdentity()
@@ -53,6 +54,7 @@ export async function signInToJazz(): Promise<JazzIdentity> {
 export async function signOutOfJazz(): Promise<void> {
   const result = await client.signOut()
   if (result.error) throw new Error(result.error.message ?? "Unable to sign out")
+  clearAccountLocale()
 }
 
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i

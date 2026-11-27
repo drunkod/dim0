@@ -1,3 +1,4 @@
+import { JazzLocaleBootstrap } from "@/i18n/jazz-locale-bootstrap"
 import { resetSignedOutState } from "@/features/signin/reset-signed-out-state"
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar"
@@ -26,7 +27,7 @@ export function RootLayout() {
   const pathname = useRouterState({ select: (state) => state.location.pathname })
   const accountRoute = /^\/(signin|signup|jazz-signin)\/?$/.test(pathname)
   const jazzRoute = accountRoute ||
-    pathname.startsWith("/share/join/") || pathname.startsWith("/jazz-invite/") ||
+    pathname.startsWith("/shared-view/") || pathname.startsWith("/share/join/") || pathname.startsWith("/jazz-invite/") ||
     pathname === "/boards" || pathname.startsWith("/boards/") ||
     pathname === "/settings" || pathname === "/settings/"
 
@@ -34,6 +35,7 @@ export function RootLayout() {
     return (
       <ThemeProvider>
         <StyleDefaultsProvider>
+          <JazzLocaleBootstrap active={!accountRoute} pathname={pathname} />
           <div className="relative h-dvh w-full overflow-hidden bg-background">
             {accountRoute ? <><AuthBackground /><div className="absolute inset-0 grid place-items-center overflow-auto px-4"><Outlet /></div></> : <Outlet />}
             <Toaster position="top-right" closeButton />

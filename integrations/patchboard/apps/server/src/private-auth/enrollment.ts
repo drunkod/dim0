@@ -31,7 +31,7 @@ export async function newRegistrationIntent(now = Date.now()): Promise<string> {
     if (count.total >= cap()) throw new EnrollmentLimitReached();
     db.prepare(`INSERT INTO patchboard_enrollment_intent
       (ticket_hash,user_id,display_name,expires_at_ms) VALUES (?,?,?,?)`).run(
-      ticketHash(ticket), id, "Patchboard " + id.slice(0, 8), now + EXPIRY_MS,
+      ticketHash(ticket), id, (process.env.PATCHBOARD_PRIVATE_DIM0_ONLY === "1" ? "SashAI " : "Patchboard ") + id.slice(0, 8), now + EXPIRY_MS,
     );
     db.exec("COMMIT");
   } catch (error) {

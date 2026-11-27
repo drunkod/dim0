@@ -1,3 +1,4 @@
+import { useCopy } from "@/i18n"
 import { resetSignedOutState } from "../reset-signed-out-state"
 import { useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
@@ -9,6 +10,7 @@ import { signOutOfJazz } from "@/features/board/jazz/jazz-auth-client"
 
 /** End the board session before discarding private state and returning to sign-in. */
 export function JazzLogoutButton() {
+  const { t } = useCopy()
   const [busy, setBusy] = useState(false)
   const cache = useQueryClient()
   async function logout() {
@@ -18,9 +20,9 @@ export function JazzLogoutButton() {
       resetSignedOutState(cache)
       location.replace("/signin")
     } catch {
-      toast.error("Could not sign out. Try again.")
+      toast.error(t("Could not sign out. Try again."))
       setBusy(false)
     }
   }
-  return <Button size="sm" variant="outline" disabled={busy} onClick={() => void logout()}><LogoutIcon />Sign out</Button>
+  return <Button size="sm" variant="outline" disabled={busy} onClick={() => void logout()}><LogoutIcon />{t("Sign out")}</Button>
 }

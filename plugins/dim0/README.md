@@ -95,6 +95,17 @@ cannot gain edit rights merely by consenting to a broader OAuth scope.
 Never put access tokens, invites or personal information in prompts or code
 samples. Do not infer a collaborator from a chat display name.
 
+## Optional catalog QA
+
+The isolated HTTPS QA profile may advertise `call-api-write` with the
+single allowlisted `dataset.create.v1` operation. It requires current Owner
+authority and explicit `board:write` and `table:create` consent. Neither this
+archive nor an old board-write consent confers that capability. Use the
+existing request ID and exact input for replay; never substitute a canvas card
+for a table. See the [installed catalog runbook](../../integrations/patchboard/docs/QA_INSTALLED_CATALOG_RUNBOOK.md).
+The relative link is for repository readers; the portable ZIP does not contain
+the backend or runbook.
+
 ## Status and support
 
 Private package candidate only. **An actual clean ChatGPT ZIP installation

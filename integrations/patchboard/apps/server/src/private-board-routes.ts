@@ -25,10 +25,17 @@ import {
   TypedRecordVersionConflict,TypedRecordRequestConflict,
   TypedRecordCommitUnknown
 } from "./typed-record-patch.ts";
+import {qaHttpsCatalogBoardAllowed,qaHttpsCatalogProfile} from "./qa-https-catalog-profile.ts";
 import {typedRecordQaEnabled} from "./typed-record-qa-gate.ts";
+import {persistentTextCatalogEnabled,persistentFilteredSharingEnabled} from "./persistent-text-catalog.ts";
+import {createTextTable,addTextRow,
+  TypedCatalogInvalid,TypedCatalogConflict,
+  TypedCatalogLimit,TypedCatalogCommitUnknown
+} from "./typed-catalog.ts";
 import {
   createSavedTypedView,changeSavedTypedView,issueTypedViewShare,
   revokeTypedViewShare,querySavedTypedView,
+  listOwnerSavedTypedViews,listOwnerTypedViewShares,
   TypedViewAccessDenied,TypedViewUnsupported,TypedViewCursorChanged,
   TypedViewNotFound,TypedViewVersionConflict
 } from "./typed-shared-view.ts";
@@ -322,6 +329,61 @@ export async function privateBoardRequest(
         actorId: accountId, expectedVersion: parsed.expected_version, value: parsed.value,
       }));
     }
+    // Shared authoritative catalog commands; persistent opt-in only enables
+    // Owner table/row creation and Owner readback; sharing is separately opted in.
+    if(pathname==="/patchboard-private/api/records/tables/create" &&
+      request.method==="POST"){
+      if(!typedRecordQaEnabled()&&!persistentTextCatalogEnabled())return json({error:"Not found"},404);
+      const parsed=z.object({
+        board_id:boardIdSchema,
+        request_id:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
+        name:z.string(),primary_field_name:z.string(),
+        default_view_name:z.string()
+      }).strict().parse(await safeJson(request));
+      return json(await createTextTable(db,{
+        boardId:parsed.board_id,actorId:accountId,
+        requestId:parsed.request_id,name:parsed.name,
+        primaryFieldName:parsed.primary_field_name,
+        defaultViewName:parsed.default_view_name
+      }),201);
+    }
+    if(pathname==="/patchboard-private/api/records/rows/create" &&
+      request.method==="POST"){
+      if(!typedRecordQaEnabled()&&!persistentTextCatalogEnabled())return json({error:"Not found"},404);
+      const parsed=z.object({
+        board_id:boardIdSchema,dataset_id:boardIdSchema,
+        request_id:z.string().regex(/^[A-Za-z0-9_-]{1,128}$/),
+        schema_version:z.number().int().positive(),field_id:boardIdSchema,
+        value:z.string().max(2000)
+      }).strict().parse(await safeJson(request));
+      return json(await addTextRow(db,{
+        boardId:parsed.board_id,datasetId:parsed.dataset_id,
+        actorId:accountId,requestId:parsed.request_id,
+        schemaVersion:parsed.schema_version,
+        fieldId:parsed.field_id,value:parsed.value
+      }),201);
+    }
+    // Owner Data picker for the explicit catalog profiles. This GET
+    // never exposes token hashes, records, credentials or member lists.
+    if(pathname==="/patchboard-private/api/records/views" &&
+      request.method==="GET"){
+      if(!typedRecordQaEnabled()&&!persistentTextCatalogEnabled()&&!qaHttpsCatalogProfile())return json({error:"Not found"},404);
+      const boardId=boardIdSchema.parse(url.searchParams.get("board_id"));
+      if(!typedRecordQaEnabled()&&!persistentTextCatalogEnabled()&&!qaHttpsCatalogBoardAllowed(boardId))return json({error:"Not found"},404);
+      return json(await listOwnerSavedTypedViews(db,{
+        boardId,actorId:accountId
+      }));
+    }
+    if(pathname==="/patchboard-private/api/records/views/shares" &&
+      request.method==="GET"){
+      if(!typedRecordQaEnabled()&&!persistentFilteredSharingEnabled())return json({error:"Not found"},404);
+      const boardId=boardIdSchema.parse(url.searchParams.get("board_id"));
+      const datasetId=boardIdSchema.parse(url.searchParams.get("dataset_id"));
+      const viewId=boardIdSchema.parse(url.searchParams.get("view_id"));
+      return json(await listOwnerTypedViewShares(db,privateAuthDatabase(),{
+        boardId,datasetId,viewId,actorId:accountId
+      }));
+    }
     // Dim0 canvas transport: all entities are persisted in Jazz and scoped to the
     // Better Auth account, never to an arbitrary actor ID supplied by the browser.
     if (pathname === "/patchboard-private/api/canvas" && request.method === "GET") {
@@ -334,14 +396,21 @@ export async function privateBoardRequest(
       const entityId = entityIdSchema.parse(url.searchParams.get("entity_id"));
       return json(await getCanvasEntity(db, boardId, accountId, entityId));
     }
-    // First typed relational-record vertical slice: disabled except for a
-    // disposable loopback CI issuer with explicit opt-in. No old OAuth scope
-    // gains a new live capability from this browser route.
-    // One persisted typed read view; its credential never joins the board
-    // membership table. All routes are disposable-QA opt-in only.
+    // Server-only saved projection. Persistent browser sharing has its own
+    // opt-in and exact action allowlist; it never grants membership or
+    // expands the OAuth/MCP inventory. Owner preview is also available in
+    // the narrower text catalog and external read-only QA profile.
     if(pathname.startsWith("/patchboard-private/api/records/views/") &&
       request.method==="POST"){
-      if(!typedRecordQaEnabled())return json({error:"Not found"},404);
+      const ownerPreview=pathname==="/patchboard-private/api/records/views/owner-query"&&
+        (persistentTextCatalogEnabled()||qaHttpsCatalogProfile());
+      const persistentShareAction=persistentFilteredSharingEnabled()&&[
+        "/patchboard-private/api/records/views/create",
+        "/patchboard-private/api/records/views/share",
+        "/patchboard-private/api/records/views/revoke",
+        "/patchboard-private/api/records/views/query"
+      ].includes(pathname);
+      if(!typedRecordQaEnabled()&&!ownerPreview&&!persistentShareAction)return json({error:"Not found"},404);
       const definition=z.object({
         name:z.string().trim().min(1).max(80),
         allowed_field_ids:z.array(boardIdSchema).min(1).max(20),
@@ -363,6 +432,19 @@ export async function privateBoardRequest(
         sort:{fieldId:value.sort.field_id,
           direction:value.sort.direction}
       });
+      if(pathname.endsWith("/owner-query")){
+        const input=z.object({...viewRef,
+          page_size:z.number().int().min(1).max(20),
+          cursor:z.string().max(20000).optional(),
+        }).strict().parse(await safeJson(request,32_000));
+        if(!typedRecordQaEnabled()&&!persistentTextCatalogEnabled()&&!qaHttpsCatalogBoardAllowed(input.board_id))return json({error:"Not found"},404);
+        return json(await querySavedTypedView(db,privateAuthDatabase(),{
+          boardId:input.board_id,datasetId:input.dataset_id,
+          viewId:input.view_id,ownerActorId:accountId,
+          verifiedSubjectId:session.user.id,channel:"browser",
+          pageSize:input.page_size,cursor:input.cursor
+        }));
+      }
       if(pathname.endsWith("/create")){
         const input=z.object({
           board_id:boardIdSchema,dataset_id:boardIdSchema,
@@ -437,7 +519,11 @@ export async function privateBoardRequest(
       const records=await db.all(app.typedRecords.where({datasetId}).limit(501));
       if(records.length>500||records.some(r=>r.boardId!==boardId))
         throw new TypedViewUnsupported("VIEW_DATASET_LIMIT_500");
+      const fields=await db.all(app.typedFields.where({datasetId}).limit(101));
+      if(fields.length>100||fields.some(f=>f.boardId!==boardId))
+        throw new TypedViewUnsupported("VIEW_INVALID_DEFINITION");
       return json({boardId,datasetId,
+        fields:fields.map(f=>({id:f.id,name:f.name,kind:f.kind})),
         records:records.map(r=>({id:r.id,version:r.version,cells:r.cells}))});
     }
     if(pathname==="/patchboard-private/api/records/record" &&
@@ -523,6 +609,12 @@ export async function privateBoardRequest(
     if (error instanceof CanvasPatchRequestConflict) return json({error:"Request ID conflict"},409);
     if (error instanceof CanvasPatchCommitUnknown) return json({error:"Commit outcome unknown",request_id:error.requestId,retry_same_request_only:true},503);
     if (error instanceof CanvasInvalid) return json({ error: "Invalid canvas payload" }, 400);
+    if(error instanceof TypedCatalogInvalid)return json({error:error.message},400);
+    if(error instanceof TypedCatalogConflict)return json({error:error.message},409);
+    if(error instanceof TypedCatalogLimit)return json({error:error.message},409);
+    if(error instanceof TypedCatalogCommitUnknown)
+      return json({error:error.message,request_id:error.requestId,
+        retry_same_request_only:true},503);
     if(error instanceof TypedViewAccessDenied)return json({error:error.message},403);
     if(error instanceof TypedViewNotFound)return json({error:error.message},404);
     if(error instanceof TypedViewCursorChanged ||

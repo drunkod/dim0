@@ -176,6 +176,19 @@ export const schema = s.defineSchema({
     boardId: s.uuid(), name: s.string(), schemaVersion: s.int(),
     state: s.enum("active","read_only").default("active"),
   }, {board:s.rel("boards","boardId")}).indexOnly(["boardId"]),
+  /** Owner-only, durable QA catalog creation: receipt/event and three IDs
+   * commit in the same Jazz transaction. No browser Jazz CRUD. */
+  typedCatalogReceipts:s.table({
+    boardId:s.uuid(),actorId:s.uuid(),requestId:s.string(),
+    fingerprint:s.string(),datasetId:s.uuid(),fieldId:s.uuid(),
+    viewId:s.uuid(),eventId:s.uuid(),
+  },{board:s.rel("boards","boardId")})
+    .indexOnly(["boardId","actorId","requestId"]),
+  typedCatalogEvents:s.table({
+    boardId:s.uuid(),actorId:s.uuid(),requestId:s.string(),
+    receiptId:s.uuid(),datasetId:s.uuid(),fieldId:s.uuid(),viewId:s.uuid(),
+  },{board:s.rel("boards","boardId")})
+    .indexOnly(["boardId","datasetId"]),
   /** One canonical server-defined read-only projection per saved view. */
   typedViews: s.table({
     boardId:s.uuid(),datasetId:s.uuid(),name:s.string(),
@@ -188,6 +201,7 @@ export const schema = s.defineSchema({
   typedFields: s.table({
     boardId: s.uuid(), datasetId: s.uuid(), name: s.string(),
     kind: s.enum("text","computed"),
+    primary:s.boolean().optional(),
     computeFromFieldId: s.uuid().optional(),
   }, {
     board:s.rel("boards","boardId"),
@@ -335,6 +349,8 @@ export const permissions = definePermissions({
   },
   canvasPatchReceipts: { read: false, insert: false, update: false, delete: false },
   canvasPatchEvents: { read: false, insert: false, update: false, delete: false },
+  typedCatalogReceipts: { read: false, insert: false, update: false, delete: false },
+  typedCatalogEvents: { read: false, insert: false, update: false, delete: false },
   typedDatasets: { read: false, insert: false, update: false, delete: false },
   typedViews: { read: false, insert: false, update: false, delete: false },
   typedFields: { read: false, insert: false, update: false, delete: false },

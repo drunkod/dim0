@@ -113,7 +113,7 @@ try {
   const committed = await saved;
   assert.equal(committed.status(), 200);
   assert.deepEqual(await committed.json(), { locale: "ru-RU", version: 1, changed: true });
-  await expect(a.page.getByRole("status")).toHaveText("Locale preference saved.");
+  await expect(a.page.getByRole("status")).toHaveText("Язык сохранён.");
   await a.page.screenshot({ path: join(evidence, "account-a-saved.png") });
   await stale.getByLabel("Preferred locale (BCP 47)").fill("fr-FR");
   const denied = stale.waitForResponse(r => r.url().endsWith("/account/preferences") && r.request().method() === "PATCH");
@@ -124,7 +124,7 @@ try {
   await expect(stale.getByRole("status")).toHaveText("STALE_STATE");
   await stale.screenshot({ path: join(evidence, "account-a-stale-conflict.png") });
   await a.page.reload();
-  await expect(field).toHaveValue("ru-RU");
+  await expect(a.page.getByLabel("Предпочитаемый язык (BCP 47)")).toHaveValue("ru-RU");
   await a.page.screenshot({ path: join(evidence, "account-a-reloaded.png") });
   await b.page.reload();
   await expect(b.page.getByLabel("Preferred locale (BCP 47)")).toHaveValue("en");

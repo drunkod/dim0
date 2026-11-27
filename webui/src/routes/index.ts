@@ -1,3 +1,4 @@
+import { SharedViewLanding } from "@/features/board/data/shared-view-landing"
 // src/router/index.tsx
 import {
   createRouter,
@@ -122,6 +123,12 @@ const captureSpikeRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/dev/capture-spike",
   component: CaptureSpikePage,
+})
+
+const savedViewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/shared-view/$boardId/$datasetId/$viewId",
+  component: SharedViewLanding,
 })
 
 const signupRoute = createRoute({
@@ -410,6 +417,7 @@ const routeTree = rootRoute.addChildren([
   jazzSigninRoute,
   jazzInviteRoute,
   boardInviteRoute,
+  savedViewRoute,
   signupRoute,
   googleCallbackRoute,
   verifyEmailRoute,

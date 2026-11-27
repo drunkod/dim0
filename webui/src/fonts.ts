@@ -22,7 +22,14 @@
  * `document.fonts` `loadingdone`.
  */
 
-// sans — Atkinson Hyperlegible Next
+// UI sans — full unicode-range declarations keep mixed-script runs in one family.
+import "@fontsource/noto-sans/400.css"
+import "@fontsource/noto-sans/500.css"
+import "@fontsource/noto-sans/600.css"
+import "@fontsource/noto-sans/700.css"
+import "@fontsource/noto-sans/400-italic.css"
+import "@fontsource/noto-sans/700-italic.css"
+// canvas sans — keep the harness family and existing board metrics.
 import "@fontsource/atkinson-hyperlegible-next/400.css"
 import "@fontsource/atkinson-hyperlegible-next/500.css"
 import "@fontsource/atkinson-hyperlegible-next/600.css"

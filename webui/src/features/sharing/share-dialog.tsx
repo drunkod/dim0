@@ -1,3 +1,6 @@
+import { useCopy } from "@/i18n"
+import { SavedViewShareControls } from "@/features/board/data/saved-view-share-controls"
+import { nativeSavedViewsEnabled, nativeCatalogReadOnly } from "@/features/board/data/saved-view-api"
 import { disableJazzLinks, jazzLinks, jazzMembers, mintJazzLink, removeJazzMember, revokeJazzLink, updateJazzMemberRole } from "./jazz-api"
 import { useState } from "react"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -40,6 +43,7 @@ type ShareDialogProps = {
  * (see [HarnessCanvas](../board/harness/canvas/harness-canvas.tsx)).
  */
 export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenChange }: ShareDialogProps) {
+  const { t } = useCopy()
   const [selectedRole, setSelectedRole] = useState<ShareRole>("member")
   const queryClient = useQueryClient()
 
@@ -68,7 +72,7 @@ export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenCha
       } else await mintShareLink(boardId, role)
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: linksKey }),
-    onError: () => toast.error("Couldn't create share link. Try again."),
+    onError: () => toast.error(t("Couldn't create share link. Try again.")),
   })
 
   const revokeAllMutation = useMutation({
@@ -76,9 +80,9 @@ export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenCha
     onSuccess: (count) => {
       setMinted(null)
       queryClient.invalidateQueries({ queryKey: linksKey })
-      toast.success(count === 0 ? "Sharing was already disabled." : `Disabled ${count} link(s).`)
+      toast.success(count === 0 ? t("Sharing was already disabled.") : t("Disabled {{count}} link(s).", { count }))
     },
-    onError: () => toast.error("Couldn't disable sharing. Try again."),
+    onError: () => toast.error(t("Couldn't disable sharing. Try again.")),
   })
 
   const removeMutation = useMutation({
@@ -92,9 +96,9 @@ export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenCha
       const kickedNote = res.kicked_sessions > 0
         ? ` (${res.kicked_sessions} live session(s) closed)`
         : ""
-      toast.success(`Removed from board.${kickedNote}`)
+      toast.success(t("Removed from board.") + kickedNote)
     },
-    onError: () => toast.error("Couldn't remove member. Try again."),
+    onError: () => toast.error(t("Couldn't remove member. Try again.")),
   })
 
   const roleMutation = useMutation({
@@ -104,11 +108,11 @@ export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenCha
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({queryKey:membersKey})
-      toast.success("Member role updated. Current board permissions now apply.")
+      toast.success(t("Member role updated. Current board permissions now apply."))
     },
     onError: () => {
       void queryClient.invalidateQueries({queryKey:membersKey})
-      toast.error("Role update denied or stale. Reload members before retrying.")
+      toast.error(t("Role update denied or stale. Reload members before retrying."))
     },
   })
 
@@ -118,7 +122,7 @@ export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenCha
       if (minted?.id === id) setMinted(null)
       void queryClient.invalidateQueries({ queryKey: linksKey })
     },
-    onError: () => toast.error("Could not revoke invitation."),
+    onError: () => toast.error(t("Could not revoke invitation.")),
   })
   const activeLink = (linksQuery.data ?? []).find((l) => l.role === selectedRole) ?? null
   const otherLinks = (linksQuery.data ?? []).filter((l) => l.role !== selectedRole)
@@ -128,9 +132,9 @@ export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenCha
   const copyLink = async (value: string) => {
     try {
       await navigator.clipboard.writeText(value)
-      toast.success("Link copied to clipboard.")
+      toast.success(t("Link copied to clipboard."))
     } catch {
-      toast.error("Couldn't copy. Long-press to select.")
+      toast.error(t("Couldn't copy. Long-press to select."))
     }
   }
 
@@ -146,7 +150,7 @@ export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenCha
         */}
         <DialogHeader className="min-w-0">
           <DialogTitle className="truncate">
-            Share &ldquo;{boardLabel || "Untitled board"}&rdquo;
+            {t("Share “{{title}}”", { title: boardLabel || t("Untitled board") })}
           </DialogTitle>
         </DialogHeader>
 
@@ -163,27 +167,25 @@ export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenCha
         >
           <WarningIcon className="mt-0.5 size-4 shrink-0" weight="fill" />
           <span>
-            Sharing this board also shares every sub-board and nested
-            note inside it. Move anything private out before inviting.
+            {t("Sharing this board also shares every sub-board and nested note inside it. Move anything private out before inviting.")}
           </span>
         </div>
 
         <section className="flex flex-col gap-3">
           <p className="text-xs text-muted-foreground" role="note">
-            Anyone with this link who signs in to Dim0 may request to join with the specified role.
-            Links can be forwarded and do not verify the intended recipient. Share only with people you trust.
+            {t("Anyone with this link who signs in to SashAI may request to join with the specified role. Links can be forwarded and do not verify the intended recipient. Share only with people you trust.")}
           </p>
-          <div className="text-sm text-muted-foreground">Anyone with the link can:</div>
+          <div className="text-sm text-muted-foreground">{t("Anyone with the link can:")}</div>
           <div className="flex items-center gap-2">
             <RoleToggle
               value="viewer"
-              label="View"
+              label={t("View")}
               selected={selectedRole === "viewer"}
               onSelect={() => setSelectedRole("viewer")}
             />
             <RoleToggle
               value="member"
-              label="Edit"
+              label={t("Edit")}
               selected={selectedRole === "member"}
               onSelect={() => setSelectedRole("member")}
             />
@@ -197,45 +199,44 @@ export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenCha
           ) : (
             <div className="flex items-center justify-between gap-2 rounded-md border border-dashed border-border bg-muted/40 p-3 text-sm">
               <span className="text-muted-foreground">
-                {activeLink ? "Create a new link to copy and share." : "Create a link to invite people."}
+                {activeLink ? t("Create a new link to copy and share.") : t("Create a link to invite people.")}
               </span>
               <Button
                 size="sm"
                 onClick={() => mintMutation.mutate(selectedRole)}
                 disabled={mintMutation.isPending}
               >
-                {mintMutation.isPending ? "Creating…" : "Create link"}
+                {mintMutation.isPending ? t("Creating…") : t("Create link")}
               </Button>
             </div>
           )}
 
           {otherLinks.length > 0 && (
             <div className="text-xs text-muted-foreground">
-              Switch role to see the other link
-              {otherLinks.length > 1 ? "s" : ""} for this board.
+              {t(otherLinks.length > 1 ? "Switch role to see the other links for this board." : "Switch role to see the other link for this board.")}
             </div>
           )}
 
           {jazz && linksQuery.data?.map(link => (
             <div key={link.id} className="flex justify-between gap-2 text-sm">
-              <span>{link.role === "member" ? "Edit" : "View"} · {link.reusable ? "Reusable" : "One-time"} · {link.expires === null ? "Never expires" : "expires " + new Date(link.expires).toLocaleDateString()}</span>
-              <Button size="sm" variant="outline" disabled={revoke.isPending} onClick={() => revoke.mutate(link.id)}>Revoke</Button>
+              <span>{link.role === "member" ? t("Edit") : t("View")} · {link.reusable ? t("Reusable") : t("One-time")} · {link.expires === null ? t("Never expires") : t("expires {{date}}", { date: new Date(link.expires).toLocaleDateString() })}</span>
+              <Button size="sm" variant="outline" disabled={revoke.isPending} onClick={() => revoke.mutate(link.id)}>{t("Revoke")}</Button>
             </div>
           ))}
-          {(membersQuery.isError || linksQuery.isError) && <p role="alert">Could not load sharing details. Reopen to retry.</p>}
+          {(membersQuery.isError || linksQuery.isError) && <p role="alert">{t("Could not load sharing details. Reopen to retry.")}</p>}
           <div className="flex justify-end">
             <Button
               variant="ghost"
               size="sm"
               className="text-destructive"
               onClick={() => {
-                if (window.confirm("Disable sharing? Existing members keep access; only future invites are blocked.")) {
+                if (window.confirm(t("Disable sharing? Existing members keep access; only future invites are blocked."))) {
                   revokeAllMutation.mutate()
                 }
               }}
               disabled={revokeAllMutation.isPending}
             >
-              {revokeAllMutation.isPending ? "Disabling…" : "Disable sharing"}
+              {revokeAllMutation.isPending ? t("Disabling…") : t("Disable sharing")}
             </Button>
           </div>
         </section>
@@ -243,9 +244,9 @@ export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenCha
         <hr className="my-2 border-border" />
 
         <section className="flex flex-col gap-2">
-          <div className="text-sm font-medium">People with access</div>
+          <div className="text-sm font-medium">{t("People with access")}</div>
           {membersQuery.isLoading ? (
-            <div className="text-sm text-muted-foreground">Loading…</div>
+            <div className="text-sm text-muted-foreground">{t("Loading…")}</div>
           ) : (
             <ul className="flex flex-col gap-1">
               {(membersQuery.data ?? []).map((m) => (
@@ -253,7 +254,7 @@ export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenCha
                   key={m.user_uid}
                   member={m}
                   onRemove={() => {
-                    if (window.confirm(`Remove ${m.email} from this board?`)) {
+                    if (window.confirm(t("Remove {{name}} from this board?", { name: m.email }))) {
                       removeMutation.mutate(m.user_uid)
                     }
                   }}
@@ -261,7 +262,7 @@ export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenCha
                   onChangeRole={jazz && m.role_version && (m.role === "member" || m.role === "viewer")
                     ? (role) => {
                       if (m.role === "member" && role === "viewer" &&
-                          !window.confirm("Downgrade this member to Viewer? Existing writes, including MCP requests, will be denied.")) return
+                          !window.confirm(t("Downgrade this member to Viewer? Existing writes, including MCP requests, will be denied."))) return
                       roleMutation.mutate({member:m,role})
                     }
                     : undefined}
@@ -271,11 +272,12 @@ export function ShareDialog({ jazz = false, boardId, boardLabel, open, onOpenCha
             </ul>
           )}
         </section>
+        {jazz && open && nativeSavedViewsEnabled && !nativeCatalogReadOnly && <SavedViewShareControls key={boardId} boardId={boardId} />}
         {jazz && <section className="space-y-2 border-t pt-3">
-          <label className="text-sm font-medium" htmlFor="mcp-endpoint">Connect ChatGPT</label>
+          <label className="text-sm font-medium" htmlFor="mcp-endpoint">{t("Connect ChatGPT")}</label>
           <input id="mcp-endpoint" readOnly value={location.origin + "/patchboard-private-mcp"}
             onClick={event => event.currentTarget.select()} className="w-full text-xs" />
-          <Button size="sm" variant="outline" onClick={() => void copyLink(location.origin + "/patchboard-private-mcp")}>Copy MCP endpoint</Button>
+          <Button size="sm" variant="outline" onClick={() => void copyLink(location.origin + "/patchboard-private-mcp")}>{t("Copy MCP endpoint")}</Button>
         </section>}
       </DialogContent>
     </Dialog>
@@ -310,17 +312,18 @@ function RoleToggle({
 
 
 function LinkRow({ url, onCopy }: { url: string; onCopy: () => void }) {
+  const { t } = useCopy()
   return (
     <div className="flex items-center gap-2 rounded-md border border-border bg-background p-2">
       <input
         readOnly
-        aria-label="Invitation link"
+        aria-label={t("Invitation link")}
         value={url}
         onClick={(e) => (e.target as HTMLInputElement).select()}
         className="flex-1 truncate bg-transparent text-xs font-mono text-muted-foreground outline-none"
       />
       <Button size="sm" variant="secondary" onClick={onCopy}>
-        Copy
+        {t("Copy")}
       </Button>
     </div>
   )
@@ -335,6 +338,7 @@ function MemberRow({
   roleBusy = false,
 }: { member: BoardMember; onRemove: () => void; removeBusy: boolean;
   onChangeRole?: (role:"member"|"viewer") => void; roleBusy?: boolean }) {
+  const { t } = useCopy()
   const isOwner = member.role === "owner"
   return (
     <li className="flex items-center justify-between gap-2 rounded-md px-2 py-1.5 text-sm hover:bg-muted/60">
@@ -345,16 +349,16 @@ function MemberRow({
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         {onChangeRole ? (
           <select
-            aria-label={"Role of " + member.email}
+            aria-label={t("Role of {{name}}", { name: member.email })}
             className="rounded-md border bg-background px-2 py-1 text-xs"
             value={member.role}
             disabled={roleBusy || removeBusy}
             onChange={(event) => onChangeRole(event.target.value as "member"|"viewer")}
           >
-            <option value="member">Editor</option>
-            <option value="viewer">Viewer</option>
+            <option value="member">{t("Editor")}</option>
+            <option value="viewer">{t("Viewer")}</option>
           </select>
-        ) : <span className="capitalize">{member.role}</span>}
+        ) : <span className="capitalize">{t(member.role)}</span>}
         {!isOwner && (
           <Button
             size="sm"
@@ -363,7 +367,7 @@ function MemberRow({
             onClick={onRemove}
             disabled={removeBusy}
           >
-            {removeBusy ? "…" : "Remove"}
+            {removeBusy ? "…" : t("Remove")}
           </Button>
         )}
       </div>

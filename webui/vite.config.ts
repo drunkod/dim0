@@ -97,20 +97,20 @@ const PICKER_ONLY_ICON_NAMES = new Set(
 const jazzPrivateProxy = process.env.VITE_DIM0_JAZZ_CANVAS === "1" ? {
   "/patchboard-private": {
     target: `http://127.0.0.1:${process.env.PATCHBOARD_PRIVATE_PORT ?? "8792"}`,
-    changeOrigin: true,
+    changeOrigin: process.env.PATCHBOARD_QA_HTTPS_TEXT_TABLE !== "1" && process.env.PATCHBOARD_PERSISTENT_TEXT_CATALOG !== "1",
     ws: true,
   },
   "/patchboard-auth": {
     target: `http://127.0.0.1:${process.env.PATCHBOARD_PRIVATE_PORT ?? "8792"}`,
-    changeOrigin: true,
+    changeOrigin: process.env.PATCHBOARD_QA_HTTPS_TEXT_TABLE !== "1" && process.env.PATCHBOARD_PERSISTENT_TEXT_CATALOG !== "1",
   },
   "/patchboard-private-mcp": {
     target: `http://127.0.0.1:${process.env.PATCHBOARD_PRIVATE_PORT ?? "8792"}`,
-    changeOrigin: true,
+    changeOrigin: process.env.PATCHBOARD_QA_HTTPS_TEXT_TABLE !== "1" && process.env.PATCHBOARD_PERSISTENT_TEXT_CATALOG !== "1",
   },
   "/.well-known": {
     target: `http://127.0.0.1:${process.env.PATCHBOARD_PRIVATE_PORT ?? "8792"}`,
-    changeOrigin: true,
+    changeOrigin: process.env.PATCHBOARD_QA_HTTPS_TEXT_TABLE !== "1" && process.env.PATCHBOARD_PERSISTENT_TEXT_CATALOG !== "1",
   },
 } : undefined
 
@@ -136,8 +136,8 @@ export default defineConfig({
         "dim0.svg",
       ],
       manifest: {
-        name: "Dim0",
-        short_name: "Dim0",
+        name: "SashAI",
+        short_name: "SashAI",
         description: "Visual workspace for boards, notes, and agent-assisted thinking.",
         theme_color: "#f7f1e8",
         background_color: "#f7f1e8",

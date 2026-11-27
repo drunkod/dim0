@@ -1,3 +1,4 @@
+import { useCopy } from "@/i18n"
 import { JazzLogoutButton } from "@/features/signin/components/jazz-logout-button"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
@@ -52,6 +53,7 @@ import { applyContentToStore } from "@/features/board/persist/local/apply-conten
 import { getLocalStores } from "@/features/local-stores"
 import { saveLocalThumbnail } from "@/features/board/local/save-local-thumbnail"
 import { setBoardPersistenceRef } from "@/features/board/persist/local/board-persistence-ref"
+import { NativeBoardDataControl } from "@/features/board/data/native-board-data"
 import { ShareButton } from "@/features/sharing/share-button"
 import { BoardKindBadge } from "@/features/board/components/board-kind-badge"
 import { BoardBreadcrumb } from "@/features/board/components/breadcrumb/board-breadcrumb"
@@ -656,6 +658,7 @@ function HarnessCanvasInner({
   onDoubleClick,
   onRenderer,
 }: InnerProps) {
+  const { t } = useCopy()
   const renderView = useRenderCustomNodeView()
   const isBoard = viewMode === "board"
   const jazzMode = import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1"
@@ -734,7 +737,7 @@ function HarnessCanvasInner({
           title bar (see SidebarLabel), which the backdrop never covers. */}
       {!presenting && !isTauri() && (jazzMode ? (
         <a href="/boards" className="absolute left-4 top-4 z-[60] rounded-md border bg-background/80 px-3 py-2 text-xs font-medium backdrop-blur">
-          ← Boards
+          ← {t("Boards")}
         </a>
       ) : (
         <BoardBreadcrumb
@@ -756,6 +759,7 @@ function HarnessCanvasInner({
         {!canCollab && <BoardKindBadge kind="local-only" />}
         {jazzMode && !presenting && <JazzLogoutButton />}
         {canCollab && !jazzMode && <HarnessCollabStatus />}
+        {canCollab && jazzMode && <NativeBoardDataControl />}
         {canCollab && <ShareButton jazz={jazzMode} />}
       </div>
       <NodeSurfaceHost />

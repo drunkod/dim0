@@ -5,10 +5,18 @@ import { passkey } from "@better-auth/passkey";
 import { privateAuthConfig } from "./config.ts";
 import { privateAuthDatabase } from "./db.ts";
 import { consentGrantReference, tokenBoardGrantClaim } from "./grants.ts";
+import { typedRecordQaEnabled } from "../typed-record-qa-gate.ts";
+import {persistentTextCatalogEnabled,persistentFilteredSharingEnabled,persistentMcpTableCreateEnabled} from "../persistent-text-catalog.ts";
+import {qaHttpsCatalogProfile} from "../qa-https-catalog-profile.ts";
 import { passkeyOnlyIdentitySchemaPlugin } from "./passkey-only-identity.ts";
 import { resolveRegistrationIntent } from "./enrollment.ts";
 import { finalizeVerifiedPasskeyRegistration } from "./finalize-registration.ts";
 
+// Validate the opt-in before auth configuration creates any store or secret.
+const httpsCatalog = qaHttpsCatalogProfile();
+persistentTextCatalogEnabled(); // Validate before privateAuthConfig creates any data.
+persistentFilteredSharingEnabled();
+const persistentMcpCatalog = persistentMcpTableCreateEnabled();
 const config = privateAuthConfig();
 // ChatGPT’s custom MCP connector currently requests board:read/write without
 // offline_access. Keep the production 15-minute default, but allow an explicit,
@@ -50,13 +58,16 @@ export const auth = betterAuth({
         tokenBoardGrantClaim(referenceId, user?.id),
       // offline_access permits a refresh token; the referenceId survives
       // rotation, so it cannot widen a consented single-board grant.
-      scopes: ["board:read", "board:write", "offline_access"],
+      // Explicit opt-in catalog action: never part of default client scopes.
+      scopes: ["board:read", "board:write", "offline_access",
+        ...((typedRecordQaEnabled()||httpsCatalog||persistentMcpCatalog) ? ["table:create"] : [])],
       grantTypes: ["authorization_code", "refresh_token"],
       allowDynamicClientRegistration: true,
       allowUnauthenticatedClientRegistration: true,
       clientRegistrationRequirePKCE: true,
       clientRegistrationDefaultScopes: ["board:read", "board:write"],
-      clientRegistrationAllowedScopes: ["offline_access"],
+      clientRegistrationAllowedScopes: ["offline_access",
+        ...((typedRecordQaEnabled()||httpsCatalog||persistentMcpCatalog) ? ["table:create"] : [])],
       accessTokenExpiresIn: accessTokenSeconds,
       refreshTokenExpiresIn: 604800,
     }) as unknown as import("better-auth").BetterAuthPlugin,
@@ -65,7 +76,7 @@ export const auth = betterAuth({
     // Preserve the official runtime plugin; do not weaken token verification.
     passkey({
       rpID: new URL(config.origin).hostname,
-      rpName: process.env.PATCHBOARD_PRIVATE_DIM0_ONLY === "1" ? "Dim0" : "Patchboard",
+      rpName: process.env.PATCHBOARD_PRIVATE_DIM0_ONLY === "1" ? "SashAI" : "Patchboard",
       origin: config.origin,
       authenticatorSelection: {
         residentKey: "required",
