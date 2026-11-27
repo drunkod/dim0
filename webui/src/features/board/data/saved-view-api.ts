@@ -2,7 +2,9 @@ import { z } from "zod"
 
 export const nativeCatalogReadOnly = import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" &&
   import.meta.env.VITE_DIM0_QA_NATIVE_CATALOG_READONLY === "1"
-export const nativeSavedViewsEnabled = !nativeCatalogReadOnly && import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" &&
+export const nativePersistentTextCatalogEnabled = !nativeCatalogReadOnly && import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" &&
+  import.meta.env.VITE_DIM0_PERSISTENT_TEXT_CATALOG === "1"
+export const nativeSavedViewsEnabled = !nativeCatalogReadOnly && !nativePersistentTextCatalogEnabled && import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" &&
   import.meta.env.VITE_DIM0_QA_NATIVE_SAVED_VIEW === "1"
 const uuid = z.string().uuid()
 const field = z.object({ id: uuid, name: z.string() })
@@ -34,7 +36,7 @@ export const isViewDenied = (e: unknown) => e instanceof ViewError && [401, 403,
 export const isStaleCursor = (e: unknown) => e instanceof ViewError && e.status === 409 && e.code === "VIEW_CURSOR_REQUIRES_FRESH_QUERY"
 export function viewErrorText(e: unknown) {
   if (isViewDenied(e)) return "Access to this view has been revoked or is unavailable."
-  if (e instanceof ViewError && e.code === "VIEW_DATASET_LIMIT_500") return "This view exceeds the 500-record QA limit. No partial results are shown."
+  if (e instanceof ViewError && e.code === "VIEW_DATASET_LIMIT_500") return nativePersistentTextCatalogEnabled ? "This view exceeds the 500-record limit. No partial results are shown." : "This view exceeds the 500-record QA limit. No partial results are shown."
   return "Unable to load this view. Retry when connected."
 }
 export async function request(path: string, signal: AbortSignal, body?: object): Promise<unknown> {

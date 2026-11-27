@@ -1,5 +1,5 @@
 import { z } from "zod"
-import { request, ViewError } from "./saved-view-api"
+import { request, ViewError, nativePersistentTextCatalogEnabled } from "./saved-view-api"
 
 const uuid = z.string().uuid()
 const receipt = z.object({ receiptId: uuid, eventId: uuid, replayed: z.boolean() })
@@ -44,6 +44,6 @@ export function catalogRejection(error: unknown): string | null {
   if ([401, 403, 404].includes(error.status)) return "Catalog access denied. Reopen Data after checking your account."
   if (error.status === 400) return "Invalid catalog definition or row value."
   if (error.status === 409) return error.code === "CATALOG_ROW_LIMIT_500"
-    ? "This table has reached the 500-record QA limit." : "Catalog request conflicts with current data. Reopen Data before trying again."
+    ? (nativePersistentTextCatalogEnabled ? "This table has reached the 500-record limit." : "This table has reached the 500-record QA limit.") : "Catalog request conflicts with current data. Reopen Data before trying again."
   return null
 }

@@ -3,7 +3,7 @@ import { useParams } from "@tanstack/react-router"
 import { Button } from "@/components/ui/button"
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { useBoardAppStore } from "../harness/store/board-app-store"
-import { listViews, nativeSavedViewsEnabled, nativeCatalogReadOnly, isViewDenied, type OwnerView } from "./saved-view-api"
+import { listViews, nativeSavedViewsEnabled, nativeCatalogReadOnly, nativePersistentTextCatalogEnabled, isViewDenied, type OwnerView } from "./saved-view-api"
 import { SavedViewGrid } from "./saved-view-grid"
 import { addRow, catalogRejection, createTable, saveView, type RowRequest, type TableRequest, type SaveViewRequest } from "./catalog-api"
 
@@ -14,11 +14,11 @@ export function NativeBoardDataControl() {
   const boardId = useBoardAppStore(s => s.boardId)
   const role = useBoardAppStore(s => s.boardRole)
   const presenting = useBoardAppStore(s => s.presentationMode)
-  if ((!nativeSavedViewsEnabled && !nativeCatalogReadOnly) || !id || id !== boardId || role !== "owner" || presenting) return null
-  return <NativeBoardData key={id} boardId={id} readOnly={nativeCatalogReadOnly} />
+  if ((!nativeSavedViewsEnabled && !nativeCatalogReadOnly && !nativePersistentTextCatalogEnabled) || !id || id !== boardId || role !== "owner" || presenting) return null
+  return <NativeBoardData key={id} boardId={id} readOnly={nativeCatalogReadOnly} allowSaveView={!nativePersistentTextCatalogEnabled} />
 }
 
-export function NativeBoardData({ boardId, readOnly = false }: { boardId: string; readOnly?: boolean }) {
+export function NativeBoardData({ boardId, readOnly = false, allowSaveView = true }: { boardId: string; readOnly?: boolean; allowSaveView?: boolean }) {
   const [views, setViews] = useState<OwnerView[] | null>(null)
   const [open, setOpen] = useState(false)
   const [selected, setSelected] = useState<string>()
@@ -115,7 +115,7 @@ export function NativeBoardData({ boardId, readOnly = false }: { boardId: string
   }
   async function newView(event: FormEvent) {
     event.preventDefault()
-    if (readOnly || locked || write.current || !view || !primary || !viewName.trim()) return
+    if (readOnly || !allowSaveView || locked || write.current || !view || !primary || !viewName.trim()) return
     const input: SaveViewRequest = { board_id: boardId, dataset_id: view.datasetId,
       definition: { name: viewName.trim(), allowed_field_ids: [primary.id],
         filter: { op: "text_prefix", field_id: primary.id, value: prefix },
@@ -159,7 +159,7 @@ export function NativeBoardData({ boardId, readOnly = false }: { boardId: string
       onClick={() => { setOpen(true); setEpoch(n => n + 1) }}>Data</button>
     <Sheet open={open} onOpenChange={next => { if (!busy) setOpen(next) }}>
       <SheetContent className="w-full max-w-lg overflow-y-auto">
-        <SheetHeader><SheetTitle>Board Data</SheetTitle><SheetDescription>{readOnly ? "Read-only catalog rehearsal. Create tables through the authorized MCP connection." : "Create primary-text tables and read-only saved views."}</SheetDescription></SheetHeader>
+        <SheetHeader><SheetTitle>Board Data</SheetTitle><SheetDescription>{readOnly ? "Read-only catalog rehearsal. Create tables through the authorized MCP connection." : allowSaveView ? "Create primary-text tables and read-only saved views." : "Create primary-text tables and add rows."}</SheetDescription></SheetHeader>
         <section aria-label="Board Data" className="space-y-4 px-4 pb-6">
           {views.length === 0 && <p className="text-sm text-muted-foreground">No saved views on this board.</p>}
           {!readOnly && <form aria-label="Create text table" className="space-y-2 rounded-md border p-3" onSubmit={newTable}>
@@ -191,11 +191,11 @@ export function NativeBoardData({ boardId, readOnly = false }: { boardId: string
                 value={value} disabled={locked} onChange={e => setValue(e.target.value)} /></label>
               <Button type="submit" size="sm" disabled={locked || !value.trim()}>Add row</Button>
             </form>
-            <form aria-label="Save filtered view" onSubmit={newView} className="space-y-2 rounded-md border p-3">
+            {allowSaveView && <form aria-label="Save filtered view" onSubmit={newView} className="space-y-2 rounded-md border p-3">
               <label className="block text-xs">Saved view name<input className={inputClass} required maxLength={80} value={viewName} disabled={locked} onChange={e => setViewName(e.target.value)} /></label>
               <label className="block text-xs">{primary.name} starts with<input className={inputClass} maxLength={80} value={prefix} disabled={locked} onChange={e => setPrefix(e.target.value)} /></label>
               <Button type="submit" size="sm" disabled={locked || !viewName.trim()}>Save view</Button>
-            </form>
+            </form>}
           </>}
         </section>
       </SheetContent>
