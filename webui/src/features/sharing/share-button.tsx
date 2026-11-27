@@ -1,3 +1,4 @@
+import { useCopy } from "@/i18n"
 import { useState } from "react"
 
 import { ShareIcon } from "@/components/icons"
@@ -16,6 +17,7 @@ import { ShareDialog } from "./share-dialog"
  * subtle shadow).
  */
 export function ShareButton({ jazz = false }: { jazz?: boolean } = {}) {
+  const { t } = useCopy()
   const boardId = useBoardAppStore((s) => s.boardId)
   const boardRole = useBoardAppStore((s) => s.boardRole)
   const boardLabel = useBoardAppStore((s) => s.boardLabel)
@@ -31,7 +33,7 @@ export function ShareButton({ jazz = false }: { jazz?: boolean } = {}) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label="Share this board"
+        aria-label={t("Share this board")}
         data-coachmark="share"
         className={
           "flex items-center gap-1.5 rounded-md px-1.5 py-1 " +
@@ -40,7 +42,7 @@ export function ShareButton({ jazz = false }: { jazz?: boolean } = {}) {
         }
       >
         <ShareIcon className="size-3.5 shrink-0" />
-        Share
+        {t("Share")}
       </button>
       <ShareDialog key={boardId} jazz={jazz} boardId={boardId} boardLabel={boardLabel}
         open={open} onOpenChange={setOpen} />

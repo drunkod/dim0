@@ -20,6 +20,7 @@ import {app} from "@patchboard/jazz-schema";
 import permissions from "@patchboard/jazz-schema/private.permissions.json" with {type:"json"};
 import {chromium,expect} from "@playwright/test";
 
+const presentation=process.argv.includes("--presentation");
 const persistentMcp=process.argv.includes("--persistent-mcp");
 const filteredSharing=process.argv.includes("--filtered-sharing");
 const patchboard=resolve(fileURLToPath(new URL("../../../",import.meta.url)));
@@ -101,7 +102,7 @@ async function startBackend(enabled=backendMode,sharing=sharingMode,mcp=mcpMode)
     await sleep(250);
   }throw Error("Backend readiness failed");
 }
-async function startFrontend(sharing=filteredSharing?"1":"0"){
+async function startFrontend(sharing=filteredSharing||presentation?"1":"0"){
   const buildDir=join(root,"native-persistent-"+sharing);
   await execute(vite,["build","--outDir",buildDir],webui,{VITE_DIM0_PERSISTENT_FILTERED_SHARING:sharing});
   frontend=launch(vite,["preview","--outDir",buildDir,"--host","127.0.0.1","--port",String(uiPort),"--strictPort"],webui,{PATCHBOARD_PERSISTENT_TEXT_CATALOG:"1"});
@@ -382,7 +383,7 @@ const mcpURL=origin+"/patchboard-private-mcp",callback="http://127.0.0.1:7432/ca
 const args=(board,requestId=randomUUID(),name="Persistent MCP rehearsal")=>({operation:"dataset.create.v1",input:{
   board_id:board,request_id:requestId,name,primary_field_name:"Title",default_view_name:"All rows"}});
 const clientList=[];
-async function authorize(account,board,scope,label){
+async function authorize(account,board,scope,label,language="en"){
   const meta=await fetch(origin+"/.well-known/oauth-authorization-server/patchboard-auth");
   assert.equal(meta.status,200);const metadata=await meta.json();
   for(const key of ["registration_endpoint","authorization_endpoint","token_endpoint"])assert.equal(new URL(metadata[key]).origin,origin);
@@ -399,11 +400,21 @@ async function authorize(account,board,scope,label){
   await page.goto(auth.href,{waitUntil:"domcontentloaded"});
   await expect(page).toHaveURL(url=>url.origin===origin&&url.searchParams.get("client_id")===client_id&&["/signin","/patchboard-private/oauth-consent"].includes(url.pathname));
   if(new URL(page.url()).pathname==="/signin")await page.getByRole("button",{name:"Sign in with passkey",exact:true}).click();
-  await expect(page.getByRole("heading",{name:"Authorize a Dim0 connection",exact:true})).toBeVisible(options);
+  const russian=language==="ru";
+  await expect(page.getByRole("heading",{name:russian?"Разрешить подключение к SashAI":"Authorize a SashAI connection",exact:true})).toBeVisible(options);
+  await expect(page.locator("html")).toHaveAttribute("lang",language);
+  if(presentation){
+    assert.ok((await page.title()).startsWith("SashAI"));
+    assert.equal(await page.locator("#board option").count(),2);
+    assert.equal(await page.locator("#board option").nth(1).getAttribute("value"),board);
+    await expect(page.locator("#board option").nth(1)).toHaveText("Persistent catalog rehearsal ("+(russian?"Владелец":"owner")+")");
+    for(const permission of scope.split(" "))await expect(page.getByText(permission,{exact:true})).toBeVisible();
+  }
   if(scope.includes("table:create"))await expect(page.getByText("table:create",{exact:true})).toBeVisible(options);
-  await page.getByLabel("Approved board").selectOption(board);
+  await page.getByLabel(russian?"Доска для подключения":"Approved board").selectOption(board);
+  if(presentation)await page.screenshot({path:join(evidence,"consent-"+language+".png")});
   if(label==="Persistent scoped MCP")await page.screenshot({path:join(evidence,"sdk-consent.png")});
-  await page.getByRole("button",{name:"Authorize selected board"}).click();
+  await page.getByRole("button",{name:russian?"Разрешить доступ":"Authorize selected board"}).click();
   await page.waitForURL(url=>url.origin==="http://127.0.0.1:7432"&&url.searchParams.get("state")===state,{timeout:15000});
   const code=new URL(page.url()).searchParams.get("code");assert.ok(code);
   const token=await fetch(metadata.token_endpoint,{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body:new URLSearchParams({grant_type:"authorization_code",code,client_id,redirect_uri:callback,code_verifier:verifier,resource:mcpURL})});
@@ -554,10 +565,171 @@ async function runPersistentMcp(board,owner,other){
   console.log("PERSISTENT_MCP_TABLE_CREATE_PASS",JSON.stringify({created,replay,native,afterRestart,disconnectStatus:200,postDisconnectHttp:401,counts:counts(stored)}));
 }
 
+
+async function runPresentation(board,owner,recipient){
+  const op=owner.page,rp=recipient.page,boardUrl=origin+"/boards/"+board;
+  const scope="board:read board:write table:create";
+  const setLocale=async(page,value,language)=>{
+    const oldLanguage=await page.locator("html").getAttribute("lang");
+    const russian=oldLanguage==="ru";
+    const change=page.waitForResponse(r=>r.url().endsWith("/account/preferences")&&r.request().method()==="PATCH");
+    await page.getByRole("combobox",{name:russian?"Язык интерфейса":"Interface language"}).selectOption(value);
+    await page.getByRole("button",{name:russian?"Сохранить язык":"Save locale preference",exact:true}).click();
+    const response=await change;assert.equal(response.status(),200);
+    const saved=await response.json();assert.equal(saved.locale,value==="ru"?"ru-RU":"en");
+    await expect(page.locator("html")).toHaveAttribute("lang",language,options);
+    await expect(page.getByText(language==="ru"?"Язык сохранён.":"Locale preference saved.",{exact:true})).toBeVisible(options);
+    return saved;
+  };
+  stage="English title and profile; select Russian";
+  await op.goto(origin+"/boards");
+  await expect(op).toHaveTitle("SashAI");
+  await expect(op.locator('meta[name="apple-mobile-web-app-title"]')).toHaveAttribute("content","SashAI");
+  await expect(op.getByRole("link",{name:"Account settings"})).toBeVisible(options);
+  assert.match(owner.identity.name,/^SashAI /);
+  await op.screenshot({animations:"disabled",path:join(evidence,"boards-en.png")});
+  await op.goto(origin+"/settings");
+  await expect(op.getByLabel("Preferred locale (BCP 47)")).toHaveValue("en");
+  await op.screenshot({animations:"disabled",path:join(evidence,"settings-en.png")});
+  const russian=await setLocale(op,"ru","ru");
+  await expect(op.getByLabel("Предпочитаемый язык (BCP 47)")).toHaveValue("ru-RU");
+  await expect(op.getByText("Профиль",{exact:true})).toBeVisible();
+  await op.screenshot({animations:"disabled",path:join(evidence,"settings-ru.png")});
+  await op.reload();
+  await expect(op.locator("html")).toHaveAttribute("lang","ru",options);
+  await expect(op.getByLabel("Предпочитаемый язык (BCP 47)")).toHaveValue("ru-RU");
+  // Independent account remains English; no origin-wide locale cache.
+  await rp.goto(origin+"/settings");await expect(rp.getByLabel("Preferred locale (BCP 47)")).toHaveValue("en");
+  await expect(rp.locator("html")).toHaveAttribute("lang","en");
+  stage="Russian real OAuth and scoped table create";
+  const consent=await authorize(owner,board,scope,"SashAI presentation RU","ru");
+  const client=await connect(consent);
+  assert.equal(await listed(client),true);
+  const command=args(board,randomUUID(),"Presentation table");
+  const created=success(await invoke(client,command));assert.equal(created.replayed,false);
+  const open=async(page,lang)=>{
+    await page.goto(boardUrl);
+    await expect(page.locator("html")).toHaveAttribute("lang",lang,options);
+    await page.getByRole("button",{name:lang==="ru"?"Открыть данные доски":"Open board Data"}).click();
+    const data=page.getByRole("region",{name:lang==="ru"?"Данные доски":"Board Data"});
+    await expect(data.getByRole("heading",{name:"Presentation table",exact:true})).toBeVisible(options);
+    await data.getByRole("button",{name:lang==="ru"?"Открыть сохранённое представление All rows":"Open saved view All rows"}).click();
+    const table=page.getByRole("table",{name:lang==="ru"?"Записи сохранённого представления":"Saved view records"});
+    await expect(table).toHaveAttribute("data-dataset-id",created.datasetId);
+    await expect(table).toHaveAttribute("data-view-id",created.defaultViewId);
+    await expect(table.getByRole("columnheader",{name:"Title",exact:true})).toHaveAttribute("data-field-id",created.fieldId);
+    return {data,table};
+  };
+  let {data,table}=await open(op,"ru");
+  const rowValue="Demo — исходный текст";
+  const rowResponse=op.waitForResponse(r=>r.url().endsWith("/records/rows/create")&&r.request().method()==="POST");
+  await data.getByLabel("Новая строка: Title",{exact:true}).fill(rowValue);
+  await data.getByRole("button",{name:"Добавить строку",exact:true}).click();
+  const added=await rowResponse;assert.equal(added.status(),201);
+  const row=await added.json();assert.equal(added.request().postDataJSON().value,rowValue);
+  assert.equal(added.request().postDataJSON().dataset_id,created.datasetId);
+  await expect(table.getByRole("cell",{name:rowValue,exact:true})).toBeVisible(options);
+  await expect(data.getByText("Найдено записей: 1",{exact:true})).toBeVisible();
+  await data.getByLabel("Название сохранённого представления",{exact:true}).fill("Demo items");
+  await data.getByLabel("Title начинается с",{exact:true}).fill("Demo");
+  const savedResponse=op.waitForResponse(r=>r.url().endsWith("/records/views/create")&&r.request().method()==="POST");
+  await data.getByRole("button",{name:"Сохранить представление",exact:true}).click();
+  const saved=await savedResponse;assert.equal(saved.status(),201);const view=(await saved.json()).viewId;
+  await expect(table).toHaveAttribute("data-view-id",view);
+  await expect(table.getByRole("cell",{name:rowValue,exact:true})).toBeVisible();
+  await op.screenshot({animations:"disabled",path:join(evidence,"data-ru.png")});
+  await op.keyboard.press("Escape");
+  stage="Russian Share and copied link, independent English recipient";
+  await op.getByRole("button",{name:"Поделиться",exact:true}).click();
+  await expect(op.getByRole("region",{name:"Ссылки на сохранённые представления"})).toBeVisible(options);
+  await op.screenshot({animations:"disabled",path:join(evidence,"share-ru-header.png")});
+  const group=op.getByRole("group",{name:"Поделиться представлением Demo items"});
+  const shareResponse=op.waitForResponse(r=>r.url().endsWith("/records/views/share")&&r.request().method()==="POST");
+  await group.getByRole("button",{name:"Создать ссылку на представление",exact:true}).click();
+  const shareReply=await shareResponse;assert.equal(shareReply.status(),201);const share=await shareReply.json();
+  await group.getByRole("button",{name:"Копировать ссылку на представление",exact:true}).click();
+  await expect(group.getByText("Ссылка на представление скопирована.",{exact:true})).toBeVisible(options);
+  const copied=await op.evaluate(()=>navigator.clipboard.readText());
+  const u=new URL(copied);assert.equal(u.pathname,"/shared-view/"+board+"/"+created.datasetId+"/"+view);
+  assert.equal(new URLSearchParams(u.hash.slice(1)).get("share"),share.shareToken);
+  await group.scrollIntoViewIfNeeded();
+  await op.screenshot({animations:"disabled",path:join(evidence,"share-ru.png")});
+  await op.keyboard.press("Escape");
+  await rp.goto(copied,{waitUntil:"domcontentloaded"});
+  await expect(rp.locator("html")).toHaveAttribute("lang","en");
+  await expect(rp.getByRole("table",{name:"Saved view records"}).getByRole("cell",{name:rowValue,exact:true})).toBeVisible(options);
+  assert.deepEqual((await api(rp,"boards")).body.boards,[]);
+  stage="restart with Russian preserved; read exact unchanged objects";
+  await rp.goto("about:blank");
+  const before=await snapshot(board,op);
+  assert.deepEqual(counts(before),{...one,typedViews:2});
+  assert.deepEqual(before.typedRecords.map(x=>x.cells[created.fieldId]),[rowValue]);
+  await op.goto(origin+"/settings");
+  await expect(op.locator("html")).toHaveAttribute("lang","ru",options);
+  await expect(op.getByLabel("Предпочитаемый язык (BCP 47)")).toHaveValue("ru-RU");
+  await op.screenshot({animations:"disabled",path:join(evidence,"settings-ru-after-restart.png")});
+  ({data,table}=await open(op,"ru"));
+  await expect(table.getByRole("cell",{name:rowValue,exact:true})).toBeVisible();
+  await op.screenshot({animations:"disabled",path:join(evidence,"data-ru-after-restart.png")});
+  await op.keyboard.press("Escape");
+  stage="switch back to English and observe English consent";
+  await op.goto(origin+"/settings");
+  await expect(op.locator("html")).toHaveAttribute("lang","ru",options);
+  const english=await setLocale(op,"en","en");
+  await op.reload();
+  await expect(op.getByLabel("Preferred locale (BCP 47)")).toHaveValue("en");
+  await expect(op.locator("html")).toHaveAttribute("lang","en");
+  const englishConsent=await authorize(owner,board,scope,"SashAI presentation EN","en");
+  assert.equal(englishConsent.board,consent.board);
+  ({data,table}=await open(op,"en"));
+  await expect(table.getByRole("cell",{name:rowValue,exact:true})).toBeVisible();
+  await op.screenshot({animations:"disabled",path:join(evidence,"data-en-restored.png")});
+  await op.keyboard.press("Escape");
+  await op.getByRole("button",{name:"Share this board"}).click();
+  await expect(op.getByRole("region",{name:"Saved view links"})).toBeVisible();
+  await op.screenshot({animations:"disabled",path:join(evidence,"share-en-restored.png")});
+  await op.keyboard.press("Escape");
+  assert.deepEqual(await snapshot(board,op),before);
+  stage="unsupported locale fallback and account isolation";
+  await op.goto(origin+"/settings");
+  await expect(op.getByLabel("Preferred locale (BCP 47)")).toHaveValue("en");
+  await op.getByLabel("Preferred locale (BCP 47)").fill("fr-FR");
+  const unsupported=op.waitForResponse(r=>r.url().endsWith("/account/preferences")&&r.request().method()==="PATCH");
+  await op.getByRole("button",{name:"Save locale preference"}).click();
+  assert.equal((await unsupported).status(),200);
+  await expect(op.getByText("Locale preference saved.",{exact:true})).toBeVisible();
+  await op.reload();
+  await expect(op.getByLabel("Preferred locale (BCP 47)")).toHaveValue("fr-FR");
+  await expect(op.locator("html")).toHaveAttribute("lang","en");
+  await op.getByRole("combobox",{name:"Interface language"}).selectOption("en");
+  await op.getByRole("button",{name:"Save locale preference"}).click();
+  await expect(op.getByText("Locale preference saved.",{exact:true})).toBeVisible();
+  assert.equal((await api(op,"account/profile")).body.locale,"en");
+  await rp.goto(copied,{waitUntil:"domcontentloaded"});
+  await expect(rp.getByRole("table",{name:"Saved view records"}).getByRole("cell",{name:rowValue,exact:true})).toBeVisible();
+  await rp.screenshot({animations:"disabled",path:join(evidence,"recipient-en.png")});
+  await rp.goto(origin+"/settings");
+  await expect(rp.getByLabel("Preferred locale (BCP 47)")).toHaveValue("en");
+  await setLocale(rp,"ru","ru");
+  await rp.goto(copied,{waitUntil:"domcontentloaded"});
+  await expect(rp.locator("html")).toHaveAttribute("lang","ru",options);
+  await expect(rp.getByRole("heading",{name:"Общее сохранённое представление",exact:true})).toBeVisible(options);
+  await expect(rp.getByRole("table",{name:"Записи сохранённого представления"}).getByRole("cell",{name:rowValue,exact:true})).toBeVisible(options);
+  await rp.screenshot({animations:"disabled",path:join(evidence,"recipient-ru.png")});
+  assert.equal((await api(op,"account/profile")).body.locale,"en");
+  await save("sashai-presentation-trace",{profile:"persistent local HTTPS",qaFlags:false,oneBoard:true,oneStore:true,
+    title:"SashAI",mobileTitle:"SashAI",newAccountBrand:"SashAI",scope:scope.split(" "),board,created,viewId:view,rowId:row.recordId,rowValue,
+    russian:{locale:russian.locale,version:russian.version,reload:true,restart:true,settings:true,data:true,share:true,consent:true},
+    english:{locale:english.locale,version:english.version,restored:true,reload:true,data:true,share:true,consent:true},
+    unsupportedLocaleFallback:true,independentAccountEnglish:true,recipientRussian:true,ownerEnglishWhileRecipientRussian:true,unchangedUserContent:true,unchangedCatalogAfterRestart:true,
+    actualClipboard:true,exactConsentScopesBothLanguages:true,counts:counts(before),installedClientTested:false,publicDeployment:false});
+  console.log("SASHAI_PRESENTATION_PASS",JSON.stringify({board,datasetId:created.datasetId,viewId:view,counts:counts(before),russian:russian.locale,english:english.locale}));
+}
+
 let stage="startup";
 try{
   await execute("pnpm",["auth:migrate:private"],patchboard);
-  await startBackend("0");await startFrontend();browser=await chromium.launch({headless:true});
+  await startBackend(presentation?"1":"0",presentation?"1":"0",presentation?"1":"0");await startFrontend();browser=await chromium.launch({headless:true});
   const owner=await account(),other=await account(),op=owner.page,np=other.page;
   assert.notEqual(owner.identity.id,other.identity.id);
   stage="create native board; default off";
@@ -568,13 +740,17 @@ try{
   const board=(await response.json()).board_id;
   await op.goto(origin+"/boards/"+board);
   await expect(op.getByRole("button",{name:"Share this board"})).toBeVisible(options);
+  if(!presentation){
   const create={board_id:board,request_id:randomUUID(),name:"Persistent table",primary_field_name:"Title",default_view_name:"All rows"};
   assert.equal((await api(op,"records/tables/create",create)).status,404);
   assert.equal((await api(op,"records/views?board_id="+board)).status,404);
   await expect(op.getByRole("button",{name:"Open board Data"})).toHaveCount(0);
+  }
   assert.deepEqual(counts(await snapshot(board,op)),zero);
 
-  if(persistentMcp){
+  if(presentation){
+    await runPresentation(board,owner,other);
+  }else if(persistentMcp){
     await runPersistentMcp(board,owner,other);
   }else if(filteredSharing){
     await runFilteredSharing(board,owner,other);

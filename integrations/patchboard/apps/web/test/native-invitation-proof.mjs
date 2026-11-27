@@ -248,7 +248,7 @@ try {
   await invitee.page.goto(auth.href);
   await expect(invitee.page).toHaveURL(url => url.pathname === "/signin" && url.searchParams.get("client_id") === client_id && url.searchParams.has("sig"));
   await invitee.page.getByRole("button",{name:"Sign in with passkey",exact:true}).click();
-  await expect(invitee.page.getByRole("heading",{name:"Authorize a Dim0 connection",exact:true})).toBeVisible({timeout:30000});
+  await expect(invitee.page.getByRole("heading",{name:"Authorize a SashAI connection",exact:true})).toBeVisible({timeout:30000});
   assert.equal(new URL(invitee.page.url()).searchParams.get("client_id"),client_id);
   assert.equal(await invitee.page.evaluate(id => JSON.parse(sessionStorage.getItem("dim0:jazz:pendingInvite") || "null")?.boardId === id, unrelatedBoard),true);
   await check("signed-oauth-continuation-before-invitation",1,2,unrelatedBoard);

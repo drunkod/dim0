@@ -1,8 +1,10 @@
+import { useCopy } from "@/i18n"
 import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { issueShare, listShares, listViews, revokeShare, sharedViewUrl, type OwnerView, type ViewShare } from "./saved-view-api"
 
 export function SavedViewShareControls({ boardId }: { boardId: string }) {
+  const { t } = useCopy()
   const [views, setViews] = useState<OwnerView[] | null>(null)
   useEffect(() => {
     const abort = new AbortController()
@@ -10,13 +12,14 @@ export function SavedViewShareControls({ boardId }: { boardId: string }) {
     return () => abort.abort()
   }, [boardId])
   if (!views?.length) return null
-  return <section aria-label="Saved view links" className="space-y-3 border-t pt-3">
-    <h3 className="text-sm font-medium">Saved view links</h3>
-    <p className="text-xs text-muted-foreground">Read-only view links show only permitted rows and fields. They do not grant board membership. Anyone with a link who signs in may read the view until revoked.</p>
+  return <section aria-label={t("Saved view links")} className="space-y-3 border-t pt-3">
+    <h3 className="text-sm font-medium">{t("Saved view links")}</h3>
+    <p className="text-xs text-muted-foreground">{t("Read-only view links show only permitted rows and fields. They do not grant board membership. Anyone with a link who signs in may read the view until revoked.")}</p>
     {views.map(view => <ViewShareRow key={view.viewId} view={view} />)}
   </section>
 }
 function ViewShareRow({ view }: { view: OwnerView }) {
+  const { t } = useCopy()
   const [shares, setShares] = useState<ViewShare[]>([])
   const [minted, setMinted] = useState<{ shareId: string; url: string } | null>(null)
   const [busy, setBusy] = useState(false)
@@ -47,15 +50,15 @@ function ViewShareRow({ view }: { view: OwnerView }) {
     } catch { setMessage("Could not confirm revocation. Refresh sharing details.") }
     finally { setBusy(false); setRefresh(n => n + 1) }
   }
-  return <div role="group" aria-label={"Share saved view " + view.name} className="space-y-2 rounded-md border p-3">
+  return <div role="group" aria-label={t("Share saved view {{name}}", { name: view.name })} className="space-y-2 rounded-md border p-3">
     <h4 className="text-sm font-medium">{view.name}</h4>
-    <Button size="sm" variant="outline" disabled={busy} onClick={() => void create()}>Create view link</Button>
+    <Button size="sm" variant="outline" disabled={busy} onClick={() => void create()}>{t("Create view link")}</Button>
     {minted && shares.some(s => s.shareId === minted.shareId && !s.revoked) &&
-      <Button size="sm" onClick={() => void navigator.clipboard.writeText(minted.url).then(() => setMessage("View link copied.")).catch(() => setMessage("Clipboard unavailable."))}>Copy view link</Button>}
+      <Button size="sm" onClick={() => void navigator.clipboard.writeText(minted.url).then(() => setMessage("View link copied.")).catch(() => setMessage("Clipboard unavailable."))}>{t("Copy view link")}</Button>}
     {shares.map(s => <div key={s.shareId} className="flex items-center justify-between gap-2 text-xs">
-      <span>{s.revoked ? "Revoked" : "Active view link"} · {s.shareId.slice(0, 8)}</span>
-      {!s.revoked && <Button size="sm" variant="outline" disabled={busy} onClick={() => void revoke(s)}>Revoke view link</Button>}
+      <span>{s.revoked ? t("Revoked") : t("Active view link")} · {s.shareId.slice(0, 8)}</span>
+      {!s.revoked && <Button size="sm" variant="outline" disabled={busy} onClick={() => void revoke(s)}>{t("Revoke view link")}</Button>}
     </div>)}
-    {message && <p role="status" className="text-xs">{message}</p>}
+    {message && <p role="status" className="text-xs">{t(message)}</p>}
   </div>
 }

@@ -148,7 +148,7 @@ try {
     if(new URL(page.url()).pathname==="/signin") {
       await page.getByRole("button",{name:"Sign in with passkey",exact:true}).click();
     }
-    await expect(page.getByRole("heading",{name:"Authorize a Dim0 connection",exact:true})).toBeVisible({timeout:30000});
+    await expect(page.getByRole("heading",{name:"Authorize a SashAI connection",exact:true})).toBeVisible({timeout:30000});
     await page.getByLabel("Approved board").selectOption(board_id);
     await page.getByRole("button",{name:"Authorize selected board"}).click();
     await page.waitForURL(url=>url.origin==="http://127.0.0.1:7432" && url.searchParams.get("state")===state,{timeout:15000});

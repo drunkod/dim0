@@ -1,3 +1,4 @@
+import { useCopy } from "@/i18n"
 import { JazzLogoutButton } from "@/features/signin/components/jazz-logout-button"
 import { useEffect, useState, type FormEvent } from "react"
 import { useNavigate } from "@tanstack/react-router"
@@ -16,6 +17,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
  * Does not load the old Patchboard application or legacy Dim0 SQL endpoints.
  */
 export function JazzBoardsPage() {
+  const { t } = useCopy()
   const navigate = useNavigate()
   const [session, setSession] = useState<JazzIdentity | null | undefined>(undefined)
   const [boards, setBoards] = useState<Board[]>([])
@@ -115,66 +117,66 @@ export function JazzBoardsPage() {
 
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-5 px-6 py-10 text-foreground">
-      <h1 className="text-3xl font-semibold">Boards</h1>
+      <h1 className="text-3xl font-semibold">{t("Boards")}</h1>
       {new URLSearchParams(window.location.search).get("access") === "removed" && (
         <p role="alert" className="rounded-lg border border-destructive px-4 py-3 text-sm text-destructive">
-          Access to that board was removed. Ask the owner to invite you again.
+          {t("Access to that board was removed. Ask the owner to invite you again.")}
         </p>
       )}
       {pendingInvite && (
         <div role="status" className="rounded-lg border bg-muted/30 p-3 text-sm">
-          {session ? "Invitation pending. Review the role and explicitly accept, or cancel to continue without joining." :
-            "Your invitation is ready. Sign in to review it before joining."}
+          {session ? t("Invitation pending. Review the role and explicitly accept, or cancel to continue without joining.") :
+            t("Your invitation is ready. Sign in to review it before joining.")}
           {session && <div className="mt-2 flex gap-3">
             <button type="button" disabled={busy} onClick={reviewInvite}
-              className="underline underline-offset-2">Review invitation</button>
+              className="underline underline-offset-2">{t("Review invitation")}</button>
             <button type="button" disabled={busy} onClick={cancelInvite}
-              className="underline underline-offset-2">Cancel invitation</button>
+              className="underline underline-offset-2">{t("Cancel invitation")}</button>
           </div>}
         </div>
       )}
       {error && <p role="alert" className="rounded-lg border border-destructive p-3 text-sm text-destructive">{error}</p>}
       {session === undefined ? (
-        <div role="status" className="text-sm">Checking Jazz session…
+        <div role="status" className="text-sm">{t("Checking Jazz session…")}
           {sessionUnavailable && <button type="button" className="ml-2 underline"
-            onClick={() => window.location.reload()}>Retry connection</button>}
+            onClick={() => window.location.reload()}>{t("Retry connection")}</button>}
         </div>
       ) : session && (
         <>
           <div className="flex items-center justify-between gap-3 text-sm">
-            <p role="status">Signed in as <strong>{session.name}</strong></p>
+            <p role="status">{t("Signed in as")} <strong>{session.name}</strong></p>
             <div className="flex items-center gap-3">
-              <a href="/settings" className="underline underline-offset-2">Account settings</a>
+              <a href="/settings" className="underline underline-offset-2">{t("Account settings")}</a>
               <JazzLogoutButton />
             </div>
           </div>
           {boards.length > 0 && (
             <section className="space-y-2">
-              <h2 className="font-medium">Your boards</h2>
+              <h2 className="font-medium">{t("Your boards")}</h2>
               {boards.map((board) => (
                 <button type="button" key={board.board_id} onClick={() => openBoard(board.board_id)}
                   className="flex w-full items-center justify-between gap-2 rounded-lg border bg-background p-3 text-left hover:bg-muted">
                   <span className="truncate">{board.title}</span>
-                  <span className="text-xs text-muted-foreground">{board.role === "owner" ? "Owner" : board.role === "editor" ? "Editor" : "Viewer"}</span>
+                  <span className="text-xs text-muted-foreground">{board.role === "owner" ? t("Owner") : board.role === "editor" ? t("Editor") : t("Viewer")}</span>
                 </button>
               ))}
             </section>
           )}
           <form onSubmit={(event) => void createBoard(event)} className="flex flex-col gap-3">
-            <label htmlFor="jazz-board-title" className="font-medium">Create a board</label>
+            <label htmlFor="jazz-board-title" className="font-medium">{t("Create a board")}</label>
             <input id="jazz-board-title" className="rounded-lg border bg-background px-3 py-3"
               value={title} maxLength={80} onChange={(event) => setTitle(event.target.value)} />
             <button type="submit" disabled={busy || !title.trim()}
               className="rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground disabled:opacity-50">
-              {busy ? "Creating…" : "Create board"}
+              {busy ? t("Creating…") : t("Create board")}
             </button>
           </form>
           <form onSubmit={(event) => { event.preventDefault(); openBoard(boardId.trim()) }}
             className="flex flex-col gap-2">
-            <label htmlFor="jazz-board-id" className="text-sm font-medium">Open by board ID</label>
+            <label htmlFor="jazz-board-id" className="text-sm font-medium">{t("Open by board ID")}</label>
             <input id="jazz-board-id" className="rounded-lg border bg-background px-3 py-3"
-              value={boardId} placeholder="Board UUID" onChange={(event) => setBoardId(event.target.value)} />
-            <button type="submit" className="rounded-lg border px-4 py-3 font-medium">Open board</button>
+              value={boardId} placeholder={t("Board UUID")} onChange={(event) => setBoardId(event.target.value)} />
+            <button type="submit" className="rounded-lg border px-4 py-3 font-medium">{t("Open board")}</button>
           </form>
         </>
       )}

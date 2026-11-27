@@ -126,7 +126,7 @@ async function authorize(account,board,scope,label){
   await page.goto(auth.href,{waitUntil:"domcontentloaded"});
   await expect(page).toHaveURL(url=>url.origin===origin&&url.searchParams.get("client_id")===client_id&&["/signin","/patchboard-private/oauth-consent"].includes(url.pathname));
   if(new URL(page.url()).pathname==="/signin")await page.getByRole("button",{name:"Sign in with passkey",exact:true}).click();
-  await expect(page.getByRole("heading",{name:"Authorize a Dim0 connection",exact:true})).toBeVisible(options);
+  await expect(page.getByRole("heading",{name:"Authorize a SashAI connection",exact:true})).toBeVisible(options);
   if(scope.includes("table:create"))await expect(page.getByText("table:create",{exact:true})).toBeVisible(options);
   await page.getByLabel("Approved board").selectOption(board);
   await page.getByRole("button",{name:"Authorize selected board"}).click();

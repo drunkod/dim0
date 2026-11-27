@@ -76,7 +76,7 @@ export const auth = betterAuth({
     // Preserve the official runtime plugin; do not weaken token verification.
     passkey({
       rpID: new URL(config.origin).hostname,
-      rpName: process.env.PATCHBOARD_PRIVATE_DIM0_ONLY === "1" ? "Dim0" : "Patchboard",
+      rpName: process.env.PATCHBOARD_PRIVATE_DIM0_ONLY === "1" ? "SashAI" : "Patchboard",
       origin: config.origin,
       authenticatorSelection: {
         residentKey: "required",
