@@ -2,7 +2,7 @@
   "$schema": "https://jazz.tools/schemas/jazz.permissions.v1.json",
   "$generated": {
     "by": "jazz-tools generate from schema.ts — edit the TypeScript, not this file",
-    "sha256": "d1dbadbf036f750579776e4e27f64b9a0a0200f5d4a21d03ed143c1780608f87"
+    "sha256": "7dd785580edb8f505bbe20356a3d962f7a5cfed1f4b09e64b13041bce4aeade4"
   },
   "tables": {
     "agentRuns": {
@@ -62,6 +62,12 @@
       "insert": "exists boards(id = this.boardId, ownerId = session.user)",
       "update": "false",
       "delete": "exists boards(id = this.boardId, ownerId = session.user)"
+    },
+    "boardMemberRoleReceipts": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
     },
     "boardMembers": {
       "read": {

@@ -24,6 +24,12 @@
       "update": "false",
       "delete": "false"
     },
+    "boardMemberRoleReceipts": {
+      "read": "false",
+      "insert": "false",
+      "update": "false",
+      "delete": "false"
+    },
     "boardMembers": {
       "read": {
         "anyOf": [

@@ -10,7 +10,8 @@
     "./registry": "./src/registry.ts",
     "./pending": "./src/pending/index.ts",
     "./ports": "./src/ports.ts",
-    "./profile": "./src/profile.ts"
+    "./profile": "./src/profile.ts",
+    "./native-board-member": "./src/native-board-member.ts"
   },
   "scripts": {
     "generate": "python3 scripts/generate_acc.py",

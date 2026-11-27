@@ -8,6 +8,9 @@ import { privateAuthDatabase } from "./private-auth/db.ts";
 import { memberDisplayNames, tryRememberJazzMemberIdentity } from "./private-auth/member-directory.ts";
 import { listPrivateBoards } from "./private-auth/grants.ts";
 import { privateAccountProfileRequest } from "./account-adapters/profile-routes.ts";
+import { changeNativeBoardMemberRole } from "./account-adapters/board-member-role.ts";
+import { claimBearerInvitation } from "./account-adapters/bearer-invitation-claim.ts";
+import { BoardRoleChangeError } from "@patchboard/account-domain/native-board-member";
 import {
   canvasEntityIdPattern, canvasBoardRole, listCanvasEntities, getCanvasEntity, createCanvasEntity,
   updateCanvasEntity, deleteCanvasEntity,
@@ -178,14 +181,46 @@ export async function privateBoardRequest(
       const board = await db.one(app.boards.where({ id: boardId }));
       if (!board || board.ownerId !== accountId) return json({ error: "Only owner may manage members" }, 403);
       const rows = await db.all(app.boardMembers.where({ boardId }).limit(200));
-      const members = [{ id: board.ownerId, role: "owner" },
-        ...rows.map((row) => ({ id: row.userId, role: row.role }))];
+      const members = [{ id: board.ownerId, role: "owner", role_version: null },
+        ...rows.map((row) => ({ id: row.userId, role: row.role,
+          role_version: row.roleVersion }))];
       // Server-side owner-only join, scoped strictly to existing Jazz grants.
       // No arbitrary user-profile lookup or email address is exposed.
       const names = memberDisplayNames(privateAuthDatabase(), members.map((member) => member.id));
       return json({ members: members.map((member) => ({
         ...member, name: names.get(member.id) ?? null,
       })) });
+    }
+    if (pathname === "/patchboard-private/api/members/role" && request.method === "POST") {
+      const parsed = z.object({
+        board_id: boardIdSchema, user_id: boardIdSchema,
+        role: z.enum(["editor", "viewer"]),
+        expected_version: z.number().int().positive(),
+        request_id: requestSchema,
+      }).strict().parse(await safeJson(request));
+      // Existing route has already obtained a VERIFIED Better Auth session
+      // and original server.jazz.createAccountFor(subject) Jazz actor.
+      try {
+        const result = await changeNativeBoardMemberRole(db, accountId, {
+          boardId: parsed.board_id, memberId: parsed.user_id,
+          assignedRole: parsed.role,
+          expectedVersion: parsed.expected_version,
+          requestId: parsed.request_id,
+        });
+        return json({
+          user_id: result.memberId, previous_role: result.previousRole,
+          assigned_role: result.assignedRole,
+          role_version: result.membershipVersion,
+          changed: result.changed, receipt_id: result.receiptId,
+        });
+      } catch (error) {
+        if (error instanceof BoardRoleChangeError) {
+          return json({ error: error.code },
+            error.code === "FORBIDDEN" ? 403 :
+            error.code === "MEMBER_NOT_FOUND" ? 404 : 409);
+        }
+        throw error;
+      }
     }
     if (pathname === "/patchboard-private/api/members/remove" && request.method === "POST") {
       const parsed = z.object({ board_id: boardIdSchema, user_id: boardIdSchema })
@@ -209,35 +244,9 @@ export async function privateBoardRequest(
       }).strict().parse(await safeJson(request));
       const digest = createHash("sha256").update(parsed.token).digest("hex");
       try {
-        const write = await db.serializableTransaction(async (tx) => {
-          const invite = await tx.one(app.boardInvites.where({
-            boardId: parsed.board_id, token: digest,
-          }));
-          if (!invite || (invite.expiresAtEpochMs !== null &&
-              invite.expiresAtEpochMs < Date.now()) ||
-              (invite.intendedUserId && invite.intendedUserId !== accountId)) {
-            throw new Error("INVITE_INVALID");
-          }
-          const existing = await tx.one(app.boardMembers.where({
-            boardId: parsed.board_id, userId: accountId,
-          }));
-          if (existing && invite.singleUse) throw new Error("INVITE_INVALID");
-          const board = await tx.one(app.boards.where({ id: parsed.board_id }));
-          if (!board) throw new Error("INVITE_INVALID");
-          if (existing) {
-            // Original Dim0 invitation semantics: upgrade-only, never downgrade.
-            if (existing.role === "viewer" && invite.role === "editor") {
-              tx.update(app.boardMembers, existing.id, { role: "editor" });
-            }
-          } else if (board.ownerId !== accountId) {
-            tx.insert(app.boardMembers, {
-              boardId: parsed.board_id, userId: accountId, role: invite.role,
-            }, { id: randomUUID() });
-          }
-          if (invite.singleUse) tx.delete(app.boardInvites, invite.id);
-          return { role: invite.role };
-        });
-        await write.wait({ timeoutMs: 10000 });
+        // The server-only claim command shares one authoritative transaction
+        // with the owner-role CAS contract and is exercised by its own tests.
+        await claimBearerInvitation(db, parsed.board_id, digest, accountId);
         return json({ joined: true, board_id: parsed.board_id }, 200);
       } catch (error) {
         if (String(error).includes("INVITE_INVALID")) return json({ error: "Invite invalid, used or expired" }, 404);
