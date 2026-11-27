@@ -1,33 +1,42 @@
 #!/usr/bin/env python3
 """Generate the desktop OAuth loopback success/error pages.
 
-Emits two self-contained HTML files (inline CSS + base64-embedded Atkinson
-Hyperlegible Next, the app's UI sans) into src-tauri/src/, so the Rust loopback
+Emits two self-contained HTML files (inline CSS + base64-embedded Noto Sans,
+the app's UI sans) into src-tauri/src/, so the Rust loopback
 server can `include_str!` them. Theme-aware via prefers-color-scheme; colors are
 copied from the app's design tokens (index.css)."""
 
 import base64
 import pathlib
+import re
 
 # Anchor to the webui root via this script's location (…/webui/src-tauri/scripts/),
 # not the process CWD, so it regenerates identically from anywhere.
 WEBUI_ROOT = pathlib.Path(__file__).resolve().parents[2]
-FONT_DIR = WEBUI_ROOT / "node_modules/@fontsource/atkinson-hyperlegible-next/files"
+FONT_DIR = WEBUI_ROOT / "node_modules/@fontsource/noto-sans"
 OUT_DIR = WEBUI_ROOT / "src-tauri/src"
 
 
-def b64(name: str) -> str:
-    return base64.b64encode((FONT_DIR / name).read_bytes()).decode("ascii")
+def embedded_fonts() -> str:
+    """Embed the package's Latin and Cyrillic faces, retaining unicode ranges."""
+    faces = []
+    for weight in (400, 700):
+        css = (FONT_DIR / f"{weight}.css").read_text()
+        for subset in ("cyrillic-ext", "cyrillic", "latin-ext", "latin"):
+            name = f"noto-sans-{subset}-{weight}-normal"
+            match = re.search(r"/\* " + re.escape(name) + r" \*/\s*(@font-face\s*\{[^}]+\})", css)
+            if match is None:
+                raise ValueError(f"Missing font face: {name}")
+            face = match.group(1)
+            data = base64.b64encode((FONT_DIR / "files" / f"{name}.woff2").read_bytes()).decode("ascii")
+            face = re.sub(r"src:[^;]+;", lambda _: f"src: url(data:font/woff2;base64,{data}) format('woff2');", face)
+            if "unicode-range:" not in face:
+                raise ValueError(f"Missing unicode range: {name}")
+            faces.append(face)
+    return "\n".join(faces)
 
 
-FONT_400 = b64("atkinson-hyperlegible-next-latin-400-normal.woff2")
-FONT_700 = b64("atkinson-hyperlegible-next-latin-700-normal.woff2")
-
-
-FONT_FACE = f"""
-@font-face{{font-family:'Atkinson Hyperlegible Next';font-style:normal;font-weight:400;font-display:swap;src:url(data:font/woff2;base64,{FONT_400}) format('woff2')}}
-@font-face{{font-family:'Atkinson Hyperlegible Next';font-style:normal;font-weight:700;font-display:swap;src:url(data:font/woff2;base64,{FONT_700}) format('woff2')}}
-"""
+FONT_FACE = embedded_fonts()
 
 
 # App design tokens for the "noir" theme (webui/src/index.css [data-theme="noir"]
@@ -50,7 +59,7 @@ BASE_CSS = """
 }}
 html,body{height:100%}
 body{
-  font-family:'Atkinson Hyperlegible Next',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  font-family:'Noto Sans',system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
   background:var(--bg);color:var(--fg);
   display:flex;align-items:center;justify-content:center;padding:24px;
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;

@@ -108,9 +108,9 @@
    ============================================================ */
 
 :root {
-  /* UI chrome — Atkinson Hyperlegible Next (Braille Institute, legibility-optimized) */
-  --font-sans: 'Atkinson Hyperlegible Next', system-ui, -apple-system, BlinkMacSystemFont,
-    'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', ui-sans-serif, sans-serif,
+  /* UI chrome — Noto Sans covers both Latin and Cyrillic in one family. */
+  --font-sans: 'Noto Sans', system-ui, -apple-system, BlinkMacSystemFont,
+    'Segoe UI', Roboto, 'Helvetica Neue', Arial, ui-sans-serif, sans-serif,
     'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
   --font-serif: 'Lora', ui-serif, Georgia, Cambria, 'Times New Roman', Times, serif;
   --font-mono: 'Inconsolata', ui-monospace, SFMono-Regular,
