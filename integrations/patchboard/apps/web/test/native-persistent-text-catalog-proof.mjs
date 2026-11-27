@@ -1,6 +1,9 @@
 /** Persistent HTTPS Owner catalog rehearsal: normal private origin, non-temp store, no QA flags. */
 import assert from "node:assert/strict";
-import {randomUUID} from "node:crypto";
+import {randomUUID,randomBytes,createHash} from "node:crypto";
+import {DatabaseSync} from "node:sqlite";
+import {Client} from "@modelcontextprotocol/sdk/client/index.js";
+import {StreamableHTTPClientTransport,StreamableHTTPError} from "@modelcontextprotocol/sdk/client/streamableHttp.js";
 import {readFile} from "node:fs/promises";
 import {execFileSync} from "node:child_process";
 import {createServer as createHttpsServer} from "node:https";
@@ -17,6 +20,7 @@ import {app} from "@patchboard/jazz-schema";
 import permissions from "@patchboard/jazz-schema/private.permissions.json" with {type:"json"};
 import {chromium,expect} from "@playwright/test";
 
+const persistentMcp=process.argv.includes("--persistent-mcp");
 const filteredSharing=process.argv.includes("--filtered-sharing");
 const patchboard=resolve(fileURLToPath(new URL("../../../",import.meta.url)));
 const webui=resolve(patchboard,"../../webui");
@@ -54,7 +58,7 @@ const tls=createHttpsServer({key:await readFile(key),cert:await readFile(cert)},
 await new Promise((yes,no)=>tls.once("error",no).listen(tlsPort,"127.0.0.1",yes));
 const env=Object.fromEntries(Object.entries(process.env).filter(([k])=>!/^(PATCHBOARD_|DIM0_|BETTER_AUTH_|VITE_|JAZZ_|DATABASE_URL$|APP_PORT$|PORT$)/.test(k)));
 Object.assign(env,{CI:"1",PATCHBOARD_PRIVATE_ROOT:root,PATCHBOARD_PRIVATE_DEV:"0",PATCHBOARD_PRIVATE_ORIGIN:origin,
-  PATCHBOARD_PRIVATE_PORT:String(backendPort),PATCHBOARD_OAUTH_CI_RESTART:"0",PATCHBOARD_QA_TYPED_RECORD:"0",PATCHBOARD_QA_HTTPS_TEXT_TABLE:"0",PATCHBOARD_PERSISTENT_TEXT_CATALOG:"0",PATCHBOARD_PERSISTENT_FILTERED_SHARING:"0",PATCHBOARD_ACC051_INFLIGHT_QA:"0",
+  PATCHBOARD_PRIVATE_PORT:String(backendPort),PATCHBOARD_OAUTH_CI_RESTART:"0",PATCHBOARD_QA_TYPED_RECORD:"0",PATCHBOARD_QA_HTTPS_TEXT_TABLE:"0",PATCHBOARD_PERSISTENT_TEXT_CATALOG:"0",PATCHBOARD_PERSISTENT_FILTERED_SHARING:"0",PATCHBOARD_PERSISTENT_MCP_TABLE_CREATE:"0",PATCHBOARD_ACC051_INFLIGHT_QA:"0",
   PATCHBOARD_PRIVATE_DIM0_ONLY:"1",VITE_DIM0_JAZZ_CANVAS:"1",VITE_DIM0_QA_NATIVE_SAVED_VIEW:"0",VITE_DIM0_QA_NATIVE_CATALOG_READONLY:"0",VITE_DIM0_PERSISTENT_TEXT_CATALOG:"1",VITE_DIM0_PERSISTENT_FILTERED_SHARING:"0",DIM0_JAZZ_PUBLIC_HOST:hostname,APP_PORT:String(uiPort),NODE_EXTRA_CA_CERTS:cert});
 const jobs=[];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
@@ -78,7 +82,7 @@ async function ready(job,url){
     await sleep(250);
   }throw Error("QA service not ready");
 }
-let backend,frontend,browser,backendMode="0",sharingMode="0";
+let backend,frontend,browser,backendMode="0",sharingMode="0",mcpMode="0";
 const vite=join(webui,"node_modules/.bin/vite");
 const options={timeout:30000};
 function rawBackend(path,requestHost){
@@ -88,9 +92,9 @@ function rawBackend(path,requestHost){
     });req.on("error",no);req.setTimeout(2000,()=>req.destroy(Error("Timeout")));req.end();
   });
 }
-async function startBackend(enabled=backendMode,sharing=sharingMode){
-  backendMode=enabled;sharingMode=sharing;
-  backend=launch("pnpm",["--filter","@patchboard/server","exec","tsx","src/private-demo.ts"],patchboard,{PATCHBOARD_PERSISTENT_TEXT_CATALOG:enabled,PATCHBOARD_PERSISTENT_FILTERED_SHARING:sharing});
+async function startBackend(enabled=backendMode,sharing=sharingMode,mcp=mcpMode){
+  backendMode=enabled;sharingMode=sharing;mcpMode=mcp;
+  backend=launch("pnpm",["--filter","@patchboard/server","exec","tsx","src/private-demo.ts"],patchboard,{PATCHBOARD_PERSISTENT_TEXT_CATALOG:enabled,PATCHBOARD_PERSISTENT_FILTERED_SHARING:sharing,PATCHBOARD_PERSISTENT_MCP_TABLE_CREATE:mcp});
   for(let i=0;i<160;i++){
     assert.equal(backend.child.exitCode,null,"QA backend exited");
     try{if((await rawBackend("/health",host)).status===200)return;}catch{}
@@ -374,6 +378,182 @@ async function runFilteredSharing(board,owner,recipient){
   console.log("PERSISTENT_FILTERED_SHARING_PASS",JSON.stringify({datasetId:dataset,fieldId:title,viewId:view,shareId:issued.shareId,counts:counts(before),activeAfterRestart:true,revokedNextFetch:403,ownerRetained:3,off}));
 }
 
+const mcpURL=origin+"/patchboard-private-mcp",callback="http://127.0.0.1:7432/callback";
+const args=(board,requestId=randomUUID(),name="Persistent MCP rehearsal")=>({operation:"dataset.create.v1",input:{
+  board_id:board,request_id:requestId,name,primary_field_name:"Title",default_view_name:"All rows"}});
+const clientList=[];
+async function authorize(account,board,scope,label){
+  const meta=await fetch(origin+"/.well-known/oauth-authorization-server/patchboard-auth");
+  assert.equal(meta.status,200);const metadata=await meta.json();
+  for(const key of ["registration_endpoint","authorization_endpoint","token_endpoint"])assert.equal(new URL(metadata[key]).origin,origin);
+  const reg=await fetch(metadata.registration_endpoint,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({
+    client_name:label,application_type:"native",redirect_uris:[callback],token_endpoint_auth_method:"none",
+    grant_types:["authorization_code"],response_types:["code"],scope
+  })});
+  assert.equal(reg.status,201);const {client_id}=await reg.json();
+  const verifier=randomBytes(32).toString("base64url"),state=randomUUID();
+  const auth=new URL(metadata.authorization_endpoint);
+  for(const [k,v] of Object.entries({client_id,response_type:"code",redirect_uri:callback,code_challenge:createHash("sha256").update(verifier).digest("base64url"),code_challenge_method:"S256",state,scope,resource:mcpURL}))auth.searchParams.set(k,v);
+  const page=account.page;
+  await page.route(callback+"**",route=>route.fulfill({status:200,body:"Local callback"}));
+  await page.goto(auth.href,{waitUntil:"domcontentloaded"});
+  await expect(page).toHaveURL(url=>url.origin===origin&&url.searchParams.get("client_id")===client_id&&["/signin","/patchboard-private/oauth-consent"].includes(url.pathname));
+  if(new URL(page.url()).pathname==="/signin")await page.getByRole("button",{name:"Sign in with passkey",exact:true}).click();
+  await expect(page.getByRole("heading",{name:"Authorize a Dim0 connection",exact:true})).toBeVisible(options);
+  if(scope.includes("table:create"))await expect(page.getByText("table:create",{exact:true})).toBeVisible(options);
+  await page.getByLabel("Approved board").selectOption(board);
+  if(label==="Persistent scoped MCP")await page.screenshot({path:join(evidence,"sdk-consent.png")});
+  await page.getByRole("button",{name:"Authorize selected board"}).click();
+  await page.waitForURL(url=>url.origin==="http://127.0.0.1:7432"&&url.searchParams.get("state")===state,{timeout:15000});
+  const code=new URL(page.url()).searchParams.get("code");assert.ok(code);
+  const token=await fetch(metadata.token_endpoint,{method:"POST",headers:{"content-type":"application/x-www-form-urlencoded"},body:new URLSearchParams({grant_type:"authorization_code",code,client_id,redirect_uri:callback,code_verifier:verifier,resource:mcpURL})});
+  assert.equal(token.status,200);const {access_token}=await token.json();assert.ok(access_token);
+  await page.goto(origin+"/settings");
+  const grant=(await api(page,"account/connected-apps")).body.grants.find(g=>g.clientId===client_id&&g.boardId===board);
+  assert.ok(grant);assert.equal(grant.grantVersion,1);
+  const sql=new DatabaseSync(join(root,"auth","better-auth.sqlite"),{readOnly:true});
+  try{
+    const rows=sql.prepare("SELECT scopes FROM oauthConsent WHERE userId=? AND clientId=? AND referenceId=?").all(account.identity.id,client_id,grant.id);
+    assert.equal(rows.length,1);
+    assert.deepEqual(JSON.parse(rows[0].scopes).sort(),scope.split(" ").sort());
+  }finally{sql.close();}
+  return {token:access_token,board,clientId:client_id,grant};
+}
+async function connect(g){
+  const c=new Client({name:"native-mcp-catalog-proof",version:"1"});
+  clientList.push(c);
+  await c.connect(new StreamableHTTPClientTransport(new URL(mcpURL),{requestInit:{headers:{Authorization:"Bearer "+g.token}}}));
+  return c;
+}
+const listed=async c=>(await c.listTools()).tools.some(t=>t.name==="call-api-write");
+const invoke=(c,input)=>c.callTool({name:"call-api-write",arguments:input});
+function success(reply){assert.equal(reply.rejected,undefined);assert.equal(reply.isError,undefined);return JSON.parse(reply.content[0].text);}
+function denied(reply,code){assert.equal(reply.isError,true);if(code)assert.equal(reply.content[0].text,code);}
+const views=async(page,board)=>(await api(page,"records/views?board_id="+board));
+async function nativeRead(page,board,created){
+  await page.goto(origin+"/boards/"+board);
+  await page.getByRole("button",{name:"Open board Data"}).click();
+  const data=page.getByRole("region",{name:"Board Data"});
+  await expect(data.getByRole("heading",{name:"Persistent MCP rehearsal",exact:true})).toBeVisible(options);
+  await data.getByRole("button",{name:"Open saved view All rows",exact:true}).click();
+  const t=grid(page);await expect(t).toBeVisible(options);
+  await expect(t).toHaveAttribute("data-dataset-id",created.datasetId);
+  await expect(t).toHaveAttribute("data-view-id",created.defaultViewId);
+  await expect(t.getByRole("columnheader",{name:"Title",exact:true})).toHaveAttribute("data-field-id",created.fieldId);
+  await expect(data.getByText("0 matching records",{exact:true})).toBeVisible(options);
+  const v=await views(page,board);assert.equal(v.status,200);assert.equal(v.body.views.length,1);
+  assert.deepEqual({datasetId:v.body.views[0].datasetId,fieldId:v.body.views[0].fields[0].id,defaultViewId:v.body.views[0].viewId},
+    {datasetId:created.datasetId,fieldId:created.fieldId,defaultViewId:created.defaultViewId});
+  return {datasetId:await t.getAttribute("data-dataset-id"),defaultViewId:await t.getAttribute("data-view-id"),fieldId:await t.getByRole("columnheader").getAttribute("data-field-id")};
+}
+
+
+async function runPersistentMcp(board,owner,other){
+  const op=owner.page,np=other.page;
+  const metadata=async()=>(await (await fetch(origin+"/.well-known/oauth-authorization-server/patchboard-auth")).json());
+  const checkScopes=async enabled=>assert.equal((await metadata()).scopes_supported.includes("table:create"),enabled);
+  const expected={...zero,typedDatasets:1,typedFields:1,typedViews:1,typedCatalogReceipts:1,typedCatalogEvents:1};
+  const switchProfile=async mcp=>{
+    await op.goto("about:blank");await np.goto("about:blank");
+    await stop(backend);await startBackend("1","0",mcp);
+    await op.goto(origin+"/boards");await np.goto(origin+"/boards");
+  };
+  const grantState=id=>{
+    const sql=new DatabaseSync(join(root,"auth","better-auth.sqlite"),{readOnly:true});
+    try{
+      const g=sql.prepare("SELECT grant_version,revoked_at_ms FROM patchboard_oauth_grant WHERE id=?").get(id);
+      return {version:g.grant_version,revoked:g.revoked_at_ms!==null,
+        leases:sql.prepare("SELECT count(*) n FROM patchboard_mcp_write_lease WHERE grant_id=?").get(id).n,
+        pending:!!sql.prepare("SELECT 1 FROM patchboard_grant_disconnect_pending WHERE grant_id=?").get(id)};
+    }finally{sql.close();}
+  };
+  stage="catalog-only profile and old grant";
+  await switchProfile("0");await checkScopes(false);
+  const old=await authorize(owner,board,"board:read board:write","Persistent old scope");
+  const oldClient=await connect(old);assert.equal(await listed(oldClient),false);
+  denied(await invoke(oldClient,args(board)));
+  assert.deepEqual(counts(await snapshot(board,op)),zero);
+  stage="persistent MCP opt-in; old grant still lacks scope";
+  await switchProfile("1");await checkScopes(true);
+  const unauth=await fetch(mcpURL,{method:"POST",headers:{"content-type":"application/json",Accept:"application/json, text/event-stream"},body:JSON.stringify({jsonrpc:"2.0",id:1,method:"tools/list"})});
+  assert.equal(unauth.status,401);
+  assert.match(unauth.headers.get("www-authenticate")??"",/table:create/);
+  await unauth.body?.cancel();
+  assert.equal(await listed(oldClient),false);
+  denied(await invoke(oldClient,args(board)));
+  const missing=await authorize(owner,board,"board:read table:create","Persistent missing write");
+  const missingClient=await connect(missing);assert.equal(await listed(missingClient),false);
+  denied(await invoke(missingClient,args(board)));
+  assert.deepEqual(counts(await snapshot(board,op)),zero);
+  stage="current Viewer denied on same board";
+  const scope="board:read board:write table:create";
+  await op.goto(origin+"/boards");await np.goto(origin+"/boards");
+  const invite=await api(op,"invite",{board_id:board,role:"viewer"});assert.equal(invite.status,201);
+  const joined=await api(np,"join",{board_id:board,token:new URL(invite.body.invite_url).searchParams.get("invite")});assert.equal(joined.status,200);
+  const viewer=await authorize(other,board,scope,"Persistent Viewer");
+  const viewerClient=await connect(viewer);assert.equal(await listed(viewerClient),false);
+  denied(await invoke(viewerClient,args(board)));
+  assert.deepEqual(counts(await snapshot(board,op)),zero);
+  stage="native Owner explicit consent and scoped SDK create";
+  const consent=await authorize(owner,board,scope,"Persistent scoped MCP");
+  const client=await connect(consent);
+  const tools=(await client.listTools()).tools.map(t=>t.name);
+  assert.ok(tools.includes("call-api-write"));
+  assert.ok(!tools.includes("patch_typed_record")&&!tools.includes("read_typed_view"));
+  denied(await invoke(client,args(randomUUID())),"BOARD_ACCESS_DENIED");
+  const command=args(board);
+  denied(await invoke(client,{...command,operation:"dataset.delete.v1"}));
+  denied(await invoke(client,{...command,input:{...command.input,actor_id:owner.identity.accountId}}));
+  assert.deepEqual(counts(await snapshot(board,op)),zero);
+  const created=success(await invoke(client,command));assert.equal(created.replayed,false);
+  const replay=success(await invoke(client,command));assert.deepEqual(replay,{...created,replayed:true});
+  denied(await invoke(client,{...command,input:{...command.input,name:"Conflicting name"}}),"CATALOG_REQUEST_ID_CONFLICT");
+  assert.deepEqual(grantState(consent.grant.id),{version:1,revoked:false,leases:0,pending:false});
+  const native=await nativeRead(op,board,created);
+  await op.screenshot({path:join(evidence,"native-grid.png")});
+  const stored=await snapshot(board,op);
+  assert.deepEqual(counts(stored),expected);
+  const receipt=stored.typedCatalogReceipts[0],event=stored.typedCatalogEvents[0];
+  assert.equal(receipt.actorId,owner.identity.accountId);assert.equal(receipt.requestId,command.input.request_id);
+  assert.equal(receipt.id,created.receiptId);assert.equal(event.id,created.eventId);assert.equal(event.receiptId,receipt.id);
+  assert.equal(stored.typedDatasets[0].id,created.datasetId);assert.equal(stored.typedFields[0].id,created.fieldId);assert.equal(stored.typedViews[0].id,created.defaultViewId);
+  stage="restart readback and original SDK replay";
+  const again=success(await invoke(client,command));assert.deepEqual(again,replay);
+  const afterRestart=await nativeRead(op,board,created);assert.deepEqual(afterRestart,native);
+  await op.screenshot({path:join(evidence,"native-grid-after-restart.png")});
+  stage="disable MCP alone with original grant still live";
+  await switchProfile("0");await checkScopes(false);
+  assert.equal(await listed(client),false);denied(await invoke(client,args(board)));
+  assert.deepEqual(await nativeRead(op,board,created),native);
+  assert.deepEqual(await snapshot(board,op),stored);
+  stage="re-enable and disconnect exact native Settings grant";
+  await switchProfile("1");await checkScopes(true);
+  assert.equal(await listed(client),true);
+  await op.goto(origin+"/settings");
+  const settings=op.getByRole("listitem").filter({hasText:"Client "+consent.clientId});
+  await expect(settings.getByRole("button",{name:"Disconnect",exact:true})).toBeEnabled(options);
+  op.once("dialog",dialog=>dialog.accept());
+  const disconnectResponse=op.waitForResponse(r=>r.url().endsWith("/account/connected-apps/revoke")&&r.request().method()==="POST");
+  await settings.getByRole("button",{name:"Disconnect",exact:true}).click();
+  await expect(settings.getByRole("button",{name:"Disconnected",exact:true})).toBeDisabled(options);
+  const disconnected=await disconnectResponse;assert.equal(disconnected.status(),200);
+  assert.deepEqual(grantState(consent.grant.id),{version:2,revoked:true,leases:0,pending:false});
+  const fresh=args(board,randomUUID(),"Must not create after disconnect");
+  await assert.rejects(()=>invoke(client,fresh),error=>error instanceof StreamableHTTPError&&error.code===401);
+  const independent=success(await oldClient.callTool({name:"read_board",arguments:{board_id:board}}));assert.equal(independent.board_id,board);
+  assert.deepEqual(await snapshot(board,op),stored);
+  assert.deepEqual(await nativeRead(op,board,created),native);
+  assert.equal((await api(op,"me")).body.accountId,owner.identity.accountId);
+  // Same revoked grant after another restart: still a real HTTP 401.
+  await assert.rejects(()=>invoke(client,args(board)),error=>error instanceof StreamableHTTPError&&error.code===401);
+  await save("persistent-mcp-table-create-trace",{profile:"persistent HTTPS local fixture",qaFlags:false,sharing:false,
+    initial:zero,oldGrantDenied:true,missingWriteDenied:true,viewerDenied:true,wrongBoardDenied:true,unsupportedOperationDenied:true,
+    consentedScopes:scope.split(" "),discovery:tools,created,replay,native,afterRestart,identicalRetry:true,writerPreserved:true,
+    offDiscoveryAbsent:true,offCachedDenied:true,disconnectStatus:200,postDisconnectHttp:401,postRestartDisconnectHttp:401,
+    grant:grantState(consent.grant.id),independentClientUsable:true,postDisconnectCounts:counts(stored),unchanged:true,installedClientTested:false});
+  console.log("PERSISTENT_MCP_TABLE_CREATE_PASS",JSON.stringify({created,replay,native,afterRestart,disconnectStatus:200,postDisconnectHttp:401,counts:counts(stored)}));
+}
+
 let stage="startup";
 try{
   await execute("pnpm",["auth:migrate:private"],patchboard);
@@ -394,7 +574,9 @@ try{
   await expect(op.getByRole("button",{name:"Open board Data"})).toHaveCount(0);
   assert.deepEqual(counts(await snapshot(board,op)),zero);
 
-  if(filteredSharing){
+  if(persistentMcp){
+    await runPersistentMcp(board,owner,other);
+  }else if(filteredSharing){
     await runFilteredSharing(board,owner,other);
   }else{
   stage="persistent profile create";
@@ -529,9 +711,10 @@ try{
   console.log("PERSISTENT_TEXT_CATALOG_PASS",JSON.stringify({datasetId:created.datasetId,fieldId:created.fieldId,viewId:created.defaultViewId,recordId:row.recordId,counts:counts(after),identicalRowRetry:true,replayed:replay.replayed,denied,unsupported,off}));
   }
 }catch(error){
-  console.error("PERSISTENT_TEXT_CATALOG_FAILURE",stage,error?.name??"Error");
+  console.error("PERSISTENT_TEXT_CATALOG_FAILURE",stage,error?.name??"Error",String(error?.message??"").split("\n")[0].replace(/https?:\/\/[^\s]+/g,"[URL]").replace(/[A-Za-z0-9_-]{43,}/g,"[REDACTED]"));
   process.exitCode=1;
 }finally{
+  for(const client of clientList)await client.close().catch(()=>{});
   await browser?.close().catch(()=>{});
   for(const job of jobs)await stop(job);
   await new Promise(resolve=>tls.close(resolve));

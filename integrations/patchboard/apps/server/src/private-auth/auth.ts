@@ -6,7 +6,7 @@ import { privateAuthConfig } from "./config.ts";
 import { privateAuthDatabase } from "./db.ts";
 import { consentGrantReference, tokenBoardGrantClaim } from "./grants.ts";
 import { typedRecordQaEnabled } from "../typed-record-qa-gate.ts";
-import {persistentTextCatalogEnabled,persistentFilteredSharingEnabled} from "../persistent-text-catalog.ts";
+import {persistentTextCatalogEnabled,persistentFilteredSharingEnabled,persistentMcpTableCreateEnabled} from "../persistent-text-catalog.ts";
 import {qaHttpsCatalogProfile} from "../qa-https-catalog-profile.ts";
 import { passkeyOnlyIdentitySchemaPlugin } from "./passkey-only-identity.ts";
 import { resolveRegistrationIntent } from "./enrollment.ts";
@@ -16,6 +16,7 @@ import { finalizeVerifiedPasskeyRegistration } from "./finalize-registration.ts"
 const httpsCatalog = qaHttpsCatalogProfile();
 persistentTextCatalogEnabled(); // Validate before privateAuthConfig creates any data.
 persistentFilteredSharingEnabled();
+const persistentMcpCatalog = persistentMcpTableCreateEnabled();
 const config = privateAuthConfig();
 // ChatGPT’s custom MCP connector currently requests board:read/write without
 // offline_access. Keep the production 15-minute default, but allow an explicit,
@@ -57,17 +58,16 @@ export const auth = betterAuth({
         tokenBoardGrantClaim(referenceId, user?.id),
       // offline_access permits a refresh token; the referenceId survives
       // rotation, so it cannot widen a consented single-board grant.
-      // Explicit opt-in QA action: source table|create -> Dim0 table:create.
-      // Never part of OAuth's default client scopes or production issuer.
+      // Explicit opt-in catalog action: never part of default client scopes.
       scopes: ["board:read", "board:write", "offline_access",
-        ...((typedRecordQaEnabled()||httpsCatalog) ? ["table:create"] : [])],
+        ...((typedRecordQaEnabled()||httpsCatalog||persistentMcpCatalog) ? ["table:create"] : [])],
       grantTypes: ["authorization_code", "refresh_token"],
       allowDynamicClientRegistration: true,
       allowUnauthenticatedClientRegistration: true,
       clientRegistrationRequirePKCE: true,
       clientRegistrationDefaultScopes: ["board:read", "board:write"],
       clientRegistrationAllowedScopes: ["offline_access",
-        ...((typedRecordQaEnabled()||httpsCatalog) ? ["table:create"] : [])],
+        ...((typedRecordQaEnabled()||httpsCatalog||persistentMcpCatalog) ? ["table:create"] : [])],
       accessTokenExpiresIn: accessTokenSeconds,
       refreshTokenExpiresIn: 604800,
     }) as unknown as import("better-auth").BetterAuthPlugin,

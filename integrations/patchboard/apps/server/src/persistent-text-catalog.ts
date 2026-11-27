@@ -36,3 +36,11 @@ export function persistentFilteredSharingEnabled(env:NodeJS.ProcessEnv=process.e
   if(!persistentTextCatalogEnabled(env))throw new Error("INVALID_PERSISTENT_FILTERED_SHARING_PROFILE");
   return true;
 }
+
+/** Explicitly opt into the one board-scoped MCP table creation operation.
+ * Independent of browser sharing, never a switch for the typed QA tools. */
+export function persistentMcpTableCreateEnabled(env:NodeJS.ProcessEnv=process.env):boolean{
+  if(env.PATCHBOARD_PERSISTENT_MCP_TABLE_CREATE!=="1")return false;
+  if(!persistentTextCatalogEnabled(env))throw new Error("INVALID_PERSISTENT_MCP_TABLE_CREATE_PROFILE");
+  return true;
+}

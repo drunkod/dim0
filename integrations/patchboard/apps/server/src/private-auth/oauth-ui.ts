@@ -26,7 +26,7 @@ export async function oauthConsentPage(
   const clientId = escapeHtml(url.searchParams.get("client_id") ?? "Unknown client");
   const requestedScopes = (url.searchParams.get("scope") ?? "").split(" ").filter(Boolean);
   const scopeList = requestedScopes.map(scope => scope==="table:create"
-    ? "<li><strong>table:create</strong> — Create a new primary-text table and default grid on the selected board (owner only, disposable QA). This is separate from board:write.</li>"
+    ? "<li><strong>table:create</strong> — Create a new primary-text table and default grid on the selected board (Owner only). Also requires board:write; no other catalog operation is granted.</li>"
     : "<li>" + escapeHtml(scope) + "</li>").join("");
   const catalogProfile=qaHttpsCatalogProfile();
   const boards = (await listPrivateBoards(db, await jazzAccountFor(session.user.id)))

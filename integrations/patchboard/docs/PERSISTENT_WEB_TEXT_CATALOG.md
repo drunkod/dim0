@@ -32,7 +32,7 @@ Back up the complete stopped root (auth, Jazz and blobs) before any upgrade.
 
 The text-catalog-only profile permits Owner table and row creation and Owner
 grid readback. 100-view/500-row bounds remain. Unrestricted typed records,
-typed patch and MCP table:create stay disabled in both persistent profiles.
+typed patch stay disabled; MCP table:create requires its own separate opt-in.
 No QA flag, grant or permissions artifact is repurposed. Feature-off keeps
 ordinary private boards/Share and does not delete persisted objects.
 
@@ -57,8 +57,8 @@ links and canonical records. Keep both Jazz and auth stores and the auth secret
 in the stopped-root backup.
 
 Only existing browser create, issue, list, revoke and query operations are
-newly enabled; definition revision remains QA-only, no persistent MCP typed
-tools or scope additions. This remains a bounded primary-text MVP with
+newly enabled; definition revision remains QA-only. The sharing flag does not
+add MCP tools or scopes. This remains a bounded primary-text MVP with
 100-view, 100-share-list and 500-row query limits, not an unbounded catalog
 engine. No schema or migration changes.
 
@@ -77,6 +77,39 @@ The real hidden-column fixture is covered separately by typed-shared-view.test.m
 Disable sharing alone and rebuild; table/row Data and ordinary board invites
 still work, share routes return 404, and the stored catalog is unchanged.
 No public endpoint or production data are used.
+
+## Optional persistent MCP table creation (#33)
+
+Set PATCHBOARD_PERSISTENT_MCP_TABLE_CREATE=1 with the validated persistent
+text-catalog backend profile. Default off. Independent of filtered sharing;
+no frontend flag beyond the text catalog is required. Invalid or QA-mixed
+profile fails startup. OAuth supports explicit table:create only when the
+profile permits it (or in existing QA); default registration scopes are
+unchanged. Existing board:write grants do not acquire this operation.
+Consent must include both board:write and table:create on the selected board;
+discovery and invocation require current Owner, the live grant and exact board.
+Only call-api-write / dataset.create.v1 is enabled, not generic API writes,
+typed patch or shared-view MCP read. The same authoritative createTextTable,
+stable request ID, receipt/event, and durable write reservation apply.
+Native Data reads the same objects. Disconnect uses the existing drain
+protocol and revokes the selected grant only. Unknown commit outcomes retain
+the reservation; the process-level reconciliation helper still requires
+verified writer exit. Production scheduling/fencing remains a release gate.
+
+Reproduce:
+```sh
+pnpm test:native:persistent-mcp-table-create
+```
+Actual native passkey/consent + MCP SDK over the isolated HTTPS fixture, one
+board and one non-temporary store, no QA flags. Check legacy grant, missing
+board:write, Viewer, wrong board, unsupported operation and actor override
+denials; create/replay/conflict; same native table and column IDs after restart;
+disable MCP alone with live grant; re-enable and disconnect from Settings;
+fresh SDK writes must return HTTP 401 even after restart, while the Owner
+retains access and an independent grant remains usable. The durable catalog
+contains one dataset, primary field, default grid, receipt and event, no rows.
+This is SDK acceptance, not a new installed ChatGPT-client rehearsal or a
+public deployment. Existing #28 installed-browser evidence is separate.
 
 ## Reproduce the first acceptance gate
 
@@ -115,11 +148,11 @@ submission rather than silently allocating a replacement request.
 The journal contains the pending definition or row text (not auth tokens or
 share credentials). It is tab/origin-scoped browser storage, not encrypted
 backup or a server outbox; tab closure, storage clearing, another browser or
-device are outside this guarantee. Non-idempotent QA saved-view creation
+device are outside this guarantee. Non-idempotent saved-view creation
 persists a review marker, never replays automatically, and remains locked until
 the list successfully refreshes and the Owner explicitly acknowledges review.
 This is a manual review boundary, not a saved-view idempotency receipt.
 
 This is a local staging-profile proof, not a public-hostname or persistent
-production deployment. Later #33 increments cover scoped MCP, then supported staging/production operation, branding and a
-combined journey. #24 upgrade remains separate.
+production deployment. Later #33 increments cover supported staging/production operation, branding
+and a combined journey. #24 upgrade remains separate.
