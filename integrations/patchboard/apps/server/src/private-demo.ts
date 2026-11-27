@@ -1,4 +1,5 @@
 import { join, resolve } from "node:path";
+import { setMaxListeners } from "node:events";
 import { writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { startBoardServer } from "./http-server.ts";
@@ -19,6 +20,9 @@ const jazzDataPath = join(config.root, "jazz");
 if (jazzDataPath === config.databasePath || jazzDataPath.includes("/patchboard-nov21/")) {
   throw new Error("Private Jazz and Better Auth stores must be separate from the guest demo");
 }
+// Own the lifetime of application read streams; Jazz drains its own sockets.
+const readStreams = new AbortController();
+setMaxListeners(0, readStreams.signal);
 const server = await startBoardServer({
   port: config.port,
   staticDir,
@@ -35,6 +39,10 @@ const server = await startBoardServer({
     };
   },
   extraHandler: (request, response, db) => {
+    if (readStreams.signal.aborted) {
+      response.writeHead(503, { "cache-control": "no-store", Connection: "close" }).end();
+      return true;
+    }
     if(httpsCatalog){
       // Reject a wrong Host, including the health and legacy entry routes.
       if(request.headers.host!==new URL(httpsCatalog.origin).host){
@@ -50,11 +58,11 @@ const server = await startBoardServer({
         response.writeHead(503,{"cache-control":"no-store"});response.end();return true;
       }
     }
-    return handlePrivateCanvasStream(request, response, db, (subject) => server.jazz.createAccountFor(subject)) ||
+    return handlePrivateCanvasStream(request, response, db, (subject) => server.jazz.createAccountFor(subject), readStreams.signal) ||
     handlePrivateAuth(request, response, db, (subject) => server.jazz.createAccountFor(subject),
       (received) => privateBoardRequest(received, db,
         (subject) => server.jazz.createAccountFor(subject)),
-    ) || handlePrivateMcp(request, response, db, (subject) => server.jazz.createAccountFor(subject));
+    ) || handlePrivateMcp(request, response, db, (subject) => server.jazz.createAccountFor(subject), readStreams.signal);
   },
 });
 // Test-only process identification, never enabled for public HTTPS.
@@ -73,12 +81,26 @@ console.log("PRIVATE_AUTH_READY", JSON.stringify({
   jazzStore: jazzDataPath,
   public: false,
 }));
-let closed = false;
-async function stop() {
-  if (closed) return;
-  closed = true;
-  await server.close();
-  closePrivateAuthDatabase();
+let stopping = false;
+function stop() {
+  if (stopping) return;
+  stopping = true;
+  // Passive reads must not hold server.close() open indefinitely. Never
+  // abort an admitted MCP POST (which can own a durable write lease).
+  readStreams.abort();
+  void (async () => {
+    await server.close();
+    closePrivateAuthDatabase();
+  })().then(() => {
+    process.stdout.write("PRIVATE_AUTH_STOPPED\n", () => process.exit(0));
+  }, (error: unknown) => {
+    console.error("PRIVATE_AUTH_STOP_FAILED", error instanceof Error ? error.name : "Unknown");
+    process.exit(1);
+  });
 }
-process.once("SIGINT", () => { void stop().then(() => process.exit()); });
-process.once("SIGTERM", () => { void stop().then(() => process.exit()); });
+// Jazz beta.5 drains on these signals and re-raises the signal if no other
+// listener remains. Keep our listeners until both HTTP and auth are closed;
+// once() would disappear while the asynchronous shutdown is still running.
+// Repeated signals must not exit early or start a second close.
+process.on("SIGINT", stop);
+process.on("SIGTERM", stop);

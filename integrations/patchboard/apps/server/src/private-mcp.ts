@@ -72,6 +72,7 @@ async function executePrivateMcp(
   grantedScopes: ReadonlySet<string>,
   grant: VerifiedBoardGrant,
   admission: GrantAdmission,
+  readShutdown?: AbortSignal,
 ) {
   // The transport can dispatch multiple/delayed callbacks for one HTTP
   // request. Guard EACH callback with the immutable server-minted SQL receipt.
@@ -471,13 +472,38 @@ async function executePrivateMcp(
     } catch (error) { return canvasFailure(error); }
   },undefined,{tool:"update_applet_state"}));
 
-  response.once("close", () => { void mcpServer.close().catch(() => {}); });
+  // This stateless transport is per HTTP request. A standalone GET stream
+  // cannot dispatch tool writes, but it can hold the Node listener open
+  // forever. Close only that stream on shutdown; leave POST responses to
+  // their ordinary completion/lease path.
+  const passiveShutdown = request.method === "GET" ? readShutdown : undefined;
+  const closePassiveStream = () => {
+    transport.closeStandaloneSSEStream();
+    // A shutdown during transport setup may precede the SSE headers.
+    // Cancel only this GET connection; do not race a second response.
+    if (!response.headersSent && !response.writableEnded) response.destroy();
+  };
+  response.once("close", () => {
+    passiveShutdown?.removeEventListener("abort", closePassiveStream);
+    void mcpServer.close().catch(() => {});
+  });
   try {
     await mcpServer.connect(transport as Transport);
+    if (passiveShutdown && (response.destroyed || response.writableEnded)) {
+      await mcpServer.close();
+      return;
+    }
+    if (passiveShutdown?.aborted) {
+      response.writeHead(503, { "cache-control": "no-store", Connection: "close" }).end();
+      return;
+    }
+    passiveShutdown?.addEventListener("abort", closePassiveStream, { once: true });
     await transport.handleRequest(request, response);
   } catch {
-    if (!response.headersSent) response.writeHead(500);
-    if (!response.writableEnded) response.end();
+    if (!response.destroyed) {
+      if (!response.headersSent) response.writeHead(500);
+      if (!response.writableEnded) response.end();
+    }
   }
 }
 
@@ -487,6 +513,7 @@ export function handlePrivateMcp(
   res: ServerResponse,
   db: Db,
   jazzAccountFor: (subject: string) => Promise<string>,
+  readShutdown?: AbortSignal,
 ): boolean {
   const url = new URL(req.url ?? "/", privateAuthConfig().origin);
   if (url.pathname !== "/patchboard-private-mcp") return false;
@@ -583,7 +610,7 @@ export function handlePrivateMcp(
       (await db.one(app.boards.where({id:profile.boardId})))?.ownerId!==actorId)){
       res.writeHead(401,{"cache-control":"no-store"});res.end();return;
     }
-    await executePrivateMcp(req, res, db, actorId, row.name, grantedScopes, grant, admission);
+    await executePrivateMcp(req, res, db, actorId, row.name, grantedScopes, grant, admission, readShutdown);
   })().catch(() => {
     if (!res.headersSent) res.writeHead(503, { "cache-control": "no-store" });
     if (!res.writableEnded) res.end();
