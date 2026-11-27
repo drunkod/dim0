@@ -1,7 +1,8 @@
+import { JazzLogoutButton } from "@/features/signin/components/jazz-logout-button"
 import { useEffect, useState, type FormEvent } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import {
-  createJazzAccount, currentJazzIdentity, signInToJazz, signOutOfJazz,
+  currentJazzIdentity,
   redeemPendingJazzInvitation, readPendingJazzInvitation, clearPendingJazzInvitation,
   continueJazzOAuth, type JazzIdentity,
 } from "./jazz-auth-client"
@@ -11,10 +12,10 @@ type Board = { board_id: string; title: string; role: string }
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 /**
- * The only login/dashboard for the experimental Jazz-powered Dim0.
+ * Board list and invitation recovery for signed-in members.
  * Does not load the old Patchboard application or legacy Dim0 SQL endpoints.
  */
-export function JazzSignInPage() {
+export function JazzBoardsPage() {
   const navigate = useNavigate()
   const [session, setSession] = useState<JazzIdentity | null | undefined>(undefined)
   const [boards, setBoards] = useState<Board[]>([])
@@ -56,6 +57,7 @@ export function JazzSignInPage() {
     let cancelled = false
     void currentJazzIdentity().then(async (identity) => {
       if (cancelled) return
+      if (!identity) { window.location.replace("/signin"); return }
       setSession(identity)
       if (identity) {
         try { await afterIdentity(identity) }
@@ -71,18 +73,6 @@ export function JazzSignInPage() {
     // The landing page handles changes by navigation, not by re-running effects.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
-
-  const authenticate = async (action: "create" | "login") => {
-    if (busy) return
-    setBusy(true)
-    setError("")
-    try {
-      const identity = action === "create" ? await createJazzAccount() : await signInToJazz()
-      await afterIdentity(identity)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Passkey sign-in failed")
-    } finally { setBusy(false) }
-  }
 
   const createBoard = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -104,18 +94,6 @@ export function JazzSignInPage() {
     } finally { setBusy(false) }
   }
 
-  const signOut = async () => {
-    setBusy(true)
-    try {
-      await signOutOfJazz()
-      setSession(null)
-      setBoards([])
-      setError("")
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "Could not sign out")
-    } finally { setBusy(false) }
-  }
-
   const retryInvite = async () => {
     if (!session || busy) return
     setBusy(true)
@@ -132,18 +110,14 @@ export function JazzSignInPage() {
     if (session) void loadBoards().catch((cause) => setError(String(cause)))
   }
 
-  const oauthLogin = new URLSearchParams(location.search).has("client_id")
-
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-5 px-6 py-10 text-foreground">
-      <div className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-        Dim0 · Jazz collaborative workspace
-      </div>
-      <h1 className="text-3xl font-semibold">Your collaborative canvas</h1>
-      <p className="text-sm text-muted-foreground">
-        All board entities, invitations and memberships use Jazz Tools. Sign in with a
-        passkey to collaborate in Dim0 and authorize your own ChatGPT MCP connection.
-      </p>
+      <h1 className="text-3xl font-semibold">Boards</h1>
+      {new URLSearchParams(window.location.search).get("access") === "removed" && (
+        <p role="alert" className="rounded-lg border border-destructive px-4 py-3 text-sm text-destructive">
+          Access to that board was removed. Ask the owner to invite you again.
+        </p>
+      )}
       {pendingInvite && (
         <div role="status" className="rounded-lg border bg-muted/30 p-3 text-sm">
           {session ? "Invitation pending. Retry to join or cancel to use your other boards." :
@@ -156,43 +130,26 @@ export function JazzSignInPage() {
           </div>}
         </div>
       )}
-      {oauthLogin && (
-        <div role="status" className="rounded-lg border bg-muted/30 p-3 text-sm">
-          Sign in to continue authorizing the board for your ChatGPT account.
-        </div>
-      )}
       {error && <p role="alert" className="rounded-lg border border-destructive p-3 text-sm text-destructive">{error}</p>}
       {session === undefined ? (
         <div role="status" className="text-sm">Checking Jazz session…
           {sessionUnavailable && <button type="button" className="ml-2 underline"
             onClick={() => window.location.reload()}>Retry connection</button>}
         </div>
-      ) : session === null ? (
-        <section className="flex flex-col gap-3">
-          <button type="button" onClick={() => void authenticate("create")} disabled={busy}
-            className="rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground disabled:opacity-50">
-            {busy ? "Please wait…" : "Create account with passkey"}
-          </button>
-          <button type="button" onClick={() => void authenticate("login")} disabled={busy}
-            className="rounded-lg border bg-background px-4 py-3 font-medium disabled:opacity-50">
-            Sign in with passkey
-          </button>
-        </section>
-      ) : (
+      ) : session && (
         <>
           <div className="flex items-center justify-between gap-3 text-sm">
             <p role="status">Signed in as <strong>{session.name}</strong></p>
-            <button type="button" disabled={busy} onClick={() => void signOut()}
-              className="underline underline-offset-2">Sign out</button>
+            <JazzLogoutButton />
           </div>
           {boards.length > 0 && (
             <section className="space-y-2">
-              <h2 className="font-medium">Your Jazz boards</h2>
+              <h2 className="font-medium">Your boards</h2>
               {boards.map((board) => (
                 <button type="button" key={board.board_id} onClick={() => openBoard(board.board_id)}
                   className="flex w-full items-center justify-between gap-2 rounded-lg border bg-background p-3 text-left hover:bg-muted">
                   <span className="truncate">{board.title}</span>
-                  <span className="text-xs text-muted-foreground">{board.role === "owner" ? "Owner" : board.role === "member" ? "Editor" : "Viewer"}</span>
+                  <span className="text-xs text-muted-foreground">{board.role === "owner" ? "Owner" : board.role === "editor" ? "Editor" : "Viewer"}</span>
                 </button>
               ))}
             </section>
@@ -203,7 +160,7 @@ export function JazzSignInPage() {
               value={title} maxLength={80} onChange={(event) => setTitle(event.target.value)} />
             <button type="submit" disabled={busy || !title.trim()}
               className="rounded-lg bg-primary px-4 py-3 font-medium text-primary-foreground disabled:opacity-50">
-              {busy ? "Creating…" : "Create Jazz board"}
+              {busy ? "Creating…" : "Create board"}
             </button>
           </form>
           <form onSubmit={(event) => { event.preventDefault(); openBoard(boardId.trim()) }}

@@ -3,6 +3,7 @@ import { stat } from "node:fs/promises";
 import { extname, join, normalize } from "node:path";
 import { createServer } from "node:http";
 import { handleBoardMcp } from "./mcp.ts";
+import { dim0EntryLocation } from "./dim0-entry-location.ts";
 import { acceptDeviceAccounts, createJazz, sqlite } from "jazz-tools/backend";
 import type { CreateJazzOptions } from "jazz-tools/backend";
 import { app } from "@patchboard/jazz-schema";
@@ -83,9 +84,16 @@ export async function startBoardServer(
     if (process.env.PATCHBOARD_PRIVATE_DIM0_ONLY === "1" && staticDir &&
         request.method === "GET" &&
         /^\/patchboard-private(?:\/|\/index\.html)?(?:\?.*)?$/.test(request.url ?? "")) {
-      const query = (request.url ?? "").split("?")[1] ?? "";
-      response.writeHead(302, { Location: "/jazz-signin" + (query ? "?" + query : ""),
-        "cache-control": "no-store" });
+      const location = dim0EntryLocation(request.url ?? "/");
+      if (location === null) {
+        response.writeHead(400, {
+          "content-type": "text/plain; charset=utf-8",
+          "cache-control": "no-store",
+        });
+        response.end("Incomplete invitation. Ask the owner for a fresh link.");
+        return;
+      }
+      response.writeHead(302, { Location: location, "cache-control": "no-store" });
       response.end();
       return;
     }

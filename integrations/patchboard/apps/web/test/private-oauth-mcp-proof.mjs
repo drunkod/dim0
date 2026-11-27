@@ -605,6 +605,12 @@ try {
       return { status: response.status, body: await response.json() };
     }, { board_id: boardId, token: inviteUrl.searchParams.get("invite") });
     assert.equal(joined.status, 200, JSON.stringify(joined));
+    const memberDirectoryStatus = await viewerPage.evaluate(async id =>
+      (await fetch("/patchboard-private/api/members?board_id=" + encodeURIComponent(id),
+        { credentials: "include", cache: "no-store" })).status, boardId);
+    assert.equal(memberDirectoryStatus, 403,
+      "Viewer must never list the owner-only member directory, including during display-name failures");
+    console.log("PRIVATE_OAUTH_VIEWER_MEMBER_DIRECTORY_DENIED_PASS");
     const viewerWriteToken = await oauthGrant("board:read board:write", viewerPage, boardId);
     const { client: viewerMcp, connect: connectViewer } = clientWithToken(viewerWriteToken);
     try {

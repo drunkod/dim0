@@ -4,6 +4,8 @@ import { z } from "zod";
 import type { Db } from "jazz-tools";
 import { app } from "@patchboard/jazz-schema";
 import { auth } from "./private-auth/auth.ts";
+import { privateAuthDatabase } from "./private-auth/db.ts";
+import { memberDisplayNames, tryRememberJazzMemberIdentity } from "./private-auth/member-directory.ts";
 import { listPrivateBoards } from "./private-auth/grants.ts";
 import {
   canvasEntityIdPattern, canvasBoardRole, listCanvasEntities, getCanvasEntity, createCanvasEntity,
@@ -48,7 +50,33 @@ export async function privateBoardRequest(
   if (pathname === "/patchboard-private/api/me" && request.method === "GET") {
     if (!session) return json({ signedIn: false });
     const accountId = await jazzAccountFor(session.user.id);
+    tryRememberJazzMemberIdentity(privateAuthDatabase, accountId, session.user.id);
     return json({ signedIn: true, id: session.user.id, accountId, name: session.user.name });
+  }
+  // Match Dim0's original share-link contract: a holder of the
+  // fragment-borne secret may preview the invite BEFORE registering.
+  // The digest is checked without consuming the link or creating a grant.
+  // Keep private board and account endpoints session-protected.
+  if (pathname === "/patchboard-private/api/invites/preview" && request.method === "POST") {
+    try {
+      const parsed = z.object({
+        board_id: boardIdSchema, token: inviteSchema,
+      }).strict().parse(await safeJson(request));
+      const digest = createHash("sha256").update(parsed.token).digest("hex");
+      const invite = await db.one(app.boardInvites.where({
+        boardId: parsed.board_id, token: digest,
+      }));
+      if (!invite || (invite.expiresAtEpochMs !== null &&
+          invite.expiresAtEpochMs < Date.now())) {
+        return json({ error: "Invitation expired or revoked" }, 404);
+      }
+      return json({ role: invite.role });
+    } catch (error) {
+      if (error instanceof z.ZodError || error instanceof SyntaxError) {
+        return json({ error: "Invalid invitation request" }, 400);
+      }
+      throw error;
+    }
   }
   if (!session) return json({ error: "Sign in required" }, 401);
   const accountId = await jazzAccountFor(session.user.id);
@@ -73,7 +101,9 @@ export async function privateBoardRequest(
       if (!board || board.ownerId !== accountId) return json({ error: "Only owner may invite" }, 403);
       const token = randomBytes(32).toString("base64url");
       const hash = createHash("sha256").update(token).digest("hex");
-      const expiry = Date.now() + 7 * 86_400_000;
+      // Original Dim0 reusable links stay active until the owner revokes
+      // them; only single-use links have the 7-day expiration policy.
+      const expiry = parsed.reusable ? null : Date.now() + 7 * 86_400_000;
       const pending = db.insert(app.boardInvites, {
         boardId: parsed.board_id,
         token: hash, // digest only; plaintext is never placed in Jazz
@@ -85,7 +115,7 @@ export async function privateBoardRequest(
       // The original single-use Patchboard invite URL remains backwards-compatible.
       // Reusable group invites land directly on Dim0 Canvas after the passkey join.
       const inviteUrl = new URL(parsed.reusable
-        ? "/jazz-invite/" + parsed.board_id : "/patchboard-private/", request.url);
+        ? "/share/join/" + parsed.board_id : "/patchboard-private/", request.url);
       if (parsed.reusable) inviteUrl.hash = "invite=" + encodeURIComponent(token);
       else {
         inviteUrl.searchParams.set("board", parsed.board_id);
@@ -100,9 +130,22 @@ export async function privateBoardRequest(
       if (!board || board.ownerId !== accountId) return json({ error: "Only owner may manage sharing" }, 403);
       const rows = await db.all(app.boardInvites.where({ boardId }).limit(200));
       // Only opaque IDs and metadata leave the server, never stored invite digests.
-      return json({ invites: rows.filter((row) => (row.expiresAtEpochMs ?? 0) > Date.now())
+      return json({ invites: rows.filter((row) =>
+        row.expiresAtEpochMs === null || row.expiresAtEpochMs > Date.now())
         .map((row) => ({ id: row.id, role: row.role, reusable: !row.singleUse,
           expires_at: row.expiresAtEpochMs })) });
+    }
+    if (pathname === "/patchboard-private/api/invites/revoke-all" && request.method === "POST") {
+      const { board_id } = z.object({ board_id: boardIdSchema }).strict().parse(await safeJson(request));
+      const result = await db.serializableTransaction(async (tx) => {
+        const board = await tx.one(app.boards.where({ id: board_id }));
+        if (!board || board.ownerId !== accountId) throw new PrivatePermissionDenied();
+        const invites = await tx.all(app.boardInvites.where({ boardId: board_id }));
+        for (const invite of invites) tx.delete(app.boardInvites, invite.id);
+        return invites.length;
+      });
+      await result.wait({ timeoutMs: 10000 });
+      return json({ revoked_count: result.value });
     }
     if (pathname === "/patchboard-private/api/invites/revoke" && request.method === "POST") {
       const parsed = z.object({ board_id: boardIdSchema, invite_id: boardIdSchema })
@@ -124,8 +167,14 @@ export async function privateBoardRequest(
       const board = await db.one(app.boards.where({ id: boardId }));
       if (!board || board.ownerId !== accountId) return json({ error: "Only owner may manage members" }, 403);
       const rows = await db.all(app.boardMembers.where({ boardId }).limit(200));
-      return json({ members: [{ id: board.ownerId, role: "owner" },
-        ...rows.map((row) => ({ id: row.userId, role: row.role }))] });
+      const members = [{ id: board.ownerId, role: "owner" },
+        ...rows.map((row) => ({ id: row.userId, role: row.role }))];
+      // Server-side owner-only join, scoped strictly to existing Jazz grants.
+      // No arbitrary user-profile lookup or email address is exposed.
+      const names = memberDisplayNames(privateAuthDatabase(), members.map((member) => member.id));
+      return json({ members: members.map((member) => ({
+        ...member, name: names.get(member.id) ?? null,
+      })) });
     }
     if (pathname === "/patchboard-private/api/members/remove" && request.method === "POST") {
       const parsed = z.object({ board_id: boardIdSchema, user_id: boardIdSchema })
@@ -153,8 +202,8 @@ export async function privateBoardRequest(
           const invite = await tx.one(app.boardInvites.where({
             boardId: parsed.board_id, token: digest,
           }));
-          if (!invite || !invite.expiresAtEpochMs ||
-              invite.expiresAtEpochMs < Date.now() ||
+          if (!invite || (invite.expiresAtEpochMs !== null &&
+              invite.expiresAtEpochMs < Date.now()) ||
               (invite.intendedUserId && invite.intendedUserId !== accountId)) {
             throw new Error("INVITE_INVALID");
           }
@@ -175,7 +224,7 @@ export async function privateBoardRequest(
             }, { id: randomUUID() });
           }
           if (invite.singleUse) tx.delete(app.boardInvites, invite.id);
-          return true;
+          return { role: invite.role };
         });
         await write.wait({ timeoutMs: 10000 });
         return json({ joined: true, board_id: parsed.board_id }, 200);

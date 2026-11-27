@@ -36,7 +36,7 @@ export const auth = betterAuth({
     mcp({
       resource: config.origin + "/patchboard-private-mcp",
       loginPage: process.env.PATCHBOARD_PRIVATE_DIM0_ONLY === "1"
-        ? "/jazz-signin" : "/patchboard-private/",
+        ? "/signin" : "/patchboard-private/",
       consentPage: "/patchboard-private/oauth-consent",
       // The installed Better Auth OAuth provider preserves consent referenceId
       // across the authorization code and refresh token. AsyncLocalStorage

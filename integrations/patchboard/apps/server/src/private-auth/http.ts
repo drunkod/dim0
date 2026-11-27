@@ -1,6 +1,8 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import type { Db } from "jazz-tools";
 import { auth } from "./auth.ts";
+import { privateAuthDatabase } from "./db.ts";
+import { tryRememberJazzMemberIdentity } from "./member-directory.ts";
 import { privateAuthConfig } from "./config.ts";
 import { EnrollmentLimitReached, newRegistrationIntent } from "./enrollment.ts";
 import { oauthConsentPage } from "./oauth-ui.ts";
@@ -97,8 +99,12 @@ export function handlePrivateAuth(
         } else {
           let allowed = false;
           try {
-            await grantBoardForConsent(db, boardId as string, await jazzAccountFor(session.user.id));
+            const jazzAccountId = await jazzAccountFor(session.user.id);
+            await grantBoardForConsent(db, boardId as string, jazzAccountId);
             allowed = true;
+            // This optional display-name reference cannot turn an authorized
+            // ChatGPT board consent into an authorization denial.
+            tryRememberJazzMemberIdentity(privateAuthDatabase, jazzAccountId, session.user.id);
           } catch { /* Never expose private board existence in a consent error. */ }
           if (!allowed) {
             response = Response.json({ error: "Board permission denied" }, { status: 403 });

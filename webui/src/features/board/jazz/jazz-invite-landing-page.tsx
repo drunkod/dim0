@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react"
 import { useParams } from "@tanstack/react-router"
 import { Button } from "@/components/ui/button"
-import { clearPendingJazzInvitation, savePendingJazzInvitation } from "./jazz-auth-client"
+import { Status as InviteStatus, SignInPanel, ReadyPanel, ErrorPanel } from "@/features/sharing/screens/invite-panels"
+import { clearPendingJazzInvitation, currentJazzIdentity, redeemPendingJazzInvitation, savePendingJazzInvitation } from "./jazz-auth-client"
 
-type Status = "loading" | "signed-out" | "ready" | "joining" | "invalid"
+type Status = "loading" | "signed-out" | "ready" | "joining" | "invalid" | "retry"
 const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const tokenFormat = /^[\w-]{43}$/
 
@@ -13,7 +14,9 @@ export function JazzInviteLandingPage() {
   const boardId = params.id ?? ""
   const [token] = useState(() => new URLSearchParams(window.location.hash.slice(1)).get("invite") ?? "")
   const [status, setStatus] = useState<Status>("loading")
+  const [role, setRole] = useState<"member" | "viewer">()
   const [error, setError] = useState("")
+  const [retryJoin, setRetryJoin] = useState(false)
 
   useEffect(() => {
     if (!uuid.test(boardId) || !tokenFormat.test(token)) {
@@ -22,67 +25,89 @@ export function JazzInviteLandingPage() {
       return
     }
     let cancelled = false
-    void fetch("/patchboard-private/api/me", { credentials: "include", cache: "no-store" })
-      .then((response) => response.json())
-      .then((account: { signedIn?: boolean }) => {
-        if (!cancelled) setStatus(account.signedIn ? "ready" : "signed-out")
+    // Original Dim0 let an invitee inspect the role before creating an
+    // account. This request uses only the opaque link secret, not a session.
+    void (async () => {
+      const response = await fetch("/patchboard-private/api/invites/preview", {
+        method: "POST", credentials: "include", headers: { "content-type": "application/json" },
+        body: JSON.stringify({ board_id: boardId, token }),
       })
-      .catch(() => {
-        if (!cancelled) {
-          setStatus("invalid")
-          setError("The shared-board service is temporarily unavailable.")
-        }
-      })
+      if (cancelled) return
+      if (response.status === 404) {
+        setError("This invitation has expired or been revoked. Ask the owner for a fresh link.")
+        setStatus("invalid")
+        return
+      }
+      if (!response.ok) throw new Error("Invitation unavailable")
+      const info = await response.json() as { role: "editor" | "viewer" }
+      if (cancelled) return
+      setRole(info.role === "editor" ? "member" : "viewer")
+      const identity = await currentJazzIdentity()
+      if (!cancelled) setStatus(identity ? "ready" : "signed-out")
+    })().catch(() => {
+      if (!cancelled) {
+        setRetryJoin(false)
+        setError("Could not check your account or this invitation. Retry when connected.")
+        setStatus("retry")
+      }
+    })
     return () => { cancelled = true }
   }, [boardId, token])
 
   const signIn = () => {
     // Preserve the secret in this tab, not in the server request URL or referrer.
     savePendingJazzInvitation(boardId, token)
-    window.location.assign("/jazz-signin")
+    window.location.assign("/signin")
   }
 
   const accept = async () => {
     setStatus("joining")
     setError("")
     try {
-      const res = await fetch("/patchboard-private/api/join", {
-        method: "POST", credentials: "include",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({ board_id: boardId, token }),
-      })
-      if (res.status === 404) {
-        clearPendingJazzInvitation({ boardId, token })
-        setError("This link has expired or been revoked. Ask the owner for a new invite.")
-        setStatus("invalid")
-        return
+      savePendingJazzInvitation(boardId, token)
+      const result = await redeemPendingJazzInvitation()
+      if (result.status === "joined") window.location.replace("/boards/" + result.boardId)
+      else if (result.status === "invalid" || result.status === "retryable") {
+        setError(result.message)
+        setRetryJoin(result.status === "retryable")
+        setStatus(result.status === "invalid" ? "invalid" : "retry")
       }
-      if (!res.ok) throw new Error("Unable to join board (HTTP " + res.status + ").")
-      clearPendingJazzInvitation({ boardId, token })
-      window.location.replace("/boards/" + boardId)
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "Could not join board")
-      setStatus("ready")
+      setRetryJoin(true)
+      setStatus("retry")
     }
   }
 
+  const cancel = () => {
+    // A stale invitation request must never erase a different link opened
+    // in the same tab while the request was in flight.
+    clearPendingJazzInvitation({ boardId, token })
+    window.location.replace("/boards")
+  }
+
+  const retry = () => {
+    if (retryJoin) void accept()
+    else window.location.reload()
+  }
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center gap-5 px-6">
-      <span className="text-xs font-medium uppercase tracking-widest text-muted-foreground">
-        Dim0 · Jazz collaboration
-      </span>
-      <h1 className="text-3xl font-semibold">You've been invited to a board</h1>
-      <p className="text-sm text-muted-foreground">
-        Join the live infinite canvas to work with your friends and their AI agents.
-        Your board identity is your Jazz passkey; afterwards connect your own ChatGPT
-        account using the MCP endpoint provided in the board's Share dialog.
-      </p>
-      {status === "loading" && <p role="status">Checking account…</p>}
-      {status === "signed-out" && <Button onClick={signIn}>Sign in or create a passkey to join</Button>}
-      {status === "ready" && <Button onClick={() => void accept()}>Join the collaborative board</Button>}
-      {status === "joining" && <p role="status">Joining your board…</p>}
-      {status === "invalid" && <a className="underline" href="/jazz-signin">Open Jazz home</a>}
-      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+    <main className="mx-auto max-w-md p-6">
+      <div className="rounded-2xl border border-border bg-background p-6 shadow-md">
+        {status === "loading" && <InviteStatus text="Checking invitation…" />}
+        {status === "signed-out" && <SignInPanel onGoSignIn={signIn} role={role} />}
+        {status === "ready" && <ReadyPanel role={role} onOpen={() => void accept()} />}
+        {status === "joining" && <InviteStatus text="Joining the board…" />}
+        {status === "invalid" && <ErrorPanel message={error} onGoHome={() => location.assign("/boards")} />}
+        {status === "retry" && <div className="space-y-3">
+          <p role="alert" className="text-sm text-destructive">{error || "Invitation service unavailable."}</p>
+          <div className="flex gap-3">
+            <Button onClick={retry}>Retry invitation</Button>
+            <Button variant="outline" onClick={cancel}>Cancel invitation</Button>
+          </div>
+        </div>}
+        {error && status !== "invalid" && status !== "retry" && <p role="alert">{error}</p>}
+      </div>
     </main>
   )
 }

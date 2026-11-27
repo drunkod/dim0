@@ -3,7 +3,6 @@ import { useState } from "react"
 import { ShareIcon } from "@/components/icons"
 import { useBoardAppStore } from "@/features/board/harness/store/board-app-store"
 import { ShareDialog } from "./share-dialog"
-import { JazzShareDialog } from "./jazz-share-dialog"
 
 
 /**
@@ -43,13 +42,8 @@ export function ShareButton({ jazz = false }: { jazz?: boolean } = {}) {
         <ShareIcon className="size-3.5 shrink-0" />
         Share
       </button>
-      {jazz ? (
-        <JazzShareDialog boardId={boardId} boardLabel={boardLabel}
-          open={open} onOpenChange={setOpen} />
-      ) : (
-        <ShareDialog boardId={boardId} boardLabel={boardLabel}
-          open={open} onOpenChange={setOpen} />
-      )}
+      <ShareDialog key={boardId} jazz={jazz} boardId={boardId} boardLabel={boardLabel}
+        open={open} onOpenChange={setOpen} />
     </>
   )
 }

@@ -22,6 +22,7 @@ type SyncCallbacks = {
   onRole: (role: BoardRole) => void
   onReady: () => void
   onError: (message: string) => void
+  onAccessRemoved: (status: 401 | 403) => void
 }
 
 
@@ -45,6 +46,7 @@ export function useJazzCanvasSync(
     let disposed = false
     let hydrated = false
     let blocked = false
+    let accessClosed = false
     let busy = false
     let debounce: ReturnType<typeof setTimeout> | null = null
     let lastSnapshot: JazzCanvasSnapshot | null = null
@@ -55,6 +57,27 @@ export function useJazzCanvasSync(
     const versions = new Map<string, JazzCanvasRecord>()
 
     callbacksRef.current.onRole(null)
+
+    // Loss of CANONICAL READ access is final. Clear old private data before
+    // navigating away; a rejected write alone may simply be a viewer action.
+    const closeRevokedBoard = (error: unknown): boolean => {
+      if (!(error instanceof JazzCanvasApiError) ||
+          (error.status !== 401 && error.status !== 403)) return false
+      if (disposed || accessClosed) return true
+      accessClosed = true
+      blocked = true
+      if (debounce) clearTimeout(debounce)
+      dirty.clear()
+      versions.clear()
+      const empty: Graph = {
+        uid: boardId, type: "graph", nodes: [], edges: [],
+        readonly: true, visibility: "private", createdAt: new Date(0).toISOString(),
+      }
+      applyGraphToStore(store, empty, { mode: "replace" })
+      callbacksRef.current.onRole(null)
+      callbacksRef.current.onAccessRemoved(error.status)
+      return true
+    }
 
     /** Paint a full Jazz snapshot as remote operations to avoid write echoes. */
     const applySnapshot = (snapshot: JazzCanvasSnapshot): void => {
@@ -133,6 +156,13 @@ export function useJazzCanvasSync(
                 versions.delete(id)
               }
             } catch (error) {
+              // Read authorization decides revocation; a write 403 may merely
+              // mean an editor was downgraded to a viewer.
+              if (error instanceof JazzCanvasApiError &&
+                  (error.status === 401 || error.status === 403)) {
+                try { await loadJazzCanvas(boardId) }
+                catch (readError) { if (closeRevokedBoard(readError)) return }
+              }
               dirty.add(id)
               blocked = true
               // No blind version retry: a 409 means an external agent or human
@@ -158,9 +188,11 @@ export function useJazzCanvasSync(
             lastSnapshot = await loadJazzCanvas(boardId)
             applySnapshot(lastSnapshot)
           } catch (error) {
-            callbacksRef.current.onError(
+            if (!closeRevokedBoard(error)) {
+              callbacksRef.current.onError(
               `Jazz refresh failed: ${error instanceof Error ? error.message : "unknown error"}`,
             )
+            }
           }
         }
       }
@@ -196,14 +228,20 @@ export function useJazzCanvasSync(
     // canvas entirely. Polling is a bounded fallback for edge proxies that
     // buffer event streams (the server still uses native Jazz Db.subscribe).
     const refresh = async (): Promise<void> => {
-      if (disposed || refreshing || blocked || busy || dirty.size > 0) return
+      if (disposed || refreshing || busy || accessClosed) return
       refreshing = true
       try {
+        // Even when a conflict leaves a local draft blocked, continue checking
+        // the canonical READ grant. Never paint a remote snapshot over a dirty
+        // or conflicted draft, but do evict the board when access is withdrawn.
         const snapshot = await loadJazzCanvas(boardId)
-        lastSnapshot = snapshot
-        applySnapshot(snapshot)
+        if (!blocked && dirty.size === 0) {
+          lastSnapshot = snapshot
+          applySnapshot(snapshot)
+        }
         lastReadError = ""
       } catch (error) {
+        if (closeRevokedBoard(error)) return
         const message = error instanceof Error ? error.message : "Jazz canvas unavailable"
         if (message !== lastReadError) callbacksRef.current.onError(message)
         lastReadError = message

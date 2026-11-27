@@ -21,7 +21,7 @@ vi.mock('@/components/sidebar/sidebar-label', () => ({ SidebarLabel: () => null 
 
 afterEach(() => vi.unstubAllEnvs())
 
-it.each(['/boards', '/boards/', '/boards/example', '/boards/example/sheets/1', '/jazz-signin', '/jazz-signin/', '/jazz-invite/example'])(
+it.each(['/signin', '/signup', '/share/join/example', '/boards', '/boards/', '/boards/example', '/boards/example/sheets/1', '/jazz-signin', '/jazz-signin/', '/jazz-invite/example'])(
   'renders %s without initializing legacy auth in Jazz mode', (pathname) => {
     vi.stubEnv('VITE_DIM0_JAZZ_CANVAS', '1')
     fixture.pathname = pathname

@@ -29,7 +29,9 @@ import { ResetPasswordPage } from "@/features/signin/screens/reset-password"
 import { InstallScreen } from "@/features/install/screens/install-screen"
 import { ShareLandingScreen } from "@/features/sharing/screens/share-landing"
 import { LocalBoardScreen } from "@/features/board/local/local-board-screen"
-import { JazzSignInPage } from "@/features/board/jazz/jazz-signin-page"
+import { currentJazzIdentity } from "@/features/board/jazz/jazz-auth-client"
+import { JazzSessionUnavailable, JazzSessionCheckError } from "@/features/board/jazz/jazz-session-unavailable"
+import { JazzBoardsPage } from "@/features/board/jazz/jazz-boards-page"
 import { JazzInviteLandingPage } from "@/features/board/jazz/jazz-invite-landing-page"
 
 
@@ -75,33 +77,29 @@ const requireVerifiedAuth = async () => {
 /** For opt-in Jazz canvas boards, Patchboard passkeys replace Dim0 JWTs.
  * The server still checks the actual board grant on every read/write.
  */
-const requireBoardAuth = async () => {
+const requireBoardAuth = async ({ location }: { location: { href: string } }) => {
   if (import.meta.env.VITE_DIM0_JAZZ_CANVAS !== "1") return requireVerifiedAuth()
   try {
-    const response = await fetch("/patchboard-private/api/me", {
-      credentials: "include",
-      cache: "no-store",
-    })
-    if (response.ok) {
-      const body = await response.json() as { signedIn?: boolean }
-      if (body.signedIn === true) return
-    }
-  } catch { /* Connection or sign-in failure is handled by the login route. */ }
-  throw redirect({ to: "/jazz-signin" })
+    if (await currentJazzIdentity()) return
+  } catch {
+    // A failed network/session check is NOT a confirmed sign-out. Preserve
+    // the requested board URL and offer Retry without leaking cached content.
+    throw new JazzSessionCheckError()
+  }
+  throw redirect({ href: "/signin?next=" + encodeURIComponent(location.href) })
 }
 
 // auth pages (unguarded)
 const signinRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/signin",
-  beforeLoad: () => { if (import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1") throw redirect({ to: "/jazz-signin" }) },
   component: SigninPage,
 })
 
 const jazzSigninRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/jazz-signin",
-  component: JazzSignInPage,
+  beforeLoad: ({ location }) => { throw redirect({ href: "/signin" + location.searchStr, replace: true }) },
 })
 
 // A friend may arrive before sign-in. The signed-in Jazz server redeems the
@@ -109,6 +107,12 @@ const jazzSigninRoute = createRoute({
 const jazzInviteRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/jazz-invite/$id",
+  component: JazzInviteLandingPage,
+})
+
+const boardInviteRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/share/join/$id",
   component: JazzInviteLandingPage,
 })
 
@@ -123,7 +127,6 @@ const captureSpikeRoute = createRoute({
 const signupRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/signup",
-  beforeLoad: () => { if (import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1") throw redirect({ to: "/jazz-signin" }) },
   component: SignupPage,
 })
 
@@ -160,7 +163,7 @@ const indexRoute = createRoute({
   // missing OR stale/expired token is treated as logged-out (clear + fall
   // through) so the front door never bounces to /signin.
   beforeLoad: async () => {
-    if (import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1") throw redirect({ to: "/jazz-signin" })
+    if (import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1") throw redirect({ to: "/boards" })
     const token = getAccessToken()
     if (!token) return
     try {
@@ -208,7 +211,8 @@ const dashboardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: DashboardUrl,
   beforeLoad: requireBoardAuth,
-  component: import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" ? JazzSignInPage : DashboardScreen,
+  errorComponent: import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" ? JazzSessionUnavailable : undefined,
+  component: import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" ? JazzBoardsPage : DashboardScreen,
 })
 
 // /boards/:id (protected). Surface routes (sheets/$noteId,
@@ -221,6 +225,7 @@ const boardRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: BoardUrl,
   beforeLoad: requireBoardAuth,
+  errorComponent: import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" ? JazzSessionUnavailable : undefined,
   component: BoardScreen,
 })
 
@@ -403,6 +408,7 @@ const routeTree = rootRoute.addChildren([
   signinRoute,
   jazzSigninRoute,
   jazzInviteRoute,
+  boardInviteRoute,
   signupRoute,
   googleCallbackRoute,
   verifyEmailRoute,

@@ -44,9 +44,9 @@ try {
   assert.equal(session.signedIn, true)
   console.log("MVP_PRIVATE_PASSKEY_SESSION_PASS", session.accountId)
 
-  await page.goto(origin + "/jazz-signin")
-  await expect(page.getByRole("button", { name: "Create Jazz board" })).toBeVisible({ timeout: 20000 })
-  await page.getByRole("button", { name: "Create Jazz board" }).click()
+  await page.goto(origin + "/boards")
+  await expect(page.getByRole("button", { name: "Create board" })).toBeVisible({ timeout: 20000 })
+  await page.getByRole("button", { name: "Create board" }).click()
   await page.waitForURL(url => /^\/boards\/[0-9a-f-]{36}$/i.test(url.pathname), { timeout: 25000 })
   const boardId = new URL(page.url()).pathname.split("/").pop()
   console.log("MVP_JAZZ_BOARD_CREATED", boardId)

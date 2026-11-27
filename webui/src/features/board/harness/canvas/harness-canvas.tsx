@@ -1,3 +1,4 @@
+import { JazzLogoutButton } from "@/features/signin/components/jazz-logout-button"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { useNavigate } from "@tanstack/react-router"
 import { toast } from "sonner"
@@ -292,6 +293,13 @@ export function HarnessCanvas({ local = false }: { local?: boolean } = {}) {
       }
       setBoardRole(role)
       setCanEdit(role === "owner" || role === "member")
+    },
+    onAccessRemoved: (status) => {
+      setCanEdit(false)
+      setBoardRole(null)
+      setReady(false)
+      setIsLoading(true)
+      window.location.replace(status === 401 ? "/signin" : "/boards?access=removed")
     },
     onReady: () => {
       setIsLoading(false)
@@ -725,8 +733,8 @@ function HarnessCanvasInner({
           interactive while a sheet is open; desktop renders it in the reserved
           title bar (see SidebarLabel), which the backdrop never covers. */}
       {!presenting && !isTauri() && (jazzMode ? (
-        <a href="/jazz-signin" className="absolute left-4 top-4 z-[60] rounded-md border bg-background/80 px-3 py-2 text-xs font-medium backdrop-blur">
-          ← Jazz boards
+        <a href="/boards" className="absolute left-4 top-4 z-[60] rounded-md border bg-background/80 px-3 py-2 text-xs font-medium backdrop-blur">
+          ← Boards
         </a>
       ) : (
         <BoardBreadcrumb
@@ -746,7 +754,7 @@ function HarnessCanvasInner({
         {/* Local boards have no collab chrome, so surface an explicit
             "On device" badge so they're not mistaken for synced. */}
         {!canCollab && <BoardKindBadge kind="local-only" />}
-        {jazzMode && <span className="rounded-md border bg-background/90 px-3 py-2 text-xs font-medium shadow-sm">Jazz · MCP</span>}
+        {jazzMode && !presenting && <JazzLogoutButton />}
         {canCollab && !jazzMode && <HarnessCollabStatus />}
         {canCollab && <ShareButton jazz={jazzMode} />}
       </div>
