@@ -3,6 +3,7 @@ import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { execFileSync, spawn } from "node:child_process";
 import { openSync, closeSync, readFileSync, realpathSync } from "node:fs";
 import { DatabaseSync } from "node:sqlite";
+import { proveLiveGrantCallback } from "./live-grant-callback-proof.mjs";
 import { tmpdir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { mkdir, writeFile } from "node:fs/promises";
@@ -992,6 +993,18 @@ try {
                 recoveredExactId: true, oauthTokenRemainedValid: true,
                 browserErrors,
               }, null, 2), { mode: 0o600 });
+            }
+            // Reuse the editor's real OAuth grant only AFTER all its normal
+            // acceptance and restart assertions. No extra DCR or rate-limit change.
+            if (process.env.PATCHBOARD_OAUTH_CI_RESTART === "1") {
+              await proveLiveGrantCallback({
+                origin, mcpURL, boardId, token: editorToken,
+                clientId: issuedTokens.get(editorToken).clientId,
+                actorId: editorMe.accountId, writer: afterRestart,
+                baseEntity: { graphUid: boardId, type: "note", version: 1,
+                  content: { markdown: "Callback ordering fixture" },
+                  properties: { nodePosition: { type: "position", position: { x: 10, y: 20 } } } },
+              });
             }
           } finally {
             await afterRestart.close();

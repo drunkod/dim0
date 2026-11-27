@@ -108,9 +108,11 @@ export function admitVerifiedMcpGrant(
  * must be server-minted, bound to the verified subject/client/board/version,
  * present in private SQLite, and younger than its fixed 60-second TTL.
  *
- * Do not check the live revoke bit here: a call already admitted before a
- * durable revoke may finish, subject to current Jazz membership at mutation.
- * It cannot start another protected callback after its admission expires.
+ * A callback FIRST entering after durable revoke or grant-version change
+ * must be denied, even when its HTTP admission receipt remains within TTL.
+ * A read already past this check and the native membership guard may finish.
+ * Entry validation alone does not fence writes already running; write
+ * submission/retry fencing and disconnect draining are separate increments.
  * No receipt is accepted from an MCP argument, bearer token or browser body.
  */
 export function authorizeProtectedMcpInvocation(
@@ -135,7 +137,16 @@ export function authorizeProtectedMcpInvocation(
       grant_version:number;admitted_scope:string;admitted_at_ms:number;
       expires_at_ms:number;
     } | undefined;
-  return Boolean(row && row.grant_id === admission.grantId &&
+  // Revocation/version is authoritative at callback entry, not HTTP admission.
+  // SQLite's synchronous read observes commits made before this call starts.
+  const liveGrant = grantRow(db, admission.grantId);
+  return Boolean(row && liveGrant && liveGrant.revoked_at_ms === null &&
+    liveGrant.grant_version === admission.grantVersion &&
+    liveGrant.id === verified.id &&
+    liveGrant.user_id === verified.userId &&
+    liveGrant.client_id === verified.clientId &&
+    liveGrant.board_id === verified.boardId &&
+    row.grant_id === admission.grantId &&
     row.user_id === admission.subjectId &&
     row.client_id === admission.clientId &&
     row.board_id === admission.boardId &&
