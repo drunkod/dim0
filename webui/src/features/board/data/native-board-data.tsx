@@ -5,9 +5,19 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "
 import { useBoardAppStore } from "../harness/store/board-app-store"
 import { listViews, nativeSavedViewsEnabled, nativeCatalogReadOnly, nativePersistentTextCatalogEnabled, isViewDenied, type OwnerView } from "./saved-view-api"
 import { SavedViewGrid } from "./saved-view-grid"
-import { addRow, catalogRejection, createTable, saveView, type RowRequest, type TableRequest, type SaveViewRequest } from "./catalog-api"
+import { addRow, catalogRejection, createTable, saveView } from "./catalog-api"
+import { currentJazzIdentity } from "../jazz/jazz-auth-client"
+import { readCatalogIntent, retainCatalogIntent, releaseCatalogIntent, type CatalogIntent, type CatalogIntentScope } from "./catalog-intent"
 
-type Pending = { kind: "table"; input: TableRequest } | { kind: "row"; input: RowRequest }
+type DataProps = { boardId: string; readOnly?: boolean; allowSaveView?: boolean }
+const unknownOutcome = "Commit outcome unconfirmed. Retry the same request; its definition is locked."
+const unknownView = "Save view outcome unconfirmed. Refresh the view list and check whether it exists before creating again."
+const journalProblem = "Browser retry storage is unavailable or changed. No new catalog writes are allowed; reload this board to check the original request."
+
+function restore(scope?: CatalogIntentScope) {
+  try { return { intent: scope ? readCatalogIntent(scope) : null, blocked: false } }
+  catch { return { intent: null, blocked: true } }
+}
 
 export function NativeBoardDataControl() {
   const { id } = useParams({ strict: false }) as { id?: string }
@@ -18,22 +28,47 @@ export function NativeBoardDataControl() {
   return <NativeBoardData key={id} boardId={id} readOnly={nativeCatalogReadOnly} allowSaveView={!nativePersistentTextCatalogEnabled} />
 }
 
-export function NativeBoardData({ boardId, readOnly = false, allowSaveView = true }: { boardId: string; readOnly?: boolean; allowSaveView?: boolean }) {
+export function NativeBoardData(props: DataProps) {
+  const { boardId, readOnly = false } = props
+  const [scope, setScope] = useState<CatalogIntentScope | null>(null)
+  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
+  useEffect(() => {
+    if (readOnly) return
+    let active = true
+    void currentJazzIdentity().then(identity => {
+      if (!identity) throw new Error("No verified account")
+      if (active) {
+        setScope({ subjectId: identity.id, accountId: identity.accountId, boardId })
+        setFailed(false)
+      }
+    }).catch(() => { if (active) { setScope(null); setFailed(true) } })
+    return () => { active = false }
+  }, [boardId, readOnly, attempt])
+  if (readOnly) return <NativeBoardDataPanel key={boardId} {...props} />
+  if (!scope || scope.boardId !== boardId) return failed ? <Button size="sm" variant="ghost" onClick={() => setAttempt(n => n + 1)}>Retry Data</Button> : null
+  return <NativeBoardDataPanel key={JSON.stringify(scope)} {...props} scope={scope} />
+}
+
+function NativeBoardDataPanel({ boardId, readOnly = false, allowSaveView = true, scope }: DataProps & { scope?: CatalogIntentScope }) {
+  const [restored] = useState(() => restore(scope))
+  const [pending, setPending] = useState<CatalogIntent | null>(restored.intent)
+  const [storageBlocked, setStorageBlocked] = useState(restored.blocked)
   const [views, setViews] = useState<OwnerView[] | null>(null)
   const [open, setOpen] = useState(false)
-  const [selected, setSelected] = useState<string>()
+  const [selected, setSelected] = useState<string | undefined>(restored.intent && restored.intent.kind !== "table" ? restored.intent.viewId : undefined)
   const [epoch, setEpoch] = useState(0)
-  const [tableName, setTableName] = useState("")
-  const [fieldName, setFieldName] = useState("Title")
-  const [defaultViewName, setDefaultViewName] = useState("All rows")
-  const [value, setValue] = useState("")
-  const [viewName, setViewName] = useState("")
-  const [prefix, setPrefix] = useState("")
-  const [pending, setPending] = useState<Pending | null>(null)
+  const [tableName, setTableName] = useState(restored.intent?.kind === "table" ? restored.intent.input.name : "")
+  const [fieldName, setFieldName] = useState(restored.intent?.kind === "table" ? restored.intent.input.primary_field_name : "Title")
+  const [defaultViewName, setDefaultViewName] = useState(restored.intent?.kind === "table" ? restored.intent.input.default_view_name : "All rows")
+  const [value, setValue] = useState(restored.intent?.kind === "row" ? restored.intent.input.value : "")
+  const [viewName, setViewName] = useState(restored.intent?.kind === "view-review" ? restored.intent.input.definition.name : "")
+  const [prefix, setPrefix] = useState(restored.intent?.kind === "view-review" ? restored.intent.input.definition.filter.value : "")
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState("")
-  const [problem, setProblem] = useState("")
-  const [viewSaveUnknown, setViewSaveUnknown] = useState(false)
+  const [problem, setProblem] = useState(restored.blocked ? journalProblem : restored.intent ? (restored.intent.kind === "view-review" ? unknownView : unknownOutcome) : "")
+  const [reviewEpoch, setReviewEpoch] = useState<number | null>(null)
+  const [loadedEpoch, setLoadedEpoch] = useState<number | null>(null)
   const [listFailed, setListFailed] = useState(false)
   const write = useRef<AbortController | null>(null)
   const invalidate = useCallback(() => { write.current?.abort() }, [])
@@ -44,10 +79,12 @@ export function NativeBoardData({ boardId, readOnly = false, allowSaveView = tru
     void listViews(boardId, abort.signal).then(v => {
       if (abort.signal.aborted) return
       setViews(v)
+      setLoadedEpoch(epoch)
       setListFailed(false)
     }).catch(error => {
       if (abort.signal.aborted) return
       setViews(null)
+      setLoadedEpoch(null)
       setListFailed(!isViewDenied(error))
       setOpen(false)
     })
@@ -56,41 +93,93 @@ export function NativeBoardData({ boardId, readOnly = false, allowSaveView = tru
 
   const view = views?.find(v => v.viewId === selected)
   const primary = view?.singleTextTable && view.fields.length === 1 ? view.fields[0] : undefined
-  const locked = busy || pending !== null || viewSaveUnknown
+  const locked = busy || pending !== null || storageBlocked
+  const reviewed = pending?.kind === "view-review" && reviewEpoch === epoch && loadedEpoch === epoch
 
-  async function submit(action: Pending) {
-    if (readOnly || write.current) return
-    setPending(action)
+  async function submit(action: CatalogIntent, retry = false) {
+    if (readOnly || !scope || storageBlocked || write.current || (action.kind === "view-review" && (!allowSaveView || retry))) return
     setBusy(true)
     setMessage("")
     setProblem("")
     const abort = new AbortController()
     write.current = abort
+    let journaled = false
+    let confirmed = false
     try {
+      // A session change must not submit an old account's frozen row value.
+      const identity = await currentJazzIdentity()
+      if (abort.signal.aborted) return
+      if (!identity || identity.id !== scope.subjectId || identity.accountId !== scope.accountId) {
+        setProblem("Account changed. Reopen Data with the original account.")
+        setStorageBlocked(true)
+        return
+      }
+      try {
+        retainCatalogIntent(scope, action, retry)
+      } catch {
+        setStorageBlocked(true)
+        setProblem(journalProblem)
+        return
+      }
+      journaled = true
+      setPending(action)
+      setReviewEpoch(null)
       if (action.kind === "table") {
         const result = await createTable(action.input, abort.signal)
         if (abort.signal.aborted) return
+        confirmed = true
         setSelected(result.defaultViewId)
         setTableName("")
         setMessage("Table created.")
-      } else {
-        await addRow(action.input, abort.signal)
+      } else if (action.kind === "row") {
+        const result = await addRow(action.input, abort.signal)
         if (abort.signal.aborted) return
+        if (result.updatedBy !== scope.accountId) throw new Error("Row writer mismatch")
+        confirmed = true
+        setSelected(action.viewId)
         setValue("")
         setMessage("Row added.")
+      } else {
+        const result = await saveView(action.input, abort.signal)
+        if (abort.signal.aborted) return
+        confirmed = true
+        setSelected(result.viewId)
+        setViewName("")
+        setPrefix("")
+        setMessage("View saved.")
       }
+      releaseCatalogIntent(scope, action)
       setPending(null)
       setEpoch(n => n + 1)
     } catch (error) {
       if (abort.signal.aborted) return
-      const rejection = catalogRejection(error)
-      if (rejection) {
-        setPending(null)
-        setProblem(rejection)
-        if (isViewDenied(error)) { setViews(null); setOpen(false) }
+      if (confirmed) {
+        setStorageBlocked(true)
+        setProblem("Write confirmed, but its browser retry record could not be cleared. Reload this board to review.")
         setEpoch(n => n + 1)
+      } else if (!journaled) {
+        setProblem("Unable to verify the account. No catalog request was sent.")
       } else {
-        setProblem("Commit outcome unconfirmed. Retry the same request; its definition is locked.")
+        const rejection = catalogRejection(error)
+        // A rejection of a replay cannot establish that the earlier attempt
+        // did not commit. Only a definitive rejection of the first attempt
+        // may release the frozen intent.
+        if (rejection && !retry) {
+          try {
+            releaseCatalogIntent(scope, action)
+            setPending(null)
+            setProblem(rejection)
+          } catch {
+            setStorageBlocked(true)
+            setProblem(journalProblem)
+          }
+          if (isViewDenied(error)) { setViews(null); setOpen(false) }
+          setEpoch(n => n + 1)
+        } else {
+          setProblem(action.kind === "view-review" ? unknownView : (rejection ? "Retry did not confirm the original outcome. " + rejection : unknownOutcome))
+          if (isViewDenied(error)) { setViews(null); setOpen(false); setEpoch(n => n + 1) }
+          else if (action.kind === "view-review") setEpoch(n => n + 1)
+        }
       }
     } finally {
       if (write.current === abort) write.current = null
@@ -108,43 +197,40 @@ export function NativeBoardData({ boardId, readOnly = false, allowSaveView = tru
   function newRow(event: FormEvent) {
     event.preventDefault()
     if (readOnly || locked || !view || !primary) return
-    void submit({ kind: "row", input: {
+    void submit({ kind: "row", viewId: view.viewId, input: {
       board_id: boardId, dataset_id: view.datasetId, field_id: primary.id,
       schema_version: view.datasetSchemaVersion, value, request_id: crypto.randomUUID(),
     } })
   }
-  async function newView(event: FormEvent) {
+  function newView(event: FormEvent) {
     event.preventDefault()
     if (readOnly || !allowSaveView || locked || write.current || !view || !primary || !viewName.trim()) return
-    const input: SaveViewRequest = { board_id: boardId, dataset_id: view.datasetId,
-      definition: { name: viewName.trim(), allowed_field_ids: [primary.id],
-        filter: { op: "text_prefix", field_id: primary.id, value: prefix },
-        sort: { field_id: primary.id, direction: "asc" } } }
+    // Save view has no server idempotency receipt. Keep a review marker, never
+    // replay it automatically or unlock a second create after a failed refresh.
+    void submit({ kind: "view-review", reviewId: crypto.randomUUID(), viewId: view.viewId,
+      input: { board_id: boardId, dataset_id: view.datasetId,
+        definition: { name: viewName.trim(), allowed_field_ids: [primary.id],
+          filter: { op: "text_prefix", field_id: primary.id, value: prefix },
+          sort: { field_id: primary.id, direction: "asc" } } } })
+  }
+  async function acknowledgeViewReview() {
+    if (!scope || !reviewed || !pending || pending.kind !== "view-review" || storageBlocked || write.current) return
     const abort = new AbortController()
     write.current = abort
     setBusy(true)
-    setMessage("")
-    setProblem("")
     try {
-      const result = await saveView(input, abort.signal)
+      const identity = await currentJazzIdentity()
       if (abort.signal.aborted) return
-      setSelected(result.viewId)
+      if (!identity || identity.id !== scope.subjectId || identity.accountId !== scope.accountId) throw new Error("Account changed")
+      releaseCatalogIntent(scope, pending)
+      setPending(null)
+      setReviewEpoch(null)
+      setProblem("")
       setViewName("")
       setPrefix("")
-      setMessage("View saved.")
-      setEpoch(n => n + 1)
-    } catch (error) {
-      if (abort.signal.aborted) return
-      const rejection = catalogRejection(error)
-      if (rejection) {
-        setProblem(rejection)
-        if (isViewDenied(error)) { setViews(null); setOpen(false) }
-      } else {
-        // Saved-view creation is not idempotent in #22. Do not blindly replay.
-        setViewSaveUnknown(true)
-        setProblem("Save view outcome unconfirmed. Refresh the view list and check whether it exists before creating again.")
-      }
-      setEpoch(n => n + 1)
+      setMessage("View list reviewed. No save request was replayed.")
+    } catch {
+      if (!abort.signal.aborted) setProblem("Unable to confirm review. The original save remains locked.")
     } finally {
       if (write.current === abort) write.current = null
       if (!abort.signal.aborted) setBusy(false)
@@ -169,12 +255,15 @@ export function NativeBoardData({ boardId, readOnly = false, allowSaveView = tru
             <label className="block text-xs">Default grid name<input className={inputClass} required maxLength={80} value={defaultViewName} disabled={locked} onChange={e => setDefaultViewName(e.target.value)} /></label>
             <Button type="submit" size="sm" disabled={locked || !tableName.trim() || !fieldName.trim() || !defaultViewName.trim()}>Create table</Button>
           </form>}
-          {pending && <Button size="sm" disabled={busy} onClick={() => void submit(pending)}>
+          {pending && pending.kind !== "view-review" && !readOnly && <Button size="sm" disabled={busy || storageBlocked} onClick={() => void submit(pending, true)}>
             {pending.kind === "table" ? "Retry Create table" : "Retry Add row"}
           </Button>}
           {message && <p role="status" className="text-sm">{message}</p>}
           {problem && <p role="alert" className="text-sm text-destructive">{problem}</p>}
-          {viewSaveUnknown && <Button size="sm" variant="outline" onClick={() => { setEpoch(n => n + 1); setViewSaveUnknown(false) }}>Refresh and review saved views</Button>}
+          {pending?.kind === "view-review" && <>
+            <Button size="sm" variant="outline" disabled={busy || storageBlocked} onClick={() => { setReviewEpoch(epoch + 1); setEpoch(n => n + 1) }}>Refresh and review saved views</Button>
+            {reviewed && <Button size="sm" variant="outline" disabled={busy || storageBlocked} onClick={() => void acknowledgeViewReview()}>I reviewed the saved views</Button>}
+          </>}
           {[...new Set(views.map(v => v.datasetId))].map(id => {
             const group = views.filter(v => v.datasetId === id)
             return <section key={id} className="space-y-2">
