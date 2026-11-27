@@ -307,7 +307,8 @@ export const SettingsUrl = "/settings"
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: SettingsUrl,
-  beforeLoad: requireVerifiedAuth,
+  beforeLoad: requireBoardAuth,
+  errorComponent: import.meta.env.VITE_DIM0_JAZZ_CANVAS === "1" ? JazzSessionUnavailable : undefined,
   component: SettingsScreen,
 })
 

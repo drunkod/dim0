@@ -9,7 +9,8 @@
     "./policy": "./src/policy.ts",
     "./registry": "./src/registry.ts",
     "./pending": "./src/pending/index.ts",
-    "./ports": "./src/ports.ts"
+    "./ports": "./src/ports.ts",
+    "./profile": "./src/profile.ts"
   },
   "scripts": {
     "generate": "python3 scripts/generate_acc.py",
