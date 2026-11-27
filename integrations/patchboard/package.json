@@ -31,6 +31,7 @@
     "test:native:persistent-text-catalog": "pnpm --filter @patchboard/web exec node test/native-persistent-text-catalog-proof.mjs",
     "test:native:stopped-store-restore": "pnpm --filter @patchboard/web exec node test/native-persistent-text-catalog-proof.mjs --restore",
     "test:native:sashai-presentation": "pnpm --filter @patchboard/web exec node test/native-persistent-text-catalog-proof.mjs --presentation",
+    "test:native:sashai-narrow-chrome": "pnpm --filter @patchboard/web exec node test/native-persistent-text-catalog-proof.mjs --narrow-chrome",
     "test:native:persistent-mcp-table-create": "pnpm --filter @patchboard/web exec node test/native-persistent-text-catalog-proof.mjs --persistent-mcp",
     "test:native:persistent-filtered-sharing": "pnpm --filter @patchboard/web exec node test/native-persistent-text-catalog-proof.mjs --filtered-sharing",
     "test:native:empty-catalog": "pnpm --filter @patchboard/web exec node test/native-empty-catalog-proof.mjs",

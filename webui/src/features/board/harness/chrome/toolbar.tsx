@@ -154,8 +154,9 @@ const trayPath = (w: number, h: number, r: number): string =>
 function FlaredTray({
   children,
   className,
+  responsiveWeb = false,
   ...rest
-}: { children: React.ReactNode } & React.HTMLAttributes<HTMLDivElement>) {
+}: { children: React.ReactNode; responsiveWeb?: boolean } & React.HTMLAttributes<HTMLDivElement>) {
   const rowRef = useRef<HTMLDivElement>(null)
   const [w, setW] = useState(0)
   const [hover, setHover] = useState(false)
@@ -177,12 +178,16 @@ function FlaredTray({
 
   return (
     <div
-      className={cn("absolute left-1/2 top-0 z-50 -translate-x-1/2", className)}
+      className={cn(
+        "absolute left-1/2 top-0 z-50 -translate-x-1/2",
+        responsiveWeb && "pointer-events-auto max-xl:relative max-xl:left-auto max-xl:top-auto max-xl:mx-auto max-xl:w-max max-xl:max-w-full max-xl:translate-x-0 max-xl:overflow-x-auto",
+        className,
+      )}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       {...rest}
     >
-      <div className="relative">
+      <div className={cn("relative", responsiveWeb && "max-xl:w-max")}>
         {d && (
           <>
             {/* Frosted backdrop. CRITICAL: nothing above this in the tree may set
@@ -235,7 +240,7 @@ function FlaredTray({
 }
 
 
-export function HarnessToolbar({ local = false }: { local?: boolean } = {}) {
+export function HarnessToolbar({ local = false, responsiveWeb = false }: { local?: boolean; responsiveWeb?: boolean } = {}) {
   const tool = useBoardAppStore((s) => s.tool)
   const setTool = useBoardAppStore((s) => s.setTool)
   const inkColor = useBoardAppStore((s) => s.inkColor)
@@ -265,6 +270,7 @@ export function HarnessToolbar({ local = false }: { local?: boolean } = {}) {
 
   return (
     <FlaredTray
+      responsiveWeb={responsiveWeb}
       className="text-sidebar-foreground"
       role="toolbar"
       aria-label="Board toolbar"
