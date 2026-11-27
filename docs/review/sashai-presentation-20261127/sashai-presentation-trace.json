@@ -1,0 +1,68 @@
+{
+  "profile": "persistent local HTTPS",
+  "qaFlags": false,
+  "oneBoard": true,
+  "oneStore": true,
+  "title": "SashAI",
+  "mobileTitle": "SashAI",
+  "newAccountBrand": "SashAI",
+  "scope": [
+    "board:read",
+    "board:write",
+    "table:create"
+  ],
+  "board": "01a21cc2-d290-7cb3-a624-a6d5eae15415",
+  "created": {
+    "operation": "dataset.create.v1",
+    "boardId": "01a21cc2-d290-7cb3-a624-a6d5eae15415",
+    "datasetId": "5a111c8f-2b52-5ccb-9138-ce9d7ddd2fee",
+    "fieldId": "4f8c2061-4ec5-5e7c-b437-c0db14865809",
+    "defaultViewId": "88cd80cd-1f8d-5397-a98b-dc9e4a7ff50f",
+    "schemaVersion": 1,
+    "receiptId": "44c02e3c-e5e7-5958-9567-5d51ff038e4e",
+    "eventId": "994ce91d-9502-5a22-93d7-a0c47652f4cb",
+    "replayed": false
+  },
+  "viewId": "ca4f7a36-180e-4a09-8cc3-babd94593f91",
+  "rowId": "4607d289-56d6-5e3d-b20e-6695e98f9eeb",
+  "rowValue": "Demo — исходный текст",
+  "russian": {
+    "locale": "ru-RU",
+    "version": 1,
+    "reload": true,
+    "restart": true,
+    "settings": true,
+    "data": true,
+    "share": true,
+    "consent": true
+  },
+  "english": {
+    "locale": "en",
+    "version": 2,
+    "restored": true,
+    "reload": true,
+    "data": true,
+    "share": true,
+    "consent": true
+  },
+  "unsupportedLocaleFallback": true,
+  "independentAccountEnglish": true,
+  "recipientRussian": true,
+  "ownerEnglishWhileRecipientRussian": true,
+  "unchangedUserContent": true,
+  "unchangedCatalogAfterRestart": true,
+  "actualClipboard": true,
+  "exactConsentScopesBothLanguages": true,
+  "counts": {
+    "typedDatasets": 1,
+    "typedFields": 1,
+    "typedViews": 2,
+    "typedRecords": 1,
+    "typedCatalogReceipts": 1,
+    "typedCatalogEvents": 1,
+    "typedPatchReceipts": 1,
+    "typedPatchEvents": 1
+  },
+  "installedClientTested": false,
+  "publicDeployment": false
+}
