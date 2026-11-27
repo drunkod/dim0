@@ -27,6 +27,7 @@ import {createTextTable,textTableOperationIdentity,
   TypedCatalogInvalid,TypedCatalogConflict,TypedCatalogCommitUnknown
 } from "./typed-catalog.ts";
 import {qaHttpsCatalogProfile,qaHttpsCatalogBoardAllowed} from "./qa-https-catalog-profile.ts";
+import {persistentMcpTableCreateEnabled} from "./persistent-text-catalog.ts";
 import {typedRecordQaEnabled} from "./typed-record-qa-gate.ts";
 import {
   querySavedTypedView,TypedViewAccessDenied,TypedViewUnsupported,
@@ -83,7 +84,7 @@ async function executePrivateMcp(
   const beforeWriteSubmit = () => {
     if (!admitted("board:write")) throw new CanvasPatchAdmissionRevoked();
   };
-  const tableCreateConsented=()=>(typedRecordQaEnabled()||qaHttpsCatalogBoardAllowed(grant.boardId))&&grantedScopes.has("board:write")&&
+  const tableCreateConsented=()=>(typedRecordQaEnabled()||qaHttpsCatalogBoardAllowed(grant.boardId)||persistentMcpTableCreateEnabled())&&grantedScopes.has("board:write")&&
     grantedScopes.has("table:create")&&hasExplicitTableCreateConsent(grant);
   const beforeTableCreateSubmit=()=>{
     if(!tableCreateConsented()||!admitted("board:write")||!admitted("table:create"))
@@ -205,7 +206,7 @@ async function executePrivateMcp(
   if(tableCreateConsented()&&admitted("board:write")&&admitted("table:create")&&
     (await db.one(app.boards.where({id:grant.boardId})))?.ownerId===actorId)
     mcpServer.registerTool("call-api-write",{
-      description:"QA only: allowlisted dataset.create.v1. Create one primary-text table and default grid. Requires explicit table:create and board:write consent and current Owner. Stable request_id replays original IDs.",
+      description:"Allowlisted dataset.create.v1. Create one primary-text table and default grid. Requires explicit table:create and board:write consent and current Owner. Stable request_id replays original IDs.",
       annotations:{readOnlyHint:false,destructiveHint:false},
       inputSchema:z.object({
         operation:z.literal("dataset.create.v1"),
@@ -534,7 +535,7 @@ export function handlePrivateMcp(
       grant = verified;
       grantedScopes = new Set(typeof claims.scope === "string" ? claims.scope.split(/\s+/).filter(Boolean) : []);
       return new Response(null, { status: 204 });
-    }, { resource: resource(), challengeScopes: qaHttpsCatalogProfile() ? [...scopes,"table:create"] : scopes })(verificationRequest);
+    }, { resource: resource(), challengeScopes: (qaHttpsCatalogProfile()||persistentMcpTableCreateEnabled()) ? [...scopes,"table:create"] : scopes })(verificationRequest);
 
     if (verification.status !== 204 || !subject || !grant) {
       if (debugAuth) console.warn("PRIVATE_MCP_AUTH_REJECT", JSON.stringify({
