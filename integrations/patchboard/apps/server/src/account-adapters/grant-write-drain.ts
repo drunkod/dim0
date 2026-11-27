@@ -10,6 +10,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { Db } from "jazz-tools";
 import {app} from "@patchboard/jazz-schema";
 import type {canvasPatchOperationIdentity} from "../canvas-versioned-patch.ts";
+import type {textTableOperationIdentity} from "../typed-catalog.ts";
 import type {typedRecordOperationIdentity} from "../typed-record-patch.ts";
 import {
   authorizeProtectedMcpInvocation, GrantDrainPending, GrantOwnerError,
@@ -23,8 +24,8 @@ export type ProtectedMcpWriteLease=Readonly<{
 export type McpLeaseOperation=Readonly<{
   tool:"create_note"|"create_canvas_entity"|"update_canvas_entity"|
     "patch_canvas_entity"|"delete_canvas_entity"|"update_applet_state"|
-    "patch_typed_record";
-  identity?:ReturnType<typeof canvasPatchOperationIdentity>|ReturnType<typeof typedRecordOperationIdentity>;
+    "patch_typed_record"|"call-api-write";
+  identity?:ReturnType<typeof canvasPatchOperationIdentity>|ReturnType<typeof typedRecordOperationIdentity>|ReturnType<typeof textTableOperationIdentity>;
 }>;
 function serialized<T>(db:DatabaseSync,action:()=>T):T {
   db.exec("BEGIN IMMEDIATE");
@@ -40,8 +41,15 @@ export function beginProtectedMcpWriteLease(
     // under the SAME SQL lock that creates the write lease.
     if(!authorizeProtectedMcpInvocation(db,admission,grant,"board:write"))
       return null;
+    if(operation?.tool==="call-api-write"){
+      if(!authorizeProtectedMcpInvocation(db,admission,grant,"table:create"))return null;
+      const id=operation.identity;
+      if(!id||id.tool!=="call-api-write"||id.action!=="dataset.create.v1"||
+        id.boardId!==grant.boardId||!id.actorId||!id.requestId||!(/^[a-f0-9]{64}$/).test(id.fingerprint))
+        throw new Error("INVALID_SERVER_WRITE_OPERATION_IDENTITY");
+    }
     if(operation?.identity &&
-      (!["patch_canvas_entity","patch_typed_record"].includes(operation.tool) ||
+      (!["patch_canvas_entity","patch_typed_record","call-api-write"].includes(operation.tool) ||
         operation.identity.tool!==operation.tool ||
         operation.identity.boardId!==grant.boardId))
       throw new Error("INVALID_SERVER_WRITE_OPERATION_IDENTITY");
@@ -71,7 +79,7 @@ export async function runReservedMcpWrite<T>(
   if(reply && typeof reply==="object" && "content" in reply && Array.isArray(reply.content)){
     const failure="isError" in reply && reply.isError;
     const diagnostic=failure && reply.content.length===1 ? String(reply.content[0]?.text??"") : "";
-    const knownFailure=/^(BOARD_ACCESS_DENIED|BOARD_WRITE_DENIED|INSUFFICIENT_SCOPE: board:write required|GRANT_ADMISSION_EXPIRED_OR_INVALID|REQUEST_ID_CONFLICT|VERSION_CONFLICT|SCHEMA_VERSION_CONFLICT|SERVICE_GUARD_DENIED|INVALID_FIELD|INVALID_ENTITY|BOARD_UNAVAILABLE|WRITE_REJECTED)$/.test(diagnostic);
+    const knownFailure=/^(BOARD_ACCESS_DENIED|BOARD_WRITE_DENIED|INSUFFICIENT_SCOPE: board:write required|GRANT_ADMISSION_EXPIRED_OR_INVALID|REQUEST_ID_CONFLICT|VERSION_CONFLICT|SCHEMA_VERSION_CONFLICT|SERVICE_GUARD_DENIED|INVALID_FIELD|INVALID_ENTITY|BOARD_UNAVAILABLE|WRITE_REJECTED|CATALOG_INVALID_DEFINITION|CATALOG_REQUEST_ID_CONFLICT)$/.test(diagnostic);
     if(!failure || knownFailure)settleProtectedMcpWriteLease(db,lease);
   }
   return reply;

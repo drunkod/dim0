@@ -5,6 +5,7 @@ import { passkey } from "@better-auth/passkey";
 import { privateAuthConfig } from "./config.ts";
 import { privateAuthDatabase } from "./db.ts";
 import { consentGrantReference, tokenBoardGrantClaim } from "./grants.ts";
+import { typedRecordQaEnabled } from "../typed-record-qa-gate.ts";
 import { passkeyOnlyIdentitySchemaPlugin } from "./passkey-only-identity.ts";
 import { resolveRegistrationIntent } from "./enrollment.ts";
 import { finalizeVerifiedPasskeyRegistration } from "./finalize-registration.ts";
@@ -50,13 +51,17 @@ export const auth = betterAuth({
         tokenBoardGrantClaim(referenceId, user?.id),
       // offline_access permits a refresh token; the referenceId survives
       // rotation, so it cannot widen a consented single-board grant.
-      scopes: ["board:read", "board:write", "offline_access"],
+      // Explicit opt-in QA action: source table|create -> Dim0 table:create.
+      // Never part of OAuth's default client scopes or production issuer.
+      scopes: ["board:read", "board:write", "offline_access",
+        ...(typedRecordQaEnabled() ? ["table:create"] : [])],
       grantTypes: ["authorization_code", "refresh_token"],
       allowDynamicClientRegistration: true,
       allowUnauthenticatedClientRegistration: true,
       clientRegistrationRequirePKCE: true,
       clientRegistrationDefaultScopes: ["board:read", "board:write"],
-      clientRegistrationAllowedScopes: ["offline_access"],
+      clientRegistrationAllowedScopes: ["offline_access",
+        ...(typedRecordQaEnabled() ? ["table:create"] : [])],
       accessTokenExpiresIn: accessTokenSeconds,
       refreshTokenExpiresIn: 604800,
     }) as unknown as import("better-auth").BetterAuthPlugin,
