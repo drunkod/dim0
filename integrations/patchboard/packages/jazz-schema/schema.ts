@@ -176,6 +176,15 @@ export const schema = s.defineSchema({
     boardId: s.uuid(), name: s.string(), schemaVersion: s.int(),
     state: s.enum("active","read_only").default("active"),
   }, {board:s.rel("boards","boardId")}).indexOnly(["boardId"]),
+  /** One canonical server-defined read-only projection per saved view. */
+  typedViews: s.table({
+    boardId:s.uuid(),datasetId:s.uuid(),name:s.string(),
+    kind:s.enum("grid"),definitionVersion:s.int(),
+    allowedFieldIds:s.json(),filter:s.json(),sort:s.json(),
+  },{
+    board:s.rel("boards","boardId"),
+    dataset:s.rel("typedDatasets","datasetId"),
+  }).indexOnly(["boardId","datasetId"]),
   typedFields: s.table({
     boardId: s.uuid(), datasetId: s.uuid(), name: s.string(),
     kind: s.enum("text","computed"),
@@ -327,6 +336,7 @@ export const permissions = definePermissions({
   canvasPatchReceipts: { read: false, insert: false, update: false, delete: false },
   canvasPatchEvents: { read: false, insert: false, update: false, delete: false },
   typedDatasets: { read: false, insert: false, update: false, delete: false },
+  typedViews: { read: false, insert: false, update: false, delete: false },
   typedFields: { read: false, insert: false, update: false, delete: false },
   typedRecords: { read: false, insert: false, update: false, delete: false },
   typedPatchReceipts: { read: false, insert: false, update: false, delete: false },

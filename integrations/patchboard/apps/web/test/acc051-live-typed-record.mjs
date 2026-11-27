@@ -156,7 +156,7 @@ export async function proveAcc051LiveTypedRecord({
     assert.ok(editorTools.includes("patch_typed_record"));
     assert.ok(viewerTools.includes("patch_typed_record"),
       "writer scoped but current viewer role cannot use it");
-    assert.equal(editorTools.length,12);
+    assert.equal(editorTools.length,13);
     assert.ok(!readOnlyTools.includes("patch_typed_record"),
       "read-only OAuth consent never discovers typed writes");
     const command=(recordId,requestId,title="Demo rehearsed.",

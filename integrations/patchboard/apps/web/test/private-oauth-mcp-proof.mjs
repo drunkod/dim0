@@ -368,7 +368,8 @@ try {
   try {
     await connectReader();
     const available = (await reader.listTools()).tools.map(t => t.name).sort();
-    assert.deepEqual(available, ["get_applet_state", "get_canvas_entity", "list_boards", "list_canvas_entities", "read_board"], "read-only grant must hide write tools");
+    assert.deepEqual(available, ["get_applet_state","get_canvas_entity","list_boards","list_canvas_entities","read_board",
+      ...(process.env.PATCHBOARD_QA_TYPED_RECORD==="1"?["read_typed_view"]:[])], "read-only grant must hide write tools");
     const list = await reader.callTool({ name: "list_boards", arguments: {} });
     assert.equal(list.isError, undefined, JSON.stringify(list));
     const listed = JSON.parse(list.content[0].text);
@@ -403,7 +404,8 @@ try {
       ["create_canvas_entity", "create_note", "delete_canvas_entity", "get_applet_state",
        "get_canvas_entity", "list_boards", "list_canvas_entities", "patch_canvas_entity",
        ...(process.env.PATCHBOARD_QA_TYPED_RECORD==="1" ? ["patch_typed_record"] : []),
-       "read_board", "update_applet_state", "update_canvas_entity"]);
+       "read_board", ...(process.env.PATCHBOARD_QA_TYPED_RECORD==="1"?["read_typed_view"]:[]),
+       "update_applet_state", "update_canvas_entity"]);
     // New Dim0 entity API: an actual OAuth MCP client can mutate full
     // applet/note JSON through Jazz, with CAS and board scope enforced.
     const canvasId = randomUUID();
@@ -523,6 +525,9 @@ try {
       if(process.env.PATCHBOARD_QA_TYPED_RECORD==="1")deniedCalls.push(["patch_typed_record",{
         board_id:boardId,dataset_id:randomUUID(),record_id:randomUUID(),schema_version:3,
         expected_version:7,request_id:randomUUID(),set:{[randomUUID()]:"Denied typed callback"}
+      }]);
+      if(process.env.PATCHBOARD_QA_TYPED_RECORD==="1")deniedCalls.push(["read_typed_view",{
+        board_id:boardId,dataset_id:randomUUID(),view_id:randomUUID(),share_token:"a".repeat(43),page_size:1
       }]);
       assert.deepEqual(deniedCalls.map(([name]) => name).sort(),
         (await writer.listTools()).tools.map(tool => tool.name).sort());
@@ -853,6 +858,21 @@ try {
                   ownerActorId:ownerMe.accountId,
                   editorToken,viewerWriteToken,readOnlyToken:readToken,
                   makeMcp:clientWithToken,restart:restartPrivateCiFixture
+                });
+                const {proveAcc051LiveSharedView}=await import(
+                  "./acc051-live-shared-view.mjs");
+                await proveAcc051LiveSharedView({
+                  boardId,siblingBoardId:secondBoardId,
+                  ownerPage:page,viewerPage,editorPage,
+                  ownerActorId:ownerMe.accountId,
+                  editorToken,viewerWriteToken,readOnlyToken:readToken,
+                  makeMcp:clientWithToken,restart:restartPrivateCiFixture,
+                  siblingToken:secondToken,
+                  issueReader:async()=>{
+                    const token=await oauthGrant("board:read",page,boardId);
+                    await page.goto(sharedUrl);
+                    return {token,clientId:issuedTokens.get(token).clientId};
+                  }
                 });
               }
             }

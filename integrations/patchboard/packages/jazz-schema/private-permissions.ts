@@ -53,6 +53,7 @@ export const privatePermissions = definePermissions({
   canvasPatchReceipts: { read: false, insert: false, update: false, delete: false },
   canvasPatchEvents: { read: false, insert: false, update: false, delete: false },
   typedDatasets: { read: false, insert: false, update: false, delete: false },
+  typedViews: { read: false, insert: false, update: false, delete: false },
   typedFields: { read: false, insert: false, update: false, delete: false },
   typedRecords: { read: false, insert: false, update: false, delete: false },
   typedPatchReceipts: { read: false, insert: false, update: false, delete: false },

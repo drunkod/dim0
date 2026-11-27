@@ -5,6 +5,7 @@ import { privateAuthConfig } from "./config.ts";
 import { installJazzMemberDirectory } from "./member-directory.ts";
 import { installAccountPreferenceTables } from "../account-adapters/profile-preferences.ts";
 import { installGrantAdmissionLedger } from "../account-adapters/grant-admission.ts";
+import {installTypedViewShareLedger} from "../typed-shared-view.ts";
 
 let database: DatabaseSync | undefined;
 /** Better Auth owns this dedicated SQLite store. It is not a Jazz application table. */
@@ -34,6 +35,7 @@ export function privateAuthDatabase(): DatabaseSync {
   installJazzMemberDirectory(db);
   installAccountPreferenceTables(db);
   installGrantAdmissionLedger(db);
+  installTypedViewShareLedger(db);
   db.prepare("DELETE FROM patchboard_enrollment_intent WHERE expires_at_ms<=?").run(Date.now());
   // Preserve live five-minute registrations from the historical file store,
   // while removing abandoned/invalid file tickets on first upgraded startup.
