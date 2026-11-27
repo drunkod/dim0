@@ -1,0 +1,41 @@
+{
+  "boardId": "01a21d44-63f7-7321-b2be-4d91ba46394f",
+  "datasetId": "10353bf5-3e86-5c62-8810-ad90302c53ff",
+  "fieldId": "d5569781-9af4-584f-b56c-5e0d106c7037",
+  "viewId": "96a5bfa5-4649-56be-8e86-58259c656e23",
+  "recordId": "e7a91e25-c9ea-55af-9787-aa0b7cf25123",
+  "catalogReceiptId": "e867b8b4-6bfe-51ed-a2e1-e0b58a436887",
+  "catalogEventId": "85f7b0fb-20cb-59e5-8258-bb332c24485a",
+  "rowReceiptId": "0d99c0e8-605b-5485-be42-66aa055a4382",
+  "rowEventId": "f3f17af8-1f06-5dd6-a963-5ca9c37806b5",
+  "rowValue": "Beta.5 stopped-store restore",
+  "counts": {
+    "typedDatasets": 1,
+    "typedFields": 1,
+    "typedViews": 1,
+    "typedRecords": 1,
+    "typedCatalogReceipts": 1,
+    "typedCatalogEvents": 1,
+    "typedPatchReceipts": 1,
+    "typedPatchEvents": 1
+  },
+  "sameOwner": true,
+  "sameStoreContents": true,
+  "verifiedBytes": 1945860,
+  "verifiedFiles": 9,
+  "liveCopyRejected": true,
+  "alteredCopyRejected": true,
+  "existingDestinationRejected": true,
+  "originalKeptStopped": true,
+  "qaFlags": false,
+  "publicEndpoint": false,
+  "times": {
+    "gracefulStopMs": 19,
+    "backupMs": 264,
+    "verifiedRestoreMs": 257,
+    "restoreCopyWallMs": 302,
+    "restoreToHealthyMs": 1565,
+    "restoreToOwnerGridMs": 2786,
+    "stopToOwnerGridMs": 3117
+  }
+}

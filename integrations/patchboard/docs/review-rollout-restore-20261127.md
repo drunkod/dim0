@@ -17,5 +17,58 @@ initial native backup/restore passed. A synthetic launchd job passed
 bootstrap, health, bootout, new PRIVATE_AUTH_STOPPED marker and lsof no
 open files (418 ms bootout-to-marker/check). No real service modified.
 
-Exact-head native rehearsal results will be appended after execution.
-This document is not a public release approval.
+
+## Exact application candidate
+
+Tested commit: `cbb8bf5e268dfedb53c939fa421a906de937ea5f`. Node 24.22.3; beta.5; same Mac isolated
+staging, not a second physical host. The subsequent evidence-only commit
+does not change executable code.
+
+| Measurement | Milliseconds |
+| --- | ---: |
+| Graceful stop | 19 |
+| Verified backup helper | 264 |
+| Verified restore helper | 257 |
+| Restore copy wall clock | 302 |
+| Restore to healthy | 1565 |
+| Restore to same authenticated Owner grid | 2786 |
+| Stop to recovered Owner grid | 3117 |
+
+The full local rehearsal exited 0 (about 45 seconds including fixture setup/build). Verified 9 files, 1,945,860 bytes. The restore directory was new; the original stayed stopped. The same Owner signed out before backup, signed in with the original virtual passkey after restoration at the same HTTPS origin, and opened the original board, table and row.
+
+| Recovered object | Original and restored ID |
+| --- | --- |
+| Board | `01a21d44-63f7-7321-b2be-4d91ba46394f` |
+| Table | `10353bf5-3e86-5c62-8810-ad90302c53ff` |
+| Primary field | `d5569781-9af4-584f-b56c-5e0d106c7037` |
+| Default grid | `96a5bfa5-4649-56be-8e86-58259c656e23` |
+| Row | `e7a91e25-c9ea-55af-9787-aa0b7cf25123` |
+| Catalog receipt | `e867b8b4-6bfe-51ed-a2e1-e0b58a436887` |
+| Catalog event | `85f7b0fb-20cb-59e5-8258-bb332c24485a` |
+| Row receipt | `0d99c0e8-605b-5485-be42-66aa055a4382` |
+| Row event | `f3f17af8-1f06-5dd6-a963-5ca9c37806b5` |
+
+Row text: Beta.5 stopped-store restore. Each catalog count was exactly one,
+including both kinds of receipts/events; authoritative snapshots identical
+before backup and after restore. Live-source copy rejected with open-handle
+error, existing destination rejected, altered backup rejected with integrity
+error. No production data was copied. The fixture root, both generations and
+the temporary backup were retired at teardown. The published trace contains
+only synthetic object IDs, booleans, counts and timings.
+
+Exact-head SIGTERM/SIGINT regression, server typecheck and schema/private
+policy check passed; no generated artifacts or migrations changed. Separate
+synthetic backend launchd bootstrap/health/bootout/marker/no-open-handles
+smoke passed (421 ms). An intermediate repeat of that smoke used the wrong
+working directory and exited before migration/launch; rerun from repository
+root passed. Full pre-merge upgrade and main CI evidence reused; no local
+repeat of the entire catalog/MCP suite.
+
+[Machine trace](rollout-restore-trace-20261127.json) ·
+[Inspected recovered native grid](rollout-restore-native-grid-20261127.png).
+
+The operator commands are reviewed and shell syntax checked; the production
+Caddy/ingress jobs are proposals, not executed. Independent human rehearsal,
+realistic volume and encrypted backup/restore, actual hostname, supported
+front door, available disk, monitoring/correlation, and release permission
+remain outstanding. Public rollout NO-GO. This is not a production RTO.
