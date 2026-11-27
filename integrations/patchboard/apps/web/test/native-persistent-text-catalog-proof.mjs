@@ -325,10 +325,19 @@ async function runFilteredSharing(board,owner,recipient){
   await data.getByRole("button",{name:"Next page"}).click();await see(op,"Internal planning",3);
   await op.keyboard.press("Escape");
 
-  stage="sharing off with persistent catalog still on";
-  await stop(backend);await startBackend("1","0");
-  await stop(frontend);await startFrontend("0");
+  console.log("PERSISTENT_FILTERED_SHARING_RESTART_REVOKE_PASS",JSON.stringify({viewId:view,shareId:issued.shareId,activeAfterRestart:true,revokedNextFetch:403,ownerRetained:3,counts:counts(after)}));
+  stage="quiesce browser pages before switching sharing off";
+  // Stop periodic canvas traffic before intentionally taking its services down.
+  // This is a profile/build switch, not the live revocation/restart test above.
+  await op.goto("about:blank");await rp.goto("about:blank");
+  await stop(frontend);await stop(backend);
+  stage="start catalog-only backend and build";
+  await startBackend("1","0");await startFrontend("0");
+  stage="catalog-only Owner readback";
   await op.goto(boardUrl);
+  await rp.goto(origin+"/boards");
+  assert.equal((await api(op,"me")).body.id,owner.identity.id);
+  assert.equal((await api(rp,"me")).body.id,recipient.identity.id);
   data=await openData();await data.getByRole("button",{name:"Open saved view All rows",exact:true}).click();
   await see(op,"Demo alpha",3);
   await expect(data.getByRole("button",{name:"Save view",exact:true})).toHaveCount(0);
@@ -336,9 +345,11 @@ async function runFilteredSharing(board,owner,recipient){
   await op.keyboard.press("Escape");
   await op.getByRole("button",{name:"Share this board"}).click();
   await expect(op.getByRole("region",{name:"Saved view links"})).toHaveCount(0);
+  stage="catalog-only ordinary invitation";
   const ordinary=op.waitForResponse(r=>r.url().endsWith("/api/invite")&&r.request().method()==="POST");
   await op.getByRole("dialog").getByRole("button",{name:"Create link",exact:true}).click();
   assert.equal((await ordinary).status(),201);
+  stage="catalog-only direct route denials";
   const off={
     create:(await api(op,"records/views/create",definition)).status,
     share:(await api(op,"records/views/share",ref)).status,
@@ -347,6 +358,7 @@ async function runFilteredSharing(board,owner,recipient){
     query:(await api(rp,"records/views/query",query)).status
   };
   assert.ok(Object.values(off).every(status=>status===404),JSON.stringify(off));
+  stage="catalog-only landing and durable audit";
   const offPage=await recipient.context.newPage();await offPage.goto(copied,{waitUntil:"domcontentloaded"});
   await expect(offPage.getByRole("heading",{name:"Saved view unavailable",exact:true})).toBeVisible(options);
   assert.deepEqual(await snapshot(board,op),before);
