@@ -29,6 +29,7 @@ import {typedRecordQaEnabled} from "./typed-record-qa-gate.ts";
 import {
   createSavedTypedView,changeSavedTypedView,issueTypedViewShare,
   revokeTypedViewShare,querySavedTypedView,
+  listOwnerSavedTypedViews,listOwnerTypedViewShares,
   TypedViewAccessDenied,TypedViewUnsupported,TypedViewCursorChanged,
   TypedViewNotFound,TypedViewVersionConflict
 } from "./typed-shared-view.ts";
@@ -322,6 +323,26 @@ export async function privateBoardRequest(
         actorId: accountId, expectedVersion: parsed.expected_version, value: parsed.value,
       }));
     }
+    // QA only: owner Data picker and share-management metadata. This GET
+    // never exposes token hashes, records, credentials or member lists.
+    if(pathname==="/patchboard-private/api/records/views" &&
+      request.method==="GET"){
+      if(!typedRecordQaEnabled())return json({error:"Not found"},404);
+      const boardId=boardIdSchema.parse(url.searchParams.get("board_id"));
+      return json(await listOwnerSavedTypedViews(db,{
+        boardId,actorId:accountId
+      }));
+    }
+    if(pathname==="/patchboard-private/api/records/views/shares" &&
+      request.method==="GET"){
+      if(!typedRecordQaEnabled())return json({error:"Not found"},404);
+      const boardId=boardIdSchema.parse(url.searchParams.get("board_id"));
+      const datasetId=boardIdSchema.parse(url.searchParams.get("dataset_id"));
+      const viewId=boardIdSchema.parse(url.searchParams.get("view_id"));
+      return json(await listOwnerTypedViewShares(db,privateAuthDatabase(),{
+        boardId,datasetId,viewId,actorId:accountId
+      }));
+    }
     // Dim0 canvas transport: all entities are persisted in Jazz and scoped to the
     // Better Auth account, never to an arbitrary actor ID supplied by the browser.
     if (pathname === "/patchboard-private/api/canvas" && request.method === "GET") {
@@ -363,6 +384,18 @@ export async function privateBoardRequest(
         sort:{fieldId:value.sort.field_id,
           direction:value.sort.direction}
       });
+      if(pathname.endsWith("/owner-query")){
+        const input=z.object({...viewRef,
+          page_size:z.number().int().min(1).max(20),
+          cursor:z.string().max(20000).optional(),
+        }).strict().parse(await safeJson(request,32_000));
+        return json(await querySavedTypedView(db,privateAuthDatabase(),{
+          boardId:input.board_id,datasetId:input.dataset_id,
+          viewId:input.view_id,ownerActorId:accountId,
+          verifiedSubjectId:session.user.id,channel:"browser",
+          pageSize:input.page_size,cursor:input.cursor
+        }));
+      }
       if(pathname.endsWith("/create")){
         const input=z.object({
           board_id:boardIdSchema,dataset_id:boardIdSchema,
@@ -437,7 +470,11 @@ export async function privateBoardRequest(
       const records=await db.all(app.typedRecords.where({datasetId}).limit(501));
       if(records.length>500||records.some(r=>r.boardId!==boardId))
         throw new TypedViewUnsupported("VIEW_DATASET_LIMIT_500");
+      const fields=await db.all(app.typedFields.where({datasetId}).limit(101));
+      if(fields.length>100||fields.some(f=>f.boardId!==boardId))
+        throw new TypedViewUnsupported("VIEW_INVALID_DEFINITION");
       return json({boardId,datasetId,
+        fields:fields.map(f=>({id:f.id,name:f.name,kind:f.kind})),
         records:records.map(r=>({id:r.id,version:r.version,cells:r.cells}))});
     }
     if(pathname==="/patchboard-private/api/records/record" &&

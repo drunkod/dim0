@@ -52,6 +52,7 @@ import { applyContentToStore } from "@/features/board/persist/local/apply-conten
 import { getLocalStores } from "@/features/local-stores"
 import { saveLocalThumbnail } from "@/features/board/local/save-local-thumbnail"
 import { setBoardPersistenceRef } from "@/features/board/persist/local/board-persistence-ref"
+import { NativeBoardDataControl } from "@/features/board/data/native-board-data"
 import { ShareButton } from "@/features/sharing/share-button"
 import { BoardKindBadge } from "@/features/board/components/board-kind-badge"
 import { BoardBreadcrumb } from "@/features/board/components/breadcrumb/board-breadcrumb"
@@ -756,6 +757,7 @@ function HarnessCanvasInner({
         {!canCollab && <BoardKindBadge kind="local-only" />}
         {jazzMode && !presenting && <JazzLogoutButton />}
         {canCollab && !jazzMode && <HarnessCollabStatus />}
+        {canCollab && jazzMode && <NativeBoardDataControl />}
         {canCollab && <ShareButton jazz={jazzMode} />}
       </div>
       <NodeSurfaceHost />

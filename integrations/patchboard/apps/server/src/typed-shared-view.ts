@@ -191,7 +191,9 @@ export async function revokeTypedViewShare(
   }catch(error){sql.exec("ROLLBACK");throw error;}
 }
 type ViewQuery=Readonly<{
-  boardId:string;datasetId:string;viewId:string;shareToken:string;
+  boardId:string;datasetId:string;viewId:string;shareToken?:string|undefined;
+  /** Server-injected verified owner actor; never a user input. */
+  ownerActorId?:string|undefined;
   verifiedSubjectId:string;channel:"browser"|"mcp";
   pageSize:number;cursor?:string|undefined;recordId?:string|undefined;
   requestedFieldIds?:readonly string[]|undefined;
@@ -232,7 +234,18 @@ export async function querySavedTypedView(
     throw new TypedViewUnsupported("VIEW_INVALID_QUERY");
   // Do not read a Jazz record, field name, count or even view title until the
   // server-only revocable credential is authenticated and bound to its scope.
-  const share=shareByToken(sql,input.shareToken);
+  const ownerPreview=input.ownerActorId!==undefined;
+  if(ownerPreview){
+    if(input.channel!=="browser"||input.shareToken||!uuid.test(input.ownerActorId!))
+      throw new TypedViewAccessDenied();
+    await ownerOf(db,input.boardId,input.ownerActorId!);
+  }
+  const share=ownerPreview
+    ?{id:"owner:"+input.ownerActorId!,view_id:input.viewId,
+      board_id:input.boardId,dataset_id:input.datasetId,
+      creator_subject_id:input.verifiedSubjectId,token_hash:"",
+      version:0,revoked_at_ms:null}
+    :shareByToken(sql,input.shareToken??"");
   if(!share||share.revoked_at_ms!==null||
     share.view_id!==input.viewId||share.board_id!==input.boardId||
     share.dataset_id!==input.datasetId)
@@ -264,6 +277,11 @@ export async function querySavedTypedView(
   if(input.requestedSortFieldId!==undefined||
     input.requestedFilterFieldId!==undefined)
     throw new TypedViewUnsupported("VIEW_QUERY_OVERRIDE_UNSUPPORTED");
+  const columns=selected.map(id=>{
+    const field=fields.find(f=>f.id===id);
+    if(!field)throw new TypedViewUnsupported("VIEW_INVALID_FIELD");
+    return {id,name:field.name};
+  });
   const queryHash=hash(JSON.stringify({
     boardId:input.boardId,datasetId:input.datasetId,viewId:input.viewId,
     version:view.definitionVersion,schemaVersion:dataset.schemaVersion,
@@ -332,11 +350,13 @@ export async function querySavedTypedView(
     const cells=asObject(item.cells);
     const projected=Object.fromEntries(selected.map(id=>[id,cells[id]??null]));
     await recheckDefinition();
-    const current=shareByToken(sql,input.shareToken);
+    if(ownerPreview)await ownerOf(db,input.boardId,input.ownerActorId!);
+    const current=ownerPreview?share:shareByToken(sql,input.shareToken??"");
     if(!current||current.id!==share.id||current.version!==share.version||
       current.revoked_at_ms!==null)
       throw new TypedViewAccessDenied();
     return {viewId:view.id,viewVersion:view.definitionVersion,
+      name:view.name,columns,
       boardId:input.boardId,datasetId:input.datasetId,
       fields:selected,rows:[{id:item.id,version:item.version,cells:projected}],
       total:1,nextCursor:null};
@@ -365,11 +385,69 @@ export async function querySavedTypedView(
   // If definition or share was changed DURING Jazz reads, do not return
   // a stale projection, count or page under obsolete authorization.
   await recheckDefinition();
-  const current=shareByToken(sql,input.shareToken);
+  if(ownerPreview)await ownerOf(db,input.boardId,input.ownerActorId!);
+  const current=ownerPreview?share:shareByToken(sql,input.shareToken??"");
   if(!current||current.id!==share.id||current.version!==share.version||
     current.revoked_at_ms!==null)
     throw new TypedViewAccessDenied();
   return {viewId:view.id,viewVersion:view.definitionVersion,
+    name:view.name,columns,
     boardId:input.boardId,datasetId:input.datasetId,fields:selected,
     total,rows:output,nextCursor};
+}
+
+
+/** Owner-only Data picker; no share secret, row payload or Jazz raw client read. */
+export async function listOwnerSavedTypedViews(
+  db:Db,input:Readonly<{boardId:string;actorId:string}>
+){
+  await ownerOf(db,input.boardId,input.actorId);
+  const views=await db.all(app.typedViews.where({boardId:input.boardId}).limit(101));
+  if(views.length>100)throw new TypedViewUnsupported("VIEW_LIST_LIMIT_100");
+  const result=[];
+  for(const view of views){
+    const dataset=await db.one(app.typedDatasets.where({id:view.datasetId}));
+    if(!dataset||dataset.boardId!==input.boardId)
+      throw new TypedViewAccessDenied();
+    const allowed=parseAllowed(view.allowedFieldIds);
+    const {filter,sort}=parseDefinition(view.filter,view.sort);
+    if(!allowed.includes(filter.fieldId)||!allowed.includes(sort.fieldId))
+      throw new TypedViewUnsupported("VIEW_INVALID_DEFINITION");
+    const fields=await db.all(app.typedFields.where({datasetId:view.datasetId}));
+    const names=allowed.map(id=>{
+      const row=fields.find(f=>f.id===id&&f.boardId===input.boardId);
+      if(!row)throw new TypedViewUnsupported("VIEW_INVALID_FIELD");
+      return {id:row.id,name:row.name};
+    });
+    result.push({
+      viewId:view.id,boardId:view.boardId,datasetId:view.datasetId,
+      viewVersion:view.definitionVersion,name:view.name,
+      fields:names,
+      filter:{op:filter.op,fieldId:filter.fieldId,value:filter.value},
+      sort:{fieldId:sort.fieldId,direction:sort.direction},
+    });
+  }
+  await ownerOf(db,input.boardId,input.actorId);
+  return {views:result.sort((a,b)=>
+    a.name.localeCompare(b.name)||a.viewId.localeCompare(b.viewId))};
+}
+/** Never returns the token hash or bearer URL. Owner can revoke after reload. */
+export async function listOwnerTypedViewShares(
+  db:Db,sql:DatabaseSync,input:Readonly<{
+    boardId:string;datasetId:string;viewId:string;actorId:string
+  }>
+){
+  await viewOwner(db,input.boardId,input.datasetId,input.viewId,input.actorId);
+  const rows=sql.prepare(`SELECT id,version,revoked_at_ms
+    FROM patchboard_typed_view_share
+    WHERE board_id=? AND dataset_id=? AND view_id=?
+    ORDER BY created_at_ms DESC LIMIT 101`).all(
+      input.boardId,input.datasetId,input.viewId
+    ) as {id:string;version:number;revoked_at_ms:number|null}[];
+  if(rows.length>100)throw new TypedViewUnsupported("VIEW_SHARE_LIST_LIMIT_100");
+  await viewOwner(db,input.boardId,input.datasetId,input.viewId,input.actorId);
+  return {shares:rows.map(row=>({
+    shareId:row.id,shareVersion:row.version,
+    revoked:row.revoked_at_ms!==null
+  }))};
 }

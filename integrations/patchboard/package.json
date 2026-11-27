@@ -26,7 +26,8 @@
     "test:private:policy": "pnpm --filter @patchboard/web exec vitest run src/private-policy.test.ts",
     "test:private:oauth": "pnpm --filter @patchboard/web exec node test/private-oauth-mcp-proof.mjs",
     "test:private:enrollment": "pnpm --filter @patchboard/server exec tsx --test test/enrollment.test.mjs",
-    "test:private:ci": "node apps/server/test/private-ci.mjs"
+    "test:private:ci": "node apps/server/test/private-ci.mjs",
+    "test:native:saved-view": "pnpm --filter @patchboard/web exec node test/native-saved-view-proof.mjs"
   },
   "packageManager": "pnpm@12.11.2"
 }

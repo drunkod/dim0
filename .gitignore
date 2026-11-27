@@ -54,3 +54,7 @@ integrations/dim0-mcp-plugin/dist/
 *.p8
 *.cer
 *.certSigningRequest
+
+# Native Data-panel source (not runtime data).
+!webui/src/features/board/data/
+!webui/src/features/board/data/**
