@@ -1,0 +1,2012 @@
+[
+  {
+    "action": "app|create",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "app|create",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "app|create",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "app|create",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "app|create",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "app|delete",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "app|delete",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "app|delete",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "app|delete",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "app|delete",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "app|read",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "app|read",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "app|read",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "app|read",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "app|read",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "app|update",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "app|update",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "app|update",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "app|update",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "app|update",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "automation|create",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "automation|create",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "automation|create",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "automation|create",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "automation|create",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "automation|delete",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "automation|delete",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "automation|delete",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "automation|delete",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "automation|delete",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "automation|read",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "automation|read",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "automation|read",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "automation|read",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "automation|read",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "automation|update",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "automation|update",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "automation|update",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "automation|update",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "automation|update",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|authority_matrix_config",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|authority_matrix_config",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|authority_matrix_config",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|authority_matrix_config",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|authority_matrix_config",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|create",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|create",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|create",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|create",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|create",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|delete",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|delete",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|delete",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|delete",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|delete",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|invite_email",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "InvitationService.emailInvitation.validateUserAddRole, banned domain/risk"
+  },
+  {
+    "action": "base|invite_email",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "InvitationService.emailInvitation.validateUserAddRole, banned domain/risk"
+  },
+  {
+    "action": "base|invite_email",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "InvitationService.emailInvitation.validateUserAddRole, banned domain/risk"
+  },
+  {
+    "action": "base|invite_email",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "InvitationService.emailInvitation.validateUserAddRole, banned domain/risk"
+  },
+  {
+    "action": "base|invite_email",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "InvitationService.emailInvitation.validateUserAddRole, banned domain/risk"
+  },
+  {
+    "action": "base|invite_link",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "Source role selection + code expiry/revoke"
+  },
+  {
+    "action": "base|invite_link",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "Source role selection + code expiry/revoke"
+  },
+  {
+    "action": "base|invite_link",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "Source role selection + code expiry/revoke"
+  },
+  {
+    "action": "base|invite_link",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "Source role selection + code expiry/revoke"
+  },
+  {
+    "action": "base|invite_link",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "Source role selection + code expiry/revoke"
+  },
+  {
+    "action": "base|query_data",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "Viewer allow and Commenter deny: non-monotonic role matrix"
+  },
+  {
+    "action": "base|query_data",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "Viewer allow and Commenter deny: non-monotonic role matrix"
+  },
+  {
+    "action": "base|query_data",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "Viewer allow and Commenter deny: non-monotonic role matrix"
+  },
+  {
+    "action": "base|query_data",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "Viewer allow and Commenter deny: non-monotonic role matrix"
+  },
+  {
+    "action": "base|query_data",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "Viewer allow and Commenter deny: non-monotonic role matrix"
+  },
+  {
+    "action": "base|read",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|read",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|read",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|read",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|read",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|read_all",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|read_all",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|read_all",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|read_all",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|read_all",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|table_export",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|table_export",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|table_export",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|table_export",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|table_export",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|table_import",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|table_import",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|table_import",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|table_import",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|table_import",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|update",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|update",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|update",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|update",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "base|update",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "enterprise|read",
+    "role": "owner",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "enterprise|read",
+    "role": "creator",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "enterprise|read",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "enterprise|read",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "enterprise|read",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "enterprise|update",
+    "role": "owner",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "enterprise|update",
+    "role": "creator",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "enterprise|update",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "enterprise|update",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "enterprise|update",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "field|create",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "field|create",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "field|create",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "field|create",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "field|create",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "field|delete",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "field|delete",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "field|delete",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "field|delete",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "field|delete",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "field|read",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "field|read",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "field|read",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "field|read",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "field|read",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "field|update",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "field|update",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "field|update",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "field|update",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "field|update",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "instance|read",
+    "role": "owner",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "instance|read",
+    "role": "creator",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "instance|read",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "instance|read",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "instance|read",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "instance|update",
+    "role": "owner",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "instance|update",
+    "role": "creator",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "instance|update",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "instance|update",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "instance|update",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|archive",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|archive",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|archive",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|archive",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|archive",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|comment",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|comment",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|comment",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|comment",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|comment",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|copy",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|copy",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|copy",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|copy",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|copy",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|create",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|create",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|create",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|create",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|create",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|delete",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|delete",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|delete",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|delete",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|delete",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|read",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|read",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|read",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|read",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|read",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|update",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|update",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|update",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|update",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "record|update",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "routine|create",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "routine|create",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "routine|create",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "routine|create",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "routine|create",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "routine|delete",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "routine|delete",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "routine|delete",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "routine|delete",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "routine|delete",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "routine|read",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "routine|read",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "routine|read",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "routine|read",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "routine|read",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "routine|update",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "routine|update",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "routine|update",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "routine|update",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "routine|update",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|create",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|create",
+    "role": "creator",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|create",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|create",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|create",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|delete",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|delete",
+    "role": "creator",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|delete",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|delete",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|delete",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|grant_role",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|grant_role",
+    "role": "creator",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|grant_role",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|grant_role",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|grant_role",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|invite_email",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "InvitationService.emailInvitation.validateUserAddRole, banned domain/risk"
+  },
+  {
+    "action": "space|invite_email",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "InvitationService.emailInvitation.validateUserAddRole, banned domain/risk"
+  },
+  {
+    "action": "space|invite_email",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "InvitationService.emailInvitation.validateUserAddRole, banned domain/risk"
+  },
+  {
+    "action": "space|invite_email",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "InvitationService.emailInvitation.validateUserAddRole, banned domain/risk"
+  },
+  {
+    "action": "space|invite_email",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "InvitationService.emailInvitation.validateUserAddRole, banned domain/risk"
+  },
+  {
+    "action": "space|invite_link",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "Source role selection + code expiry/revoke"
+  },
+  {
+    "action": "space|invite_link",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "Source role selection + code expiry/revoke"
+  },
+  {
+    "action": "space|invite_link",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "Source role selection + code expiry/revoke"
+  },
+  {
+    "action": "space|invite_link",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "Source role selection + code expiry/revoke"
+  },
+  {
+    "action": "space|invite_link",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "Source role selection + code expiry/revoke"
+  },
+  {
+    "action": "space|read",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|read",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|read",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|read",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|read",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|update",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|update",
+    "role": "creator",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|update",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|update",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "space|update",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table_record_history|read",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table_record_history|read",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table_record_history|read",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table_record_history|read",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table_record_history|read",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|archive_manage",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|archive_manage",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|archive_manage",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|archive_manage",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|archive_manage",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|archive_read",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|archive_read",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|archive_read",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|archive_read",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|archive_read",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|create",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|create",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|create",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|create",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|create",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|delete",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|delete",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|delete",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|delete",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|delete",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|export",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|export",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|export",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|export",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|export",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|import",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|import",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|import",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|import",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|import",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|read",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|read",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|read",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|read",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|read",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|trash_read",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|trash_read",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|trash_read",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|trash_read",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|trash_read",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|trash_reset",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|trash_reset",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|trash_reset",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|trash_reset",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|trash_reset",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|trash_update",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|trash_update",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|trash_update",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|trash_update",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|trash_update",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|update",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|update",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|update",
+    "role": "editor",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|update",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "table|update",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "user|email_read",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|email_read",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|email_read",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|email_read",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|email_read",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|integrations",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|integrations",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|integrations",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|integrations",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|integrations",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|notifications_send",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|notifications_send",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|notifications_send",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|notifications_send",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|notifications_send",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|self_hosted_licenses_read",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|self_hosted_licenses_read",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|self_hosted_licenses_read",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|self_hosted_licenses_read",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|self_hosted_licenses_read",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|spaces_read",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|spaces_read",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|spaces_read",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|spaces_read",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "user|spaces_read",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions"
+  },
+  {
+    "action": "view|create",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "view|create",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "view|create",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "view|create",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "view|create",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "view|delete",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "view|delete",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "view|delete",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "view|delete",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "view|delete",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "view|read",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "view|read",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "view|read",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "view|read",
+    "role": "commenter",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "view|read",
+    "role": "viewer",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "view|share",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions share ceiling"
+  },
+  {
+    "action": "view|share",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions share ceiling"
+  },
+  {
+    "action": "view|share",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "PermissionService shareExcludedPermissions share ceiling"
+  },
+  {
+    "action": "view|share",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "PermissionService shareExcludedPermissions share ceiling"
+  },
+  {
+    "action": "view|share",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "PermissionService shareExcludedPermissions share ceiling"
+  },
+  {
+    "action": "view|update",
+    "role": "owner",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "view|update",
+    "role": "creator",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "view|update",
+    "role": "editor",
+    "decision": "allow",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "view|update",
+    "role": "commenter",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  },
+  {
+    "action": "view|update",
+    "role": "viewer",
+    "decision": "deny",
+    "additionalGuard": "SOURCE_SERVICE_CALLSITE_NOT_FULLY_TRACED; deny if unsure"
+  }
+]
