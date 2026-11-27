@@ -167,6 +167,48 @@ export const schema = s.defineSchema({
     field: s.enum("label.markdown"),
   }, { board: s.rel("boards", "boardId") })
     .indexOnly(["boardId", "entityId"]),
+  /**
+   * QA-gated first TYPED relational-record vertical slice. Separate from
+   * Dim0 Canvas JSON and its receipt namespace. All five tables are backend-
+   * owned, never raw browser Jazz CRUD. No inherited live write activation.
+   */
+  typedDatasets: s.table({
+    boardId: s.uuid(), name: s.string(), schemaVersion: s.int(),
+    state: s.enum("active","read_only").default("active"),
+  }, {board:s.rel("boards","boardId")}).indexOnly(["boardId"]),
+  typedFields: s.table({
+    boardId: s.uuid(), datasetId: s.uuid(), name: s.string(),
+    kind: s.enum("text","computed"),
+    computeFromFieldId: s.uuid().optional(),
+  }, {
+    board:s.rel("boards","boardId"),
+    dataset:s.rel("typedDatasets","datasetId"),
+  }).indexOnly(["datasetId"]),
+  typedRecords: s.table({
+    boardId: s.uuid(), datasetId: s.uuid(),
+    cells: s.json(), version:s.int(), updatedBy:s.uuid(),
+  }, {
+    board:s.rel("boards","boardId"),
+    dataset:s.rel("typedDatasets","datasetId"),
+  }).indexOnly(["datasetId"]),
+  typedPatchReceipts: s.table({
+    boardId:s.uuid(), datasetId:s.uuid(), recordId:s.uuid(),
+    actorId:s.uuid(), requestId:s.string(), fingerprint:s.string(),
+    schemaVersion:s.int(), previousVersion:s.int(), committedVersion:s.int(),
+    committedCells:s.json(), eventId:s.uuid(),
+  }, {
+    board:s.rel("boards","boardId"),
+    dataset:s.rel("typedDatasets","datasetId"),
+  }).indexOnly(["boardId","actorId","requestId"]),
+  typedPatchEvents: s.table({
+    boardId:s.uuid(), datasetId:s.uuid(), recordId:s.uuid(),
+    actorId:s.uuid(), requestId:s.string(), receiptId:s.uuid(),
+    previousVersion:s.int(), committedVersion:s.int(),
+    fieldIds:s.json(),
+  }, {
+    board:s.rel("boards","boardId"),
+    dataset:s.rel("typedDatasets","datasetId"),
+  }).indexOnly(["boardId","recordId"]),
   /** Per-applet shared runtime state, separate from versioned Canvas geometry.
    * Serializability and optimistic CAS prevent lost counter updates. */
   appletStates: s.table(
@@ -284,6 +326,11 @@ export const permissions = definePermissions({
   },
   canvasPatchReceipts: { read: false, insert: false, update: false, delete: false },
   canvasPatchEvents: { read: false, insert: false, update: false, delete: false },
+  typedDatasets: { read: false, insert: false, update: false, delete: false },
+  typedFields: { read: false, insert: false, update: false, delete: false },
+  typedRecords: { read: false, insert: false, update: false, delete: false },
+  typedPatchReceipts: { read: false, insert: false, update: false, delete: false },
+  typedPatchEvents: { read: false, insert: false, update: false, delete: false },
   appletStates: {
     read: (row) => member(row.boardId),
     insert: false,

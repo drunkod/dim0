@@ -400,7 +400,10 @@ try {
   try {
     await connectWriter();
     assert.deepEqual((await writer.listTools()).tools.map(t => t.name).sort(),
-      ["create_canvas_entity", "create_note", "delete_canvas_entity", "get_applet_state", "get_canvas_entity", "list_boards", "list_canvas_entities", "patch_canvas_entity", "read_board", "update_applet_state", "update_canvas_entity"]);
+      ["create_canvas_entity", "create_note", "delete_canvas_entity", "get_applet_state",
+       "get_canvas_entity", "list_boards", "list_canvas_entities", "patch_canvas_entity",
+       ...(process.env.PATCHBOARD_QA_TYPED_RECORD==="1" ? ["patch_typed_record"] : []),
+       "read_board", "update_applet_state", "update_canvas_entity"]);
     // New Dim0 entity API: an actual OAuth MCP client can mutate full
     // applet/note JSON through Jazz, with CAS and board scope enforced.
     const canvasId = randomUUID();
@@ -517,6 +520,10 @@ try {
         ["update_applet_state", { board_id: boardId, note_id: canvasId, expected_version: 1,
           value: { count: 999 } }],
       ];
+      if(process.env.PATCHBOARD_QA_TYPED_RECORD==="1")deniedCalls.push(["patch_typed_record",{
+        board_id:boardId,dataset_id:randomUUID(),record_id:randomUUID(),schema_version:3,
+        expected_version:7,request_id:randomUUID(),set:{[randomUUID()]:"Denied typed callback"}
+      }]);
       assert.deepEqual(deniedCalls.map(([name]) => name).sort(),
         (await writer.listTools()).tools.map(tool => tool.name).sort());
       let installed = false;
@@ -827,6 +834,7 @@ try {
           try {
             await connectEditor();
             let canvasQaReport = null;
+            let typedQaReport = null;
             let canvasDeniedReplay;
             if (process.env.PATCHBOARD_OAUTH_CI_RESTART === "1") {
               const { proveAcc051LiveCanvasPatch } = await import("./acc051-live-versioned-patch.mjs");
@@ -835,6 +843,18 @@ try {
                 editorMcp, viewerMcp, readOnlyToken: readToken, makeMcp: clientWithToken,
                 editorActorId: editorMe.accountId,
               });
+              {
+                const {proveAcc051LiveTypedRecord}=await import(
+                  "./acc051-live-typed-record.mjs");
+                typedQaReport=await proveAcc051LiveTypedRecord({
+                  origin,boardId,siblingBoardId:secondBoardId,
+                  ownerPage:page,editorPage,viewerPage,
+                  editorActorId:editorMe.accountId,
+                  ownerActorId:ownerMe.accountId,
+                  editorToken,viewerWriteToken,readOnlyToken:readToken,
+                  makeMcp:clientWithToken,restart:restartPrivateCiFixture
+                });
+              }
             }
             const request_id = "same-operation-" + randomUUID();
             const ownerText = "Owner wrote " + randomUUID().slice(0, 8);
@@ -969,6 +989,16 @@ try {
             return response.status;
           },replay);
           assert.equal(browserDenied,403);
+          if(typedQaReport?.update){
+            const deniedTyped=await editorMcp.callTool({name:"patch_typed_record",arguments:typedQaReport.update});
+            assert.equal(deniedTyped.isError,true);
+            assert.equal(deniedTyped.content[0].text,"BOARD_ACCESS_DENIED");
+            const typedBrowser=await editorPage.evaluate(async body=>(await fetch("/patchboard-private/api/records/patch",{
+              method:"POST",credentials:"same-origin",headers:{"content-type":"application/json"},body:JSON.stringify(body)
+            })).status,typedQaReport.update);
+            assert.equal(typedBrowser,403);
+            console.log("TYPED_REPLAY_AFTER_DOWNGRADE_PASS",JSON.stringify({browser:typedBrowser,mcp:deniedTyped.content[0].text}));
+          }
           const restored=await setRole("editor",downgraded.body.role_version);
           assert.equal(restored.status,200);
           assert.equal(restored.body.role_version,downgraded.body.role_version+1);

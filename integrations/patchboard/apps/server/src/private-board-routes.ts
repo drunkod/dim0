@@ -19,6 +19,14 @@ import {
 import { getSharedAppletState, saveSharedAppletState } from "./applet-state-service.ts";
 import { patchCanvasLabelMarkdown, CanvasPatchRequestConflict, CanvasPatchCommitUnknown } from "./canvas-versioned-patch.ts";
 import {
+  patchTypedRecord,readTypedRecord,
+  TypedRecordPermissionDenied,TypedRecordGuardDenied,
+  TypedRecordFieldInvalid,TypedRecordSchemaConflict,
+  TypedRecordVersionConflict,TypedRecordRequestConflict,
+  TypedRecordCommitUnknown
+} from "./typed-record-patch.ts";
+import {typedRecordQaEnabled} from "./typed-record-qa-gate.ts";
+import {
   changePrivateNote, createMcpNote, DemoBoardMissing, PrivatePermissionDenied,
   readBoard, RequestIdConflict, requirePrivateBoardAccess,
 } from "./board-service.ts";
@@ -320,6 +328,39 @@ export async function privateBoardRequest(
       const entityId = entityIdSchema.parse(url.searchParams.get("entity_id"));
       return json(await getCanvasEntity(db, boardId, accountId, entityId));
     }
+    // First typed relational-record vertical slice: disabled except for a
+    // disposable loopback CI issuer with explicit opt-in. No old OAuth scope
+    // gains a new live capability from this browser route.
+    if(pathname==="/patchboard-private/api/records/record" &&
+      request.method==="GET"){
+      if(!typedRecordQaEnabled())return json({error:"Not found"},404);
+      const boardId=boardIdSchema.parse(url.searchParams.get("board_id"));
+      const datasetId=boardIdSchema.parse(url.searchParams.get("dataset_id"));
+      const recordId=boardIdSchema.parse(url.searchParams.get("record_id"));
+      return json(await readTypedRecord(db,{
+        boardId,datasetId,recordId,actorId:accountId
+      }));
+    }
+    if(pathname==="/patchboard-private/api/records/patch" &&
+      request.method==="POST"){
+      if(!typedRecordQaEnabled())return json({error:"Not found"},404);
+      const parsed=z.object({
+        board_id:boardIdSchema,dataset_id:boardIdSchema,record_id:boardIdSchema,
+        schema_version:z.number().int().positive(),
+        expected_version:z.number().int().positive(),
+        request_id:requestSchema,
+        set:z.record(boardIdSchema,z.union([
+          z.string().max(2000),z.number().finite(),z.boolean(),z.null()
+        ]))
+      }).strict().parse(await safeJson(request,20_480));
+      return json(await patchTypedRecord(db,{
+        boardId:parsed.board_id,datasetId:parsed.dataset_id,
+        recordId:parsed.record_id,actorId:accountId,
+        schemaVersion:parsed.schema_version,
+        expectedVersion:parsed.expected_version,
+        requestId:parsed.request_id,set:parsed.set
+      }));
+    }
     if (pathname === "/patchboard-private/api/canvas/create" && request.method === "POST") {
       const parsed = z.object({
         board_id: boardIdSchema, kind: z.enum(["node", "link"]),
@@ -373,6 +414,14 @@ export async function privateBoardRequest(
     if (error instanceof CanvasPatchRequestConflict) return json({error:"Request ID conflict"},409);
     if (error instanceof CanvasPatchCommitUnknown) return json({error:"Commit outcome unknown",request_id:error.requestId,retry_same_request_only:true},503);
     if (error instanceof CanvasInvalid) return json({ error: "Invalid canvas payload" }, 400);
+    if(error instanceof TypedRecordPermissionDenied)return json({error:"TYPED_RECORD_ACCESS_DENIED"},403);
+    if(error instanceof TypedRecordGuardDenied)return json({error:"SERVICE_GUARD_DENIED"},403);
+    if(error instanceof TypedRecordFieldInvalid)return json({error:"INVALID_FIELD"},400);
+    if(error instanceof TypedRecordSchemaConflict)return json({error:"SCHEMA_VERSION_CONFLICT"},409);
+    if(error instanceof TypedRecordVersionConflict)return json({error:"VERSION_CONFLICT"},409);
+    if(error instanceof TypedRecordRequestConflict)return json({error:"REQUEST_ID_CONFLICT"},409);
+    if(error instanceof TypedRecordCommitUnknown)return json({error:"COMMIT_OUTCOME_UNKNOWN",
+      request_id:error.requestId,retry_same_request_only:true},503);
     // Intentionally do not expose internal Jazz or Better Auth errors over HTTP.
     return json({ error: "Private operation failed" }, 503);
   }
