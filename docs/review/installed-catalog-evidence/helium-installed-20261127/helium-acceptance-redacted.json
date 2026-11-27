@@ -1,0 +1,234 @@
+{
+  "candidate": "66789d1a59f14ea35b6c1629fd4880ea3ce5159b",
+  "date": "2026-11-27",
+  "origin": "https://dim0-catalog-qa-52113cbf.tail70b8a.ts.net",
+  "browser": "Helium",
+  "method": "Actual ChatGPT browser-native custom MCP plugin via CDP/WebMCP; not SDK surrogate",
+  "artifactSha256": "626a5b2b7e940174cd111e4b0b0187120c5bac70fc877c675cdaea8107313f48",
+  "servedAssetMatches": true,
+  "legacyRedirectStatus": 302,
+  "enrollment": {
+    "virtualPasskey": true,
+    "status": 200,
+    "signedIn": true
+  },
+  "browserBaseline": {
+    "browserCreateStatus": 404,
+    "ownerRole": "owner"
+  },
+  "archives": {
+    "originalSha256": "a14bf61b9d4a29431cb4829316a1e12d136b677f44def2c4285a5520e3ab993b",
+    "qaZipSha256": "7bf4c9c1585c7cc7499a8c88f8441a42faa79c26193528bf0d2af2ad9e30f0b2",
+    "qaName": "dim0-jazz-qa-52113cbf",
+    "metadataOnly": true,
+    "allOtherEntriesByteIdentical": true
+  },
+  "portableZip": {
+    "original": "FAIL: A plugin named dim0-jazz already exists",
+    "uniqueNameVariant": "Upload PASS; browser invocation unavailable; desktop NOT_RUN"
+  },
+  "browserNative": {
+    "name": "Dim0 PR28 Helium QA 52113cbf",
+    "registration": "DCR",
+    "scopeSelection": "Discovered default selections; no manual widening",
+    "scopes": [
+      "board:read",
+      "board:write",
+      "table:create"
+    ],
+    "tool": "call-api-write",
+    "operation": "dataset.create.v1",
+    "discoveredWriteTools": 7,
+    "discoveredReadTools": 5,
+    "consent": "Actual visible selected Owner board and persisted grant",
+    "firstRequest": {
+      "operation": "dataset.create.v1",
+      "input": {
+        "board_id": "01a21bb5-97f5-7eb3-a658-02073574525e",
+        "request_id": "plugin-rehearsal-1b023953-a31f-41f1-a988-2dcd11e25678",
+        "name": "Plugin rehearsal",
+        "primary_field_name": "Title",
+        "default_view_name": "All rows"
+      }
+    },
+    "firstVisibleResult": {
+      "datasetId": "5927b038-fc07-5a59-9a82-c0f9fe017169",
+      "fieldId": "5747b750-8182-57c2-88b1-5357e3d61e15",
+      "defaultViewId": "f92f3db8-99fe-5a9d-90ae-9618e2799fb1",
+      "receiptId": "c658dc19-ed56-59bd-87d7-8964605e92ff",
+      "eventId": "4a534b79-5b9a-51e3-b029-4c535b78836e",
+      "replayed": false
+    },
+    "replayVisibleResult": {
+      "datasetId": "5927b038-fc07-5a59-9a82-c0f9fe017169",
+      "fieldId": "5747b750-8182-57c2-88b1-5357e3d61e15",
+      "defaultViewId": "f92f3db8-99fe-5a9d-90ae-9618e2799fb1",
+      "receiptId": "c658dc19-ed56-59bd-87d7-8964605e92ff",
+      "eventId": "4a534b79-5b9a-51e3-b029-4c535b78836e",
+      "replayed": true
+    },
+    "postDisconnectRequest": {
+      "operation": "dataset.create.v1",
+      "input": {
+        "board_id": "01a21bb5-97f5-7eb3-a658-02073574525e",
+        "request_id": "after-disconnect-c7efc005-d556-4ce5-a9b3-96596b6c36fe",
+        "name": "Must not create after disconnect",
+        "primary_field_name": "Title",
+        "default_view_name": "All rows"
+      }
+    },
+    "postDisconnectClientReportedError": "UNAUTHORIZED: Error code: UNAUTHORIZED; Error: McpServerError: Client error '401 Unauthorized'",
+    "correlatedServerHttpTrace": false,
+    "classifierWarning": "Suspicious Instruction warning on tool description QA/allowlist framing and consent requirements; used Allow once for the exact disposable operation, not Always allow"
+  },
+  "audits": {
+    "baseline": {
+      "boardId": "01a21bb5-97f5-7eb3-a658-02073574525e",
+      "counts": {
+        "datasets": 0,
+        "fields": 0,
+        "views": 0,
+        "receipts": 0,
+        "events": 0,
+        "records": 0
+      },
+      "ids": {
+        "datasets": [],
+        "fields": [],
+        "views": [],
+        "receipts": [],
+        "events": [],
+        "records": []
+      },
+      "grants": []
+    },
+    "afterReplay": {
+      "boardId": "01a21bb5-97f5-7eb3-a658-02073574525e",
+      "counts": {
+        "datasets": 1,
+        "fields": 1,
+        "views": 1,
+        "receipts": 1,
+        "events": 1,
+        "records": 0
+      },
+      "ids": {
+        "datasets": [
+          "5927b038-fc07-5a59-9a82-c0f9fe017169"
+        ],
+        "fields": [
+          "5747b750-8182-57c2-88b1-5357e3d61e15"
+        ],
+        "views": [
+          "f92f3db8-99fe-5a9d-90ae-9618e2799fb1"
+        ],
+        "receipts": [
+          "c658dc19-ed56-59bd-87d7-8964605e92ff"
+        ],
+        "events": [
+          "4a534b79-5b9a-51e3-b029-4c535b78836e"
+        ],
+        "records": []
+      },
+      "grants": [
+        {
+          "id": "9254b111-34f5-4680-bdb4-4d9654a71b92",
+          "version": 1,
+          "revoked": false,
+          "scopes": [
+            "board:read",
+            "board:write",
+            "table:create"
+          ]
+        }
+      ]
+    },
+    "afterDisconnect": {
+      "boardId": "01a21bb5-97f5-7eb3-a658-02073574525e",
+      "counts": {
+        "datasets": 1,
+        "fields": 1,
+        "views": 1,
+        "receipts": 1,
+        "events": 1,
+        "records": 0
+      },
+      "ids": {
+        "datasets": [
+          "5927b038-fc07-5a59-9a82-c0f9fe017169"
+        ],
+        "fields": [
+          "5747b750-8182-57c2-88b1-5357e3d61e15"
+        ],
+        "views": [
+          "f92f3db8-99fe-5a9d-90ae-9618e2799fb1"
+        ],
+        "receipts": [
+          "c658dc19-ed56-59bd-87d7-8964605e92ff"
+        ],
+        "events": [
+          "4a534b79-5b9a-51e3-b029-4c535b78836e"
+        ],
+        "records": []
+      },
+      "grants": [
+        {
+          "id": "9254b111-34f5-4680-bdb4-4d9654a71b92",
+          "version": 2,
+          "revoked": true,
+          "scopes": [
+            "board:read",
+            "board:write",
+            "table:create"
+          ]
+        }
+      ]
+    }
+  },
+  "nativeReadbacks": {
+    "first-native": {
+      "datasetId": "5927b038-fc07-5a59-9a82-c0f9fe017169",
+      "defaultViewId": "f92f3db8-99fe-5a9d-90ae-9618e2799fb1",
+      "fieldId": "5747b750-8182-57c2-88b1-5357e3d61e15"
+    },
+    "after-restart": {
+      "datasetId": "5927b038-fc07-5a59-9a82-c0f9fe017169",
+      "defaultViewId": "f92f3db8-99fe-5a9d-90ae-9618e2799fb1",
+      "fieldId": "5747b750-8182-57c2-88b1-5357e3d61e15"
+    },
+    "after-disconnect-native": {
+      "datasetId": "5927b038-fc07-5a59-9a82-c0f9fe017169",
+      "defaultViewId": "f92f3db8-99fe-5a9d-90ae-9618e2799fb1",
+      "fieldId": "5747b750-8182-57c2-88b1-5357e3d61e15"
+    }
+  },
+  "nativeDisconnect": {
+    "status": 200,
+    "grantId": "9254b111-34f5-4680-bdb4-4d9654a71b92",
+    "disconnected": true
+  },
+  "teardown": {
+    "phase": "RETIRED",
+    "funnelDisabled": true,
+    "storeRemoved": true,
+    "primaryFunnelUnchanged": true,
+    "publicRouteStarted": false
+  },
+  "publicRouteProbe": {
+    "hostname": "dim0-catalog-qa-52113cbf.tail70b8a.ts.net",
+    "localHttpsProbe": "curl timeout, HTTP 000",
+    "publicResolver": "Google Public DNS over HTTPS",
+    "publicRouteProbe": {
+      "curlExit": 28,
+      "httpStatus": "000",
+      "method": "forced public DNS address (not tailnet address)"
+    },
+    "publicDnsStatus": 0,
+    "publicAddressCount": 3
+  },
+  "independentOffTailnetBaseline": "Inconclusive; actual cloud client could reach and use the QA server",
+  "priorTransientApiMe500": "Unexplained; this signup /api/me returned HTTP 200",
+  "applicationSourceChanged": false,
+  "existingPluginsModified": false,
+  "newTestPluginEntriesRetainedForReview": true
+}
