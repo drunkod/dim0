@@ -1,0 +1,419 @@
+{
+  "mainSha": "aa80a38b5814ac8c25a199b842dea3d387a0b2b1",
+  "sourceTree": "433df5e28e8b3f29cc68410b642823640965b5b9",
+  "sameTreeAsReviewedPr28": true,
+  "merged": [
+    {
+      "number": 1,
+      "originalHead": "36edcf5c68a52617c08f3af0485faa254b9f9fd8",
+      "mergeCommit": "2eaa3da7e72b0f01b84570f02572133c4d80a011",
+      "originalBranch": "feat/jazz-mcp-tailscale-migration",
+      "treeMatched": true,
+      "gate": "7/7 original hosted checks successful",
+      "comment": null
+    },
+    {
+      "number": 3,
+      "originalHead": "aa9ae00bd000d650e2af798daa68daaebba56caa",
+      "mergeCommit": "fca373a3e9d6e7a35e3e0d363f362656a739b9f6",
+      "originalBranch": "fix/jazz-route-shell-20261122",
+      "treeMatched": true,
+      "gate": "No hosted checks attached after retarget; Local exact-head Vitest root-layout regression: 10/10 passed; reused installed dependencies with byte-identical npm lockfile; Node 26 native Web Storage disabled for jsdom.",
+      "comment": "https://github.com/drunkod/dim0/pull/3#issuecomment-7212264482"
+    },
+    {
+      "number": 4,
+      "originalHead": "9812dfe090ac58a078cfa2f86d42d46a6c63a413",
+      "mergeCommit": "eb40db78d75fc40c9db46ba1ca3047a50ed42ec5",
+      "originalBranch": "fix/dim0-native-jazz-access",
+      "treeMatched": true,
+      "gate": "5/5 attached hosted checks successful on unchanged head; exact candidate tree identical to reviewed head. Retarget may not schedule a fresh workflow.",
+      "comment": "https://github.com/drunkod/dim0/pull/4#issuecomment-7212269065"
+    },
+    {
+      "number": 5,
+      "originalHead": "2e6652084b5e17764cf00f74d25a87e185da49d0",
+      "mergeCommit": "2004b0d61359a09a49546cdea94a005d132d2751",
+      "originalBranch": "review/account-domain-foundation",
+      "treeMatched": true,
+      "gate": "No hosted checks attached after retarget; Fresh local exact-head focused gate PASS: cd integrations/patchboard && pnpm --filter @patchboard/account-domain verify:generated && pnpm --filter @patchboard/account-domain test:contracts && pnpm --filter @patchboard/account-domain typecheck (exit 0).",
+      "comment": "https://github.com/drunkod/dim0/pull/5#issuecomment-7212280792"
+    },
+    {
+      "number": 6,
+      "originalHead": "d09280e44cf09dcfe86e48f65f0756a2caf9570a",
+      "mergeCommit": "c9020b82c9f20235993959f167043eb277907ab7",
+      "originalBranch": "review/account-profile-locale",
+      "treeMatched": true,
+      "gate": "No hosted checks attached after retarget; Fresh local exact-head focused gate PASS: (cd integrations/patchboard/apps/server && node --import tsx --test test/account-profile.test.mjs) && (cd webui && ./node_modules/.bin/vitest run src/routes/root-layout.test.tsx src/features/user-settings/components/jazz-account-profile.test.tsx) (exit 0).",
+      "comment": "https://github.com/drunkod/dim0/pull/6#issuecomment-7212285432"
+    },
+    {
+      "number": 7,
+      "originalHead": "f6663848add8213d65901abc08a094ea488ea07d",
+      "mergeCommit": "7698f180e55d72549220ca5f0ac3e3583a3a57b0",
+      "originalBranch": "review/oauth-grant-admission",
+      "treeMatched": true,
+      "gate": "No hosted checks attached after retarget; Fresh local exact-head focused gate PASS: cd integrations/patchboard/apps/server && node --import tsx --test test/grant-admission.test.mjs test/private-mcp-reconnect-grant.test.mjs (exit 0).",
+      "comment": "https://github.com/drunkod/dim0/pull/7#issuecomment-7212290657"
+    },
+    {
+      "number": 8,
+      "originalHead": "5b07d63da58901dcdef29411cc5d89ccc6918f90",
+      "mergeCommit": "fa42982c4d4331f183465e50d7d5caaeee1ab02f",
+      "originalBranch": "review/explicit-invitation-acceptance",
+      "treeMatched": true,
+      "gate": "No hosted checks attached after retarget; Fresh local exact-head focused gate PASS: cd webui && node --experimental-strip-types --test src/features/board/jazz/jazz-invite-lifecycle.test.mjs (exit 0).",
+      "comment": "https://github.com/drunkod/dim0/pull/8#issuecomment-7212295270"
+    },
+    {
+      "number": 9,
+      "originalHead": "d1c3d2ed6cb6cb464e6097e1b9262e8a2f7c657b",
+      "mergeCommit": "699d7c9b7c2e9e1159c57dce12a19367face9bc0",
+      "originalBranch": "review/versioned-membership",
+      "treeMatched": true,
+      "gate": "No hosted checks attached after retarget; Fresh local exact-head focused gate PASS: cd integrations/patchboard/apps/server && node --import tsx --test test/board-member-role.test.mjs test/member-role-migration.test.mjs test/bearer-invite-role-version.test.mjs test/private-authz.test.mjs (exit 0).",
+      "comment": "https://github.com/drunkod/dim0/pull/9#issuecomment-7212300023"
+    },
+    {
+      "number": 10,
+      "originalHead": "e9a397aed49f3041cf285e7c235c452c730aaa7f",
+      "mergeCommit": "4ffbdde7b68249092157b4777d6983580901bf29",
+      "originalBranch": "review/mcp-callback-admission",
+      "treeMatched": true,
+      "gate": "No hosted checks attached after retarget; Fresh local exact-head focused gate PASS: cd integrations/patchboard/apps/server && node --import tsx --test test/grant-admission.test.mjs test/grant-admission-context.test.mjs test/private-mcp-reconnect-grant.test.mjs (exit 0).",
+      "comment": "https://github.com/drunkod/dim0/pull/10#issuecomment-7212308817"
+    },
+    {
+      "number": 11,
+      "originalHead": "8108b40d840bdad29e81677badd2d694f528d242",
+      "mergeCommit": "8091f06f9cb3119d00825736dc004ad09197ef57",
+      "originalBranch": "review/stacked-pr-ci",
+      "treeMatched": true,
+      "gate": "5/5 attached hosted checks successful on unchanged head; exact candidate tree identical to reviewed head. Retarget may not schedule a fresh workflow.",
+      "comment": "https://github.com/drunkod/dim0/pull/11#issuecomment-7212313651"
+    },
+    {
+      "number": 12,
+      "originalHead": "23664e85aa8626e8348eb7235ab8beb623737225",
+      "mergeCommit": "9da134898b20677f2ba71396f37373e0c6a774d9",
+      "originalBranch": "review/mcp-callback-live-grant",
+      "treeMatched": true,
+      "gate": "5/5 attached hosted checks successful on unchanged head; exact candidate tree identical to reviewed head. Retarget may not schedule a fresh workflow.",
+      "comment": "https://github.com/drunkod/dim0/pull/12#issuecomment-7212317918"
+    },
+    {
+      "number": 13,
+      "originalHead": "6b68d4c8693c5a7fdc6d9ca0a0084feb499ec3fb",
+      "mergeCommit": "cc1cec1512111a3b04338de2914cd0dc27c185bb",
+      "originalBranch": "review/connected-app-settings",
+      "treeMatched": true,
+      "gate": "5/5 attached hosted checks successful on unchanged head; exact candidate tree identical to reviewed head. Retarget may not schedule a fresh workflow.",
+      "comment": "https://github.com/drunkod/dim0/pull/13#issuecomment-7212322151"
+    },
+    {
+      "number": 14,
+      "originalHead": "94d282adb2513b06312b5c802cfc78812faaaed5",
+      "mergeCommit": "c950bdc8e5a15c692be99973d3ea5375414d3b79",
+      "originalBranch": "review/canvas-migration-ancestry",
+      "treeMatched": true,
+      "gate": "5/5 attached hosted checks successful on unchanged head; exact candidate tree identical to reviewed head. Retarget may not schedule a fresh workflow.",
+      "comment": "https://github.com/drunkod/dim0/pull/14#issuecomment-7212331823"
+    },
+    {
+      "number": 15,
+      "originalHead": "553389c23b67650a4e93e02084d6074c17357eaa",
+      "mergeCommit": "35c2e56ce8626cac626f38319b15e7afde8382df",
+      "originalBranch": "review/versioned-canvas-patch",
+      "treeMatched": true,
+      "gate": "5/5 attached hosted checks successful on unchanged head; exact candidate tree identical to reviewed head. Retarget may not schedule a fresh workflow.",
+      "comment": "https://github.com/drunkod/dim0/pull/15#issuecomment-7212336589"
+    },
+    {
+      "number": 16,
+      "originalHead": "a41c9422243713bc563318025adb89cba151e85d",
+      "mergeCommit": "5a3b791c38c549b943f4cc9f34a7bf476bce5d96",
+      "originalBranch": "review/mcp-grant-write-drain",
+      "treeMatched": true,
+      "gate": "5/5 attached hosted checks successful on unchanged head; exact candidate tree identical to reviewed head. Retarget may not schedule a fresh workflow.",
+      "comment": "https://github.com/drunkod/dim0/pull/16#issuecomment-7212340917"
+    },
+    {
+      "number": 17,
+      "originalHead": "3f8ccdd7ce32845251a5a78ac3277d3b2fa65131",
+      "mergeCommit": "def14487e9894707226433cbb48931b97502ab0e",
+      "originalBranch": "review/mcp-worker-crash-recovery",
+      "treeMatched": true,
+      "gate": "5/5 attached hosted checks successful on unchanged head; exact candidate tree identical to reviewed head. Retarget may not schedule a fresh workflow.",
+      "comment": "https://github.com/drunkod/dim0/pull/17#issuecomment-7212345222"
+    },
+    {
+      "number": 19,
+      "originalHead": "a9fb520682bcab43934b367891fb327de78bb92a",
+      "mergeCommit": "4b585c0958e37924bb972a2e26a5ed01a025338c",
+      "originalBranch": "review/qa-typed-record-patch",
+      "treeMatched": true,
+      "gate": "5/5 attached hosted checks successful on unchanged head; exact candidate tree identical to reviewed head. Retarget may not schedule a fresh workflow.",
+      "comment": "https://github.com/drunkod/dim0/pull/19#issuecomment-7212356258"
+    },
+    {
+      "number": 20,
+      "originalHead": "a196ccd9a3aa5d1f86122e6036077329b94c3143",
+      "mergeCommit": "81831fd2e4829b57fe6eb989ee71003dccacf503",
+      "originalBranch": "review/qa-saved-typed-view",
+      "treeMatched": true,
+      "gate": "5/5 attached hosted checks successful on unchanged head; exact candidate tree identical to reviewed head. Retarget may not schedule a fresh workflow.",
+      "comment": "https://github.com/drunkod/dim0/pull/20#issuecomment-7212360965"
+    },
+    {
+      "number": 22,
+      "originalHead": "89ea928312a5296eeb0214768ff7f69bc20b20c0",
+      "mergeCommit": "f6021d2610f282c1ff24f8296637a77d47011f5d",
+      "originalBranch": "review/native-saved-view-sharing",
+      "treeMatched": true,
+      "gate": "5/5 attached hosted checks successful on unchanged head; exact candidate tree identical to reviewed head. Retarget may not schedule a fresh workflow.",
+      "comment": "https://github.com/drunkod/dim0/pull/22#issuecomment-7212365384"
+    },
+    {
+      "number": 25,
+      "originalHead": "65e42f3277363a90658fce33b7feda9951c410e2",
+      "mergeCommit": "52f1fd237ee6abe7ec6a876df5c16232b3bee09a",
+      "originalBranch": "review/native-empty-board-catalog",
+      "treeMatched": true,
+      "gate": "5/5 attached hosted checks successful on unchanged head; exact candidate tree identical to reviewed head. Retarget may not schedule a fresh workflow.",
+      "comment": "https://github.com/drunkod/dim0/pull/25#issuecomment-7212369521"
+    },
+    {
+      "number": 26,
+      "originalHead": "850f2778b8221a6248cb51508c50630738d5e18e",
+      "mergeCommit": "2e4fb1159af1598923d021e8884a42202aee6284",
+      "originalBranch": "review/qa-mcp-table-create",
+      "treeMatched": true,
+      "gate": "5/5 attached hosted checks successful on unchanged head; exact candidate tree identical to reviewed head. Retarget may not schedule a fresh workflow.",
+      "comment": "https://github.com/drunkod/dim0/pull/26#issuecomment-7212373556"
+    },
+    {
+      "number": 27,
+      "originalHead": "483373aaa173fc3272ae4ab73e8474b4d57cf8f4",
+      "mergeCommit": "e5c7eefa6e3fdcfae4003ca36ff194e6f366670c",
+      "originalBranch": "review/mcp-catalog-lease-recovery",
+      "treeMatched": true,
+      "gate": "5/5 attached hosted checks successful on unchanged head; exact candidate tree identical to reviewed head. Retarget may not schedule a fresh workflow.",
+      "comment": "https://github.com/drunkod/dim0/pull/27#issuecomment-7212377656"
+    },
+    {
+      "number": 28,
+      "originalHead": "66789d1a59f14ea35b6c1629fd4880ea3ce5159b",
+      "mergeCommit": "aa80a38b5814ac8c25a199b842dea3d387a0b2b1",
+      "originalBranch": "review/qa-installed-catalog",
+      "treeMatched": true,
+      "gate": "7/7 attached hosted checks successful on unchanged head; exact candidate tree identical to reviewed head. Retarget may not schedule a fresh workflow.",
+      "comment": "https://github.com/drunkod/dim0/pull/28#issuecomment-7212381756"
+    }
+  ],
+  "deferred": [
+    23,
+    24
+  ],
+  "jazzVersion": "2.0.0-alpha.69",
+  "schemaDrift": false,
+  "combinedSmoke": "PASS",
+  "smokeHarnessSha256": "733b76f236dfd1b926c49a4da220f84aca384c8c59d9e3560dfbc34b47ae2758",
+  "catalog": {
+    "initialCounts": {
+      "typedDatasets": 0,
+      "typedFields": 0,
+      "typedViews": 0,
+      "typedRecords": 0,
+      "typedCatalogReceipts": 0,
+      "typedCatalogEvents": 0,
+      "typedPatchReceipts": 0,
+      "typedPatchEvents": 0
+    },
+    "tableCreate": {
+      "boardId": "01a21be1-8d1e-7ae3-a2a4-5bcce16e6d1f",
+      "datasetId": "e356941e-4994-5449-90c6-f4481fb0edd0",
+      "fieldId": "884f77c8-3997-5cf7-a520-fe5c87147354",
+      "defaultViewId": "150a97d0-2b75-5231-9180-f0d82fb2488e",
+      "schemaVersion": 1,
+      "receiptId": "11e352e6-05b6-5caa-bdd7-f8417b2e73b2",
+      "eventId": "47f07579-b52e-5736-9f0f-8424fc7ae98c",
+      "replayed": false
+    },
+    "tableRetry": {
+      "boardId": "01a21be1-8d1e-7ae3-a2a4-5bcce16e6d1f",
+      "datasetId": "e356941e-4994-5449-90c6-f4481fb0edd0",
+      "fieldId": "884f77c8-3997-5cf7-a520-fe5c87147354",
+      "defaultViewId": "150a97d0-2b75-5231-9180-f0d82fb2488e",
+      "schemaVersion": 1,
+      "receiptId": "11e352e6-05b6-5caa-bdd7-f8417b2e73b2",
+      "eventId": "47f07579-b52e-5736-9f0f-8424fc7ae98c",
+      "replayed": true
+    },
+    "identicalTableRequest": true,
+    "tableRequestConflict": 409,
+    "afterTableReload": {
+      "typedDatasets": 1,
+      "typedFields": 1,
+      "typedViews": 1,
+      "typedRecords": 0,
+      "typedCatalogReceipts": 1,
+      "typedCatalogEvents": 1,
+      "typedPatchReceipts": 0,
+      "typedPatchEvents": 0
+    },
+    "rowCreate": [
+      {
+        "recordId": "61aa0a4e-28fd-5420-ab6c-28689706f304",
+        "datasetId": "e356941e-4994-5449-90c6-f4481fb0edd0",
+        "fieldId": "884f77c8-3997-5cf7-a520-fe5c87147354",
+        "version": 1,
+        "schemaVersion": 1,
+        "updatedBy": "adc1d6b2-33cb-43b6-a1a1-4b6db89f4700",
+        "receiptId": "284948ce-86b7-5b2b-a9a4-7e7e8c538279",
+        "eventId": "4d413dbc-0aa8-5b5c-b161-9cc7cf8428ca",
+        "replayed": false
+      },
+      {
+        "recordId": "eddd6af9-6d3e-5fbc-b70c-1c46dca5d66f",
+        "datasetId": "e356941e-4994-5449-90c6-f4481fb0edd0",
+        "fieldId": "884f77c8-3997-5cf7-a520-fe5c87147354",
+        "version": 1,
+        "schemaVersion": 1,
+        "updatedBy": "adc1d6b2-33cb-43b6-a1a1-4b6db89f4700",
+        "receiptId": "d0417846-1e92-5c8e-9d40-2569f12ebefe",
+        "eventId": "f5866644-ae0f-5922-a79d-caf697981b26",
+        "replayed": false
+      },
+      {
+        "recordId": "8fb2a9e3-fd40-599c-9dd0-62bda1d94da6",
+        "datasetId": "e356941e-4994-5449-90c6-f4481fb0edd0",
+        "fieldId": "884f77c8-3997-5cf7-a520-fe5c87147354",
+        "version": 1,
+        "schemaVersion": 1,
+        "updatedBy": "adc1d6b2-33cb-43b6-a1a1-4b6db89f4700",
+        "receiptId": "ef2581da-de8a-5777-87f4-6c08006966bb",
+        "eventId": "ac630b67-0b48-574a-bd1e-8c36b4375d1b",
+        "replayed": false
+      }
+    ],
+    "rowRetry": {
+      "recordId": "61aa0a4e-28fd-5420-ab6c-28689706f304",
+      "datasetId": "e356941e-4994-5449-90c6-f4481fb0edd0",
+      "fieldId": "884f77c8-3997-5cf7-a520-fe5c87147354",
+      "version": 1,
+      "schemaVersion": 1,
+      "receiptId": "284948ce-86b7-5b2b-a9a4-7e7e8c538279",
+      "eventId": "4d413dbc-0aa8-5b5c-b161-9cc7cf8428ca",
+      "updatedBy": "adc1d6b2-33cb-43b6-a1a1-4b6db89f4700",
+      "replayed": true
+    },
+    "identicalRowRequest": true,
+    "rowRequestConflict": 409,
+    "filteredViewId": "8bd12c47-e143-4025-a29c-cca1a6d672a9",
+    "canonicalTitles": [
+      "Demo alpha",
+      "Internal planning",
+      "Demo beta"
+    ],
+    "filteredTitles": [
+      "Demo alpha",
+      "Demo beta"
+    ],
+    "actualClipboard": true,
+    "nonmemberPasskey": true,
+    "denied": {
+      "board": 403,
+      "dataset": 403,
+      "table": 403,
+      "row": 403,
+      "view": 403
+    },
+    "recipientMemberships": 0,
+    "oauthGrants": 0,
+    "beforeRestart": {
+      "typedDatasets": 1,
+      "typedFields": 1,
+      "typedViews": 2,
+      "typedRecords": 3,
+      "typedCatalogReceipts": 1,
+      "typedCatalogEvents": 1,
+      "typedPatchReceipts": 3,
+      "typedPatchEvents": 3
+    },
+    "postRestart": {
+      "typedDatasets": 1,
+      "typedFields": 1,
+      "typedViews": 2,
+      "typedRecords": 3,
+      "typedCatalogReceipts": 1,
+      "typedCatalogEvents": 1,
+      "typedPatchReceipts": 3,
+      "typedPatchEvents": 3
+    },
+    "stableCatalogRetryAfterRestart": true,
+    "stableRowRetryAfterRestart": true,
+    "writerPreserved": true,
+    "revokedNextFetch": 403,
+    "clearedGridAndCount": true,
+    "disabledPagination": true,
+    "reloadAndRestartDenied": true,
+    "ownerRetained": 3,
+    "featureOff": {
+      "list": 404,
+      "table": 404,
+      "row": 404,
+      "view": 404
+    },
+    "ordinaryInviteStatus": 201,
+    "afterFeatureOff": {
+      "typedDatasets": 1,
+      "typedFields": 1,
+      "typedViews": 2,
+      "typedRecords": 3,
+      "typedCatalogReceipts": 1,
+      "typedCatalogEvents": 1,
+      "typedPatchReceipts": 3,
+      "typedPatchEvents": 3
+    }
+  },
+  "mcp": {
+    "mainSha": "aa80a38b5814ac8c25a199b842dea3d387a0b2b1",
+    "boardId": "01a21be1-8d1e-7ae3-a2a4-5bcce16e6d1f",
+    "datasetId": "e356941e-4994-5449-90c6-f4481fb0edd0",
+    "fieldId": "884f77c8-3997-5cf7-a520-fe5c87147354",
+    "defaultViewId": "150a97d0-2b75-5231-9180-f0d82fb2488e",
+    "replay": {
+      "boardId": "01a21be1-8d1e-7ae3-a2a4-5bcce16e6d1f",
+      "datasetId": "e356941e-4994-5449-90c6-f4481fb0edd0",
+      "fieldId": "884f77c8-3997-5cf7-a520-fe5c87147354",
+      "defaultViewId": "150a97d0-2b75-5231-9180-f0d82fb2488e",
+      "schemaVersion": 1,
+      "receiptId": "11e352e6-05b6-5caa-bdd7-f8417b2e73b2",
+      "eventId": "47f07579-b52e-5736-9f0f-8424fc7ae98c",
+      "replayed": true
+    },
+    "disconnectHttp": 200,
+    "freshHttp": 401,
+    "grantVersion": 2,
+    "counts": {
+      "typedDatasets": 1,
+      "typedFields": 1,
+      "typedViews": 2,
+      "typedRecords": 3,
+      "typedCatalogReceipts": 1,
+      "typedCatalogEvents": 1,
+      "typedPatchReceipts": 3,
+      "typedPatchEvents": 3
+    },
+    "ownerRetained": 3,
+    "scope": "board:read board:write table:create"
+  },
+  "installedClientEvidenceReused": "https://github.com/drunkod/dim0/pull/28#issuecomment-7211848583",
+  "noProductionDeployment": true,
+  "limits": [
+    "Loopback disposable QA, virtual passkeys; board creation authenticated HTTP, table/row/view/share/revoke/disconnect actual native UI.",
+    "Actual installed ChatGPT evidence from #28 reused because final tree is identical. New same-owner smoke used SDK, not installed ChatGPT.",
+    "Reload-before-confirmation remains open #30; persistent public catalog/branding and desktop deferred."
+  ]
+}
