@@ -19,10 +19,13 @@ import {createJazz,sqlite} from "jazz-tools/backend";
 import {app} from "@patchboard/jazz-schema";
 import permissions from "@patchboard/jazz-schema/private.permissions.json" with {type:"json"};
 import {chromium,expect} from "@playwright/test";
+import {runPassiveNoteProof} from "./helpers/passive-note-proof.mjs";
 
 const restoreRehearsal=process.argv.includes("--restore");
 const presentation=process.argv.includes("--presentation");
 const narrowChrome=process.argv.includes("--narrow-chrome");
+const passiveNote=process.argv.includes("--passive-note");
+const helium=passiveNote&&process.argv.includes("--helium");
 const persistentMcp=process.argv.includes("--persistent-mcp");
 const filteredSharing=process.argv.includes("--filtered-sharing");
 const patchboard=resolve(fileURLToPath(new URL("../../../",import.meta.url)));
@@ -109,7 +112,7 @@ async function startBackend(enabled=backendMode,sharing=sharingMode,mcp=mcpMode)
     await sleep(250);
   }throw Error("Backend readiness failed");
 }
-async function startFrontend(sharing=filteredSharing||presentation||restoreRehearsal||narrowChrome?"1":"0"){
+async function startFrontend(sharing=filteredSharing||presentation||restoreRehearsal||narrowChrome||passiveNote?"1":"0"){
   const buildDir=join(root,"native-persistent-"+sharing);
   await execute(vite,["build","--outDir",buildDir],webui,{VITE_DIM0_PERSISTENT_FILTERED_SHARING:sharing});
   frontend=launch(vite,["preview","--outDir",buildDir,"--host","127.0.0.1","--port",String(uiPort),"--strictPort"],webui,{PATCHBOARD_PERSISTENT_TEXT_CATALOG:"1"});
@@ -926,7 +929,7 @@ async function runRestoreRehearsal(board,owner,recipient){
 let stage="startup";
 try{
   await execute("pnpm",["auth:migrate:private"],patchboard);
-  await startBackend(presentation||restoreRehearsal||narrowChrome?"1":"0",presentation||restoreRehearsal||narrowChrome?"1":"0",presentation||restoreRehearsal||narrowChrome?"1":"0");await startFrontend();browser=await chromium.launch({headless:true});
+  await startBackend(presentation||restoreRehearsal||narrowChrome||passiveNote?"1":"0",presentation||restoreRehearsal||narrowChrome||passiveNote?"1":"0",presentation||restoreRehearsal||narrowChrome||passiveNote?"1":"0");await startFrontend();browser=await chromium.launch(helium?{headless:false,executablePath:"/Applications/Helium.app/Contents/MacOS/Helium",args:["--no-first-run","--no-default-browser-check","--disable-background-networking"]}:{headless:true});
   const owner=await account(),other=await account(),op=owner.page,np=other.page;
   assert.notEqual(owner.identity.id,other.identity.id);
   stage="create native board; default off";
@@ -937,15 +940,18 @@ try{
   const board=(await response.json()).board_id;
   await op.goto(origin+"/boards/"+board);
   await expect(op.getByRole("button",{name:"Share this board"})).toBeVisible(options);
-  if(!presentation&&!restoreRehearsal&&!narrowChrome){
+  if(!presentation&&!restoreRehearsal&&!narrowChrome&&!passiveNote){
   const create={board_id:board,request_id:randomUUID(),name:"Persistent table",primary_field_name:"Title",default_view_name:"All rows"};
   assert.equal((await api(op,"records/tables/create",create)).status,404);
   assert.equal((await api(op,"records/views?board_id="+board)).status,404);
   await expect(op.getByRole("button",{name:"Open board Data"})).toHaveCount(0);
   }
-  if(!narrowChrome)assert.deepEqual(counts(await snapshot(board,op)),zero);
+  if(!narrowChrome&&!passiveNote)assert.deepEqual(counts(await snapshot(board,op)),zero);
 
-  if(narrowChrome){
+  if(passiveNote){
+    stage="three-client passive note";
+    await runPassiveNoteProof({owner,editor:other,viewer:await account(),board,origin,api,save,evidence,browser:helium?"installed Helium "+browser.version():browser.version()});
+  }else if(narrowChrome){
     await runNarrowChrome(board,owner);
   }else if(restoreRehearsal){
     await runRestoreRehearsal(board,owner,other);
