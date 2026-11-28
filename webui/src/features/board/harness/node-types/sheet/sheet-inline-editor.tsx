@@ -84,7 +84,11 @@ export function SheetInlineEditor({
     content: initialContent,
     editable,
     immediatelyRender: false,
-    onUpdate({ editor }) {
+    onUpdate({ editor, transaction, appendedTransactions }) {
+      // Preview hydration, mode changes and selection changes are not edits.
+      // A genuine edit can include document changes in an appended transaction.
+      if (!editor.isEditable ||
+          (!transaction.docChanged && !appendedTransactions.some(tr => tr.docChanged))) return
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       save((editor as any).storage.markdown.getMarkdown())
     },
@@ -92,7 +96,8 @@ export function SheetInlineEditor({
 
   // Flip read-only ↔ editable in place (no remount → seamless transition).
   useEffect(() => {
-    editor?.setEditable(editable)
+    // TipTap emits an update by default even though the document is unchanged.
+    editor?.setEditable(editable, false)
   }, [editor, editable])
 
   // Place the caret when entering edit mode — at the click position when we
