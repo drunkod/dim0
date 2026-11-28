@@ -22,6 +22,7 @@ import {chromium,expect} from "@playwright/test";
 
 const restoreRehearsal=process.argv.includes("--restore");
 const presentation=process.argv.includes("--presentation");
+const narrowChrome=process.argv.includes("--narrow-chrome");
 const persistentMcp=process.argv.includes("--persistent-mcp");
 const filteredSharing=process.argv.includes("--filtered-sharing");
 const patchboard=resolve(fileURLToPath(new URL("../../../",import.meta.url)));
@@ -108,7 +109,7 @@ async function startBackend(enabled=backendMode,sharing=sharingMode,mcp=mcpMode)
     await sleep(250);
   }throw Error("Backend readiness failed");
 }
-async function startFrontend(sharing=filteredSharing||presentation||restoreRehearsal?"1":"0"){
+async function startFrontend(sharing=filteredSharing||presentation||restoreRehearsal||narrowChrome?"1":"0"){
   const buildDir=join(root,"native-persistent-"+sharing);
   await execute(vite,["build","--outDir",buildDir],webui,{VITE_DIM0_PERSISTENT_FILTERED_SHARING:sharing});
   frontend=launch(vite,["preview","--outDir",buildDir,"--host","127.0.0.1","--port",String(uiPort),"--strictPort"],webui,{PATCHBOARD_PERSISTENT_TEXT_CATALOG:"1"});
@@ -578,6 +579,64 @@ async function runPersistentMcp(board,owner,other){
 }
 
 
+async function runNarrowChrome(board,owner){
+  const page=owner.page, results=[];
+  const hit=async(locator,atLeft=false)=>locator.evaluate((el,left)=>{
+    const r=el.getBoundingClientRect();
+    const x=left?r.left+Math.min(8,r.width/2):r.left+r.width/2;
+    return el.contains(document.elementFromPoint(x,r.top+r.height/2));
+  },atLeft);
+  const inside=(r,width)=>r.x>=-1&&r.x+r.width<=width+1;
+  const overlaps=(a,b)=>a.x<b.x+b.width-1&&a.x+a.width>b.x+1&&a.y<b.y+b.height-1&&a.y+a.height>b.y+1;
+  for(const lang of ["en","ru"]){
+    if(lang==="ru"){
+      await page.goto(origin+"/settings");
+      await page.getByRole("combobox",{name:"Interface language"}).selectOption("ru");
+      const change=page.waitForResponse(r=>r.url().endsWith("/account/preferences")&&r.request().method()==="PATCH");
+      await page.getByRole("button",{name:"Save locale preference",exact:true}).click();
+      assert.equal((await change).status(),200);
+    }
+    for(const width of [430,360,1440]){
+      stage="board chrome "+lang+" "+width;
+      await page.setViewportSize({width,height:850});
+      await page.goto(origin+"/boards/"+board);
+      await expect(page.locator("html")).toHaveAttribute("lang",lang,options);
+      const back=page.getByRole("link",{name:/^← (Boards|Доски)$/});
+      const logout=page.getByRole("button",{name:lang==="ru"?"Выйти":"Sign out",exact:true});
+      const data=page.getByRole("button",{name:lang==="ru"?"Открыть данные доски":"Open board Data"});
+      const share=page.getByRole("button",{name:lang==="ru"?"Поделиться":"Share this board"});
+      const toolbar=page.getByRole("toolbar",{name:"Board toolbar"});
+      const controls=[back,logout,data,share,toolbar];
+      for(const control of controls)await expect(control).toBeVisible(options);
+      await page.screenshot({path:join(evidence,"chrome-"+lang+"-"+width+".png"),animations:"disabled"});
+      const rects=await Promise.all(controls.map(c=>c.boundingBox()));
+      assert.ok(rects.every(r=>r&&inside(r,width)),"board chrome extends beyond viewport");
+      for(let i=0;i<rects.length;i++)for(let j=i+1;j<rects.length;j++)assert.ok(!overlaps(rects[i],rects[j]),"board controls overlap: "+i+"/"+j);
+      for(const control of controls.slice(0,4))await expect.poll(()=>hit(control),options).toBe(true);
+      const more=toolbar.getByRole("button",{name:"More actions"});
+      await more.scrollIntoViewIfNeeded();
+      await expect.poll(()=>hit(more),options).toBe(true);
+      await data.click();
+      const sheet=page.locator('[data-slot="sheet-title"]');
+      await expect(sheet).toBeVisible(options);
+      await expect.poll(()=>hit(sheet,true),options).toBe(true);
+      await page.screenshot({path:join(evidence,"data-"+lang+"-"+width+".png"),animations:"disabled"});
+      await page.keyboard.press("Escape");
+      await expect(sheet).toHaveCount(0,options);
+      await share.click();
+      const dialog=page.locator('[data-slot="dialog-title"]');
+      await expect(dialog).toBeVisible(options);
+      await expect.poll(()=>hit(dialog,true),options).toBe(true);
+      await page.screenshot({path:join(evidence,"share-"+lang+"-"+width+".png"),animations:"disabled"});
+      await page.keyboard.press("Escape");
+      await expect(dialog).toHaveCount(0,options);
+      results.push({lang,width,controlsInside:true,noOverlap:true,controlsReachable:true,modalTitlesReachable:true});
+    }
+  }
+  await save("sashai-narrow-chrome-trace",{profile:"persistent local HTTPS",qaFlags:false,results});
+  console.log("SASHAI_NARROW_CHROME_PASS",JSON.stringify(results));
+}
+
 async function runPresentation(board,owner,recipient){
   const op=owner.page,rp=recipient.page,boardUrl=origin+"/boards/"+board;
   const scope="board:read board:write table:create";
@@ -867,7 +926,7 @@ async function runRestoreRehearsal(board,owner,recipient){
 let stage="startup";
 try{
   await execute("pnpm",["auth:migrate:private"],patchboard);
-  await startBackend(presentation||restoreRehearsal?"1":"0",presentation||restoreRehearsal?"1":"0",presentation||restoreRehearsal?"1":"0");await startFrontend();browser=await chromium.launch({headless:true});
+  await startBackend(presentation||restoreRehearsal||narrowChrome?"1":"0",presentation||restoreRehearsal||narrowChrome?"1":"0",presentation||restoreRehearsal||narrowChrome?"1":"0");await startFrontend();browser=await chromium.launch({headless:true});
   const owner=await account(),other=await account(),op=owner.page,np=other.page;
   assert.notEqual(owner.identity.id,other.identity.id);
   stage="create native board; default off";
@@ -878,15 +937,17 @@ try{
   const board=(await response.json()).board_id;
   await op.goto(origin+"/boards/"+board);
   await expect(op.getByRole("button",{name:"Share this board"})).toBeVisible(options);
-  if(!presentation&&!restoreRehearsal){
+  if(!presentation&&!restoreRehearsal&&!narrowChrome){
   const create={board_id:board,request_id:randomUUID(),name:"Persistent table",primary_field_name:"Title",default_view_name:"All rows"};
   assert.equal((await api(op,"records/tables/create",create)).status,404);
   assert.equal((await api(op,"records/views?board_id="+board)).status,404);
   await expect(op.getByRole("button",{name:"Open board Data"})).toHaveCount(0);
   }
-  assert.deepEqual(counts(await snapshot(board,op)),zero);
+  if(!narrowChrome)assert.deepEqual(counts(await snapshot(board,op)),zero);
 
-  if(restoreRehearsal){
+  if(narrowChrome){
+    await runNarrowChrome(board,owner);
+  }else if(restoreRehearsal){
     await runRestoreRehearsal(board,owner,other);
   }else if(presentation){
     await runPresentation(board,owner,other);

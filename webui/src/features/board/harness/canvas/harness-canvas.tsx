@@ -667,6 +667,20 @@ function HarnessCanvasInner({
   // already-self-hiding chrome (readonly chip, top-right strip) stays
   // managed by their own components.
   const presenting = useBoardAppStore((s) => s.presentationMode)
+  const jazzWeb = jazzMode && !isTauri()
+  const boardActions = (
+    <>
+      {canCollab && !jazzMode && <HarnessPeerChip />}
+      <HarnessReadonlyChip />
+      {/* Local boards have no collab chrome, so surface an explicit
+          "On device" badge so they're not mistaken for synced. */}
+      {!canCollab && <BoardKindBadge kind="local-only" />}
+      {jazzMode && !presenting && <JazzLogoutButton />}
+      {canCollab && !jazzMode && <HarnessCollabStatus />}
+      {canCollab && jazzMode && <NativeBoardDataControl />}
+      {canCollab && <ShareButton jazz={jazzMode} />}
+    </>
+  )
   return (
     <>
       {isBoard ? (
@@ -725,43 +739,37 @@ function HarnessCanvasInner({
       ) : (
         <ListView />
       )}
-      {/*
-        Always-mounted chrome: toolbar (with view dropdown), save
-        status badge, slide-related surfaces. NodeSurfaceHost stays
-        mounted everywhere so the modal editor opens from any view.
-      */}
-      {!presenting && <HarnessToolbar local={!canCollab} />}
-      {/* Unified location bar: [Board] › … › [Leaf ✎]. Web mounts it here as a
-          canvas overlay, above the surface backdrop so it stays crisp +
-          interactive while a sheet is open; desktop renders it in the reserved
-          title bar (see SidebarLabel), which the backdrop never covers. */}
-      {!presenting && !isTauri() && (jazzMode ? (
-        <a href="/boards" className="absolute left-4 top-4 z-[60] rounded-md border bg-background/80 px-3 py-2 text-xs font-medium backdrop-blur">
-          ← {t("Boards")}
-        </a>
+      {/* The private web navigation and toolbar share one stacking context
+          below modal portals. Narrow windows put the scrollable tool tray
+          on its own row rather than covering navigation or board actions. */}
+      {jazzWeb ? (
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-40">
+          <div className="flex flex-wrap items-center gap-2 px-4 py-3">
+            {!presenting && (
+              <a href="/boards" className="pointer-events-auto rounded-md border bg-background/80 px-3 py-2 text-xs font-medium backdrop-blur">
+                ← {t("Boards")}
+              </a>
+            )}
+            <div className="pointer-events-auto ml-auto flex min-w-0 max-w-full flex-wrap items-center justify-end gap-2">
+              {boardActions}
+            </div>
+          </div>
+          {!presenting && <HarnessToolbar local={!canCollab} responsiveWeb />}
+        </div>
       ) : (
-        <BoardBreadcrumb
-          local={!canCollab}
-          className="absolute left-14 top-4 z-[60] max-w-[calc(100vw-8rem)]"
-        />
-      ))}
-      {/*
-        Top-right chrome row: save status + share button live in one
-        flex container so they never overlap (z-stack collisions cost
-        us once already). Each child decides whether to render itself
-        — the container is invisible when empty.
-      */}
-      <div className="absolute right-3 top-3 z-50 flex items-center gap-2">
-        {canCollab && !jazzMode && <HarnessPeerChip />}
-        <HarnessReadonlyChip />
-        {/* Local boards have no collab chrome, so surface an explicit
-            "On device" badge so they're not mistaken for synced. */}
-        {!canCollab && <BoardKindBadge kind="local-only" />}
-        {jazzMode && !presenting && <JazzLogoutButton />}
-        {canCollab && !jazzMode && <HarnessCollabStatus />}
-        {canCollab && jazzMode && <NativeBoardDataControl />}
-        {canCollab && <ShareButton jazz={jazzMode} />}
-      </div>
+        <>
+          {!presenting && <HarnessToolbar local={!canCollab} />}
+          {!presenting && !isTauri() && (
+            <BoardBreadcrumb
+              local={!canCollab}
+              className="absolute left-14 top-4 z-[60] max-w-[calc(100vw-8rem)]"
+            />
+          )}
+          <div className="absolute right-3 top-3 z-50 flex items-center gap-2">
+            {boardActions}
+          </div>
+        </>
+      )}
       <NodeSurfaceHost />
       <SlidesSheet />
       <PresentationOverlay />
